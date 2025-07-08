@@ -1,0 +1,62 @@
+.container {
+  :global(.ant-picker-calendar .ant-picker-panel table.ant-picker-content) {
+    border-collapse: collapse;
+    border: 1px solid #969696;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-panel .ant-picker-body th) {
+    text-align: left;
+    border: 1px solid #969696;
+    border-collapse: collapse;
+    padding: 12px 8px;
+    color: #969696;
+    font-size: 12px;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-panel .ant-picker-body td) {
+    border: 1px solid #969696;
+    border-collapse: collapse;
+    text-align: left;
+    cursor: auto;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-calendar-date) {
+    margin: unset;
+    border-top: unset;
+    min-height: 164px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-panel .ant-picker-body td.ant-picker-cell) {
+    font-size: 16px;
+    color: #969696;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-panel .ant-picker-body td.ant-picker-cell.ant-picker-cell-in-view) {
+    background-color: #032A3F;
+    color: white;
+  }
+  :global(.ant-picker-calendar .ant-picker-cell:hover:not(.ant-picker-cell-selected):not(.ant-picker-cell-range-start):not(.ant-picker-cell-range-end):not(.ant-picker-cell-disabled) .ant-picker-cell-inner) {
+    background-color: unset;
+  }
+  :global(.ant-picker-calendar .ant-picker-panel .ant-picker-body ) {
+    padding: 0;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-panel) {
+    background-color: unset;
+  }
+  :global(.ant-picker-calendar) {
+    background-color: unset;
+  }
+  :global(.ant-picker-calendar.ant-picker-calendar-full .ant-picker-calendar-date-content) {
+    height: unset;
+  }
+}
+.tasks {
+  font-size: 10px;
+  margin-bottom: 8px;
+  li {
+    margin-top: 4px;
+    border-radius: 4px;
+    padding: 3px 2px;
+    font-weight: 600;
+    width: fit-content;
+  }
+}

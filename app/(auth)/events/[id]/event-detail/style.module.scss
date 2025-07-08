@@ -1,0 +1,125 @@
+.container {
+  .search {
+    border: unset;
+    width: 281px;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  :global(.ant-card) {
+    line-height: unset;
+    color: #fff;
+  }
+  .locationDate {
+    margin-bottom: 20px;
+    .subtitle {
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .value {
+      font-size: 16px;
+    }
+  }
+  .note {
+    .subtitle {
+      color: rgba(255, 255, 255, 0.7);
+    }
+  }
+}
+.title {
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 1.7rem;
+}
+.title2 {
+  font-weight: 600;
+  font-size: 24px;
+}
+.eventName {
+  font-size: 24px;
+  font-weight: 600;
+}
+.eventType {
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+  font-weight: normal;
+}
+.right {
+  width: 304px;
+}
+.equiment {
+  background-color: #012031;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  .title {
+    font-size: 16px;
+  }
+  svg {
+    margin-right: 12px;
+  }
+  .value {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.9)
+  }
+}
+.budget {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 32px;
+  .title {
+    font-size: 16px;
+  }
+  .value {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+.tool {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  img {
+    margin-right: 10px;
+  }
+  .title {
+    font-size: 16px;
+  }
+  .value {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+.task {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  svg {
+    margin-right: 10px;
+  }
+  .title {
+    font-size: 16px;
+  }
+  .value {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+.pending {
+  background-color: rgba(239, 255, 93, 0.1);
+  color: #EFFF5D;
+  border: 1px solid #EFFF5D;
+  padding: 2px 10px;
+  border-radius: 4px;
+}
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+.header {
+  svg {
+    cursor: pointer;
+  }
+}

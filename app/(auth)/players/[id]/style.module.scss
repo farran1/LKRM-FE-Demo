@@ -1,0 +1,170 @@
+.container {
+  .search {
+    border: unset;
+    width: 281px;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  :global(.ant-card) {
+    line-height: unset;
+    color: #fff;
+  }
+}
+.playerName {
+  font-weight: 600;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.title {
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 1.7rem;
+}
+.title2 {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.right {
+  width: 304px;
+}
+.stateGeneral {
+  .title {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .value {
+    font-size: 24px;
+    font-weight: 600;
+  }
+  .percent {
+    font-size: 12px;
+  }
+}
+.chart {
+  .titleWrapper {
+    margin-bottom: 16px;
+  }
+  .title {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .legend {
+    display: flex;
+    gap: 32px;
+    .pointGame {
+      width: 10px;
+      display: inline-block;
+      height: 10px;
+      border-radius: 50%;
+      background-color: white;
+    }
+    .pointTraining {
+      width: 10px;
+      display: inline-block;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #AEC7ED;
+    }
+  }
+}
+.offensiveStats {
+  height: 100%;
+  :global(.ant-col) {
+    font-size: 12px;
+    margin-top: 8px;
+  }
+}
+.profile {
+  text-align: center;
+  .avatar {
+    margin-bottom: 16px;
+    svg {
+      border-radius: 50%;
+    }
+    img {
+      border-radius: 50%;
+      width: 100px;
+      height: 100px;
+    }
+  }
+  .position {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .name {
+    font-size: 16px;
+    font-weight: 500;
+  }
+}
+.personalInfo {
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-size: 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+  margin-bottom: 32px;
+  .item {
+    display: flex;
+    justify-content: space-between;
+    padding-block: 12px;
+  }
+  .item:first-child {
+    padding-top: 0;
+  }
+  .item:last-child {
+    padding-bottom: 0;
+  }
+  .item + .item {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    box-sizing: border-box;
+  }
+  .value {
+    font-size: bold;
+  }
+}
+.notes {
+  margin-bottom: 32px;
+  .title2 {
+    margin-bottom: 0;
+  }
+  .note {
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    font-size: 12px;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  .author {
+    font-weight: bold;
+    text-align: right;
+    margin-top: 10px;
+  }
+  .note + .note {
+    margin-top: 8px;
+  }
+}
+.goals {
+  .title2 {
+    margin-bottom: 0;
+  }
+  .goal {
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    font-size: 12px;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  .author {
+    font-weight: bold;
+    text-align: right;
+    margin-top: 10px;
+  }
+  .goal + .goal {
+    margin-top: 8px;
+  }
+}
+.addIcon {
+  cursor: pointer;
+}

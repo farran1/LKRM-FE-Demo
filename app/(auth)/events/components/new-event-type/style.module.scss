@@ -1,0 +1,14 @@
+.container {
+  :global(.ant-modal-content) {
+    background-color: #073853 !important;
+  }
+}
+.title {
+  font-weight: 600;
+  font-size: 20px;
+}
+.header {
+  svg {
+    cursor: pointer;
+  }
+}

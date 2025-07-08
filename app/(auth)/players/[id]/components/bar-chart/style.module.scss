@@ -1,0 +1,33 @@
+.titleWrapper {
+  margin-bottom: 16px;
+}
+.title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.legend {
+  display: flex;
+  gap: 32px;
+  .pointHigh {
+    width: 10px;
+    display: inline-block;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #42966B;
+  }
+  .pointMederate {
+    width: 10px;
+    display: inline-block;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #EFFF5D;
+  }
+  .pointLow {
+    width: 10px;
+    display: inline-block;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #DA2F36;
+  }
+}

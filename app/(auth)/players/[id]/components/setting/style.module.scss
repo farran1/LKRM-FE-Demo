@@ -1,0 +1,18 @@
+.setting {
+  cursor: pointer;
+}
+.menu {
+  min-width: 225px !important;
+  :global(.ant-dropdown-menu) {
+    background-color: #054C74 !important;
+    border-radius: 12px !important;
+    padding: 8px !important;
+  }
+  :global(.ant-dropdown-menu-item) {
+    padding: 12px !important;
+  }
+  :global(.ant-dropdown-menu-item:hover) {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+  }
+}

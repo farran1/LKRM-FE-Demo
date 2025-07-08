@@ -1,0 +1,38 @@
+.container {
+  :global(.ant-modal-content) {
+    background-color: #032A3F !important;
+  }
+  .radioGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .option {
+    display: flex;
+    align-items: flex-start;
+    background: #002032;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .optionTitle {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .optionDesc {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+.title {
+  font-weight: 700;
+  font-size: 20px;
+}
+.btnCancel {
+  width: 100%;
+}
+.header {
+  margin-bottom: 16px !important;
+}

@@ -1,0 +1,62 @@
+.title {
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1.7rem;
+}
+.container {
+  .search {
+    border: unset;
+    width: 281px;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .filter {
+    background-color: rgba(255, 255, 255, 0.1);
+    &.active {
+
+    }
+  }
+  .sort {
+    background-color: rgba(255, 255, 255, 0.1);
+    &.active {
+      
+    }
+  }
+  :global(.ant-table-wrapper table ) {
+    border-radius: 8px;
+  }
+}
+.priority {
+  padding: 4px 8px;
+  border-radius: 4px;
+  &.High {
+    background-color: #DA2F36;
+  }
+  &.Medium {
+    background-color: #FF9800;
+  }
+  &.Low {
+    background-color: #1D75D0;
+  }
+}
+.header {
+  svg {
+    cursor: pointer;
+  }
+}
+.monthControll {
+  display: flex;
+  align-items: center;
+  font-size: 20px;
+  font-weight: 500;
+  gap: 10px;
+}
+.btnMonth {
+  cursor: pointer;
+  padding: 0 8px;
+  &:hover {
+    color: #1c66b4;
+  }
+}
+.month {
+  width: 160px;
+}

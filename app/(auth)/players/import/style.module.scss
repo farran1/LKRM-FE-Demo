@@ -1,0 +1,35 @@
+.container {
+  .download {
+    background-color: rgba(7, 56, 83, 0.4);
+    border-radius: 8px;
+    padding: 8px;
+    border: none;
+  }
+  .submit {
+    &:disabled {
+      border: none;
+      background-color: rgba(29, 117, 208, 0.5);
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+  .stepWrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+}
+.title {
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 1.7rem;
+}
+.step {
+  &:after {
+    content: '';
+    border: 1px solid white;
+  }
+}
+.tepPoint {
+  text-align: center;
+}

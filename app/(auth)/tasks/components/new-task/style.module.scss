@@ -1,0 +1,28 @@
+.drawer {
+  background-color: #073853 !important;
+  :global(.ant-drawer-header) {
+    display: none !important;
+  }
+  :global(.ant-input-outlined) {
+    background-color: unset;
+  }
+  :global(.ant-form-item) {
+    margin-bottom: 28px;
+  }
+  :global(.ant-drawer-body) {
+    padding-bottom: 24px !important;
+  }
+}
+.title {
+  font-weight: 600;
+  font-size: 32px;
+}
+.header {
+  svg {
+    cursor: pointer;
+  }
+}
+.subtitle {
+  font-weight: 500;
+  margin-bottom: 16px;
+}

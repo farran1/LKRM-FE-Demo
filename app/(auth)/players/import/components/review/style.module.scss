@@ -1,0 +1,25 @@
+.container {
+  :global(.ant-table-wrapper .ant-table-cell) {
+    padding: 0;
+  }
+  :global(.ant-table-wrapper .ant-table-thead>tr>th) {
+    padding: 16px;
+  }
+  :global(.ant-table-cell:has(.cellError)) {
+    background: #550a17 !important;
+    &:hover {
+      background-color: #6d0e1e !important;
+    }
+  }
+  :global(.ant-table-placeholder .ant-table-cell:has(.ant-table-expanded-row-fixed)) {
+    padding: 16px
+  }
+}
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+.cell {
+  padding: 16px;
+}

@@ -1,0 +1,37 @@
+.title {
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1.7rem;
+}
+.container {
+  .search {
+    border: unset;
+    width: 281px;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .sort {
+    background-color: rgba(255, 255, 255, 0.1);
+    &.active {
+      
+    }
+  }
+  .filter {
+    background-color: rgba(255, 255, 255, 0.1);
+    &.active {
+
+    }
+  }
+  :global(.ant-table-wrapper table ) {
+    border-radius: 8px;
+  }
+}
+.header {
+  svg {
+    cursor: pointer;
+  }
+}
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}

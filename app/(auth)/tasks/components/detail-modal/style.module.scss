@@ -1,0 +1,55 @@
+.container {
+  :global(.ant-modal-content) {
+    background-color: #073853 !important;
+  }
+  :global(.ant-modal-body) {
+    font-size: 12px;
+  }
+}
+.title {
+  font-weight: 600;
+  font-size: 20px;
+}
+.header {
+  svg {
+    cursor: pointer;
+  }
+}
+.subtitle {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.sectionAssignee {
+  margin-bottom: 16px;
+  .header {
+    margin-bottom: 12px;
+    .title {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+    }
+    svg {
+      margin-right: 10px;
+    }
+  }
+}
+.priority {
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+  &.High {
+    background-color: #DA2F36;
+  }
+  &.Medium {
+    background-color: #FF9800;
+  }
+  &.Low {
+    background-color: #1D75D0;
+  }
+}
+.edit {
+  font-size: 20px;
+  &:hover {
+    color: #1D75D0;
+  }
+}

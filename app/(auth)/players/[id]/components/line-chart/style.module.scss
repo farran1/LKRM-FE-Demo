@@ -1,0 +1,26 @@
+.titleWrapper {
+  margin-bottom: 16px;
+}
+.title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.legend {
+  display: flex;
+  gap: 32px;
+  .pointGame {
+    width: 10px;
+    display: inline-block;
+    height: 10px;
+    border-radius: 50%;
+    background-color: white;
+  }
+  .pointTraining {
+    width: 10px;
+    display: inline-block;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #AEC7ED;
+  }
+}

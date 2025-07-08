@@ -1,0 +1,55 @@
+.container {
+  .btnOutline {
+    font-size: 12px;
+    padding: 2px 28px;
+    font-weight: normal;
+    height: 28px;
+    border-color: white;
+    color: white;
+    &:disabled {
+      background-color: transparent;
+      border-color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+}
+.title {
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 1.7rem;
+}
+.title2 {
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.2rem;
+  margin-bottom: 24px;
+}
+.card {
+  background-color: rgba(7, 56, 83, 0.4);
+  border-radius: 16px;
+  padding: 24px;
+}
+.avatar {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  background-color: #FFFFFF;
+  margin-bottom: 12px;
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+}
+.subtitle {
+  font-weight: 600;
+  font-size: 14px;
+}

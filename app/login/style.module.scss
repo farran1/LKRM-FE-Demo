@@ -1,0 +1,80 @@
+.container {
+  display: flex;
+  width: 100%;
+  :global(.ant-input-outlined),
+  :global(.ant-input-outlined:hover),
+  :global(.ant-input-outlined:focus-within) {
+    background-color: transparent;
+  }
+  :global(.ant-form-vertical .ant-form-item:not(.ant-form-item-horizontal) .ant-form-item-label) {
+    padding: 0;
+  }
+  :global(.ant-form-item .ant-form-item-label >label) {
+    font-size: 13px;
+  }
+}
+.background {
+  height: 100vh;
+  img {
+    width: auto;
+    height: 100%;
+  }
+}
+.form_wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  background: linear-gradient(#022133, #025A8A);
+}
+.form {
+  width: 80%;
+  // margin: 197px auto 0;
+  max-width: 500px;
+  min-width: 360px;
+}
+.logo {
+  text-align: center;
+  .des {
+    font-size: 16px;
+    font-weight: 500;
+    color: rgb(255, 255, 255, 0.7);
+    margin-bottom: 32px;
+  }
+}
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ccc;
+}
+
+.divider:not(:empty)::before {
+  margin-right: 0.75em;
+}
+
+.divider:not(:empty)::after {
+  margin-left: 0.75em;
+}
+
+.divider_text {
+  font-weight: bold;
+}
+.forgot_password {
+  color: #fff;
+  text-align: right;
+  font-size: 14px;
+  text-decoration: underline;
+  display: block;
+  margin-bottom: 20px;
+  &:hover {
+    color: #1D75D0;
+    text-decoration: underline;
+  }
+}
