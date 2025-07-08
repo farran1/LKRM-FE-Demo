@@ -1,0 +1,2 @@
+export const SESSION_EXPIRE = '4h'
+export const SESSION_MILISECOND_EXPIRE = 14400000

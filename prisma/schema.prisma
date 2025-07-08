@@ -1,0 +1,291 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  relationMode = "prisma" // disables FK enforcement in DB
+}
+
+enum Role {
+  COACH
+  ADMIN
+  TRAINEE
+}
+
+enum Location {
+  HOME
+  AWAY
+}
+
+enum Status {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String
+  email     String   @unique
+  password  String
+  isActive  Boolean  @default(false)
+  role      Role
+  profileId Int     @unique
+  profile   Profile @relation(fields: [profileId], references: [id], map: "no_fk_profiles")
+  createdAt DateTime @default(now())
+  createdBy Int
+  updatedAt DateTime @updatedAt
+  updatedBy Int
+  notes     PlayerNote[]
+  goals     PlayerGoal[]
+
+  // @@index([profileId])
+
+  @@map("users")
+}
+
+model Profile {
+  id          Int      @id @default(autoincrement())
+  user        User?
+  firstName   String
+  lastName    String
+  email       String   @unique
+  phoneNumber String
+  institute   String
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  @@map("profiles")
+}
+
+model EventType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  color       String
+  txtColor    String   @default("#ffffff")
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+  events      Event[]
+
+  @@map("eventTypes")
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  eventTypeId Int
+  eventType   EventType @relation(fields: [eventTypeId], references: [id], map: "no_fk_eventTypes")
+  name        String
+  startTime   DateTime
+  endTime     DateTime?
+  isRepeat    Boolean  @default(false)
+  occurence   Int @default(0)
+  location    Location
+  venue       String
+  isNotice    Boolean @default(false)
+  oppositionTeam String?
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  playerEvents      PlayerEvent[]
+  volunteerEvents   VolunteerEvent[]
+
+  @@map("events")
+  @@index(name)
+  @@index(eventTypeId)
+}
+
+model Position {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+  players     Player[]
+
+  @@map("positions")
+}
+
+model Player {
+  id          Int      @id @default(autoincrement())
+  positionId  Int
+  position    Position @relation(fields: [positionId], references: [id], map: "no_fk")
+  avatar      String?
+  name        String
+  jersey      String
+  phoneNumber String
+  weight      Float
+  height      Float
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  players        PlayerEvent[]
+  tasks          PlayerTask[]
+  notes          PlayerNote[]
+  goals          PlayerGoal[]
+
+  @@map("players")
+  @@index(name)
+  @@index(positionId)
+  @@index(createdBy)
+}
+
+model PlayerImport {
+  id          Int      @id @default(autoincrement())
+  importId    String
+  position    String?
+  name        String?
+  jersey      String?
+  phoneNumber String?
+  weight      String?
+  height      String?
+  error       String?
+  createdAt   DateTime @default(now())
+  createdBy   Int
+
+  @@map("player_imports")
+  @@index(createdBy)
+}
+
+model PlayerNote {
+  id          Int      @id @default(autoincrement())
+  playerId    Int
+  player      Player @relation(fields: [playerId], references: [id], map: "no_fk")
+  note        String
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  createdUser User @relation(fields: [createdBy], references: [id], map: "no_fk_profiles")
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  @@map("player_notes")
+  @@index(playerId)
+  @@index(createdBy)
+}
+
+model PlayerGoal {
+  id          Int      @id @default(autoincrement())
+  playerId    Int
+  player      Player @relation(fields: [playerId], references: [id], map: "no_fk")
+  note        String
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  createdUser User @relation(fields: [createdBy], references: [id], map: "no_fk_profiles")
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  @@map("player_goals")
+  @@index(playerId)
+  @@index(createdBy)
+}
+
+model PlayerEvent {
+  playerId    Int
+  eventId     Int
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  player   Player @relation(fields: [playerId], references: [id])
+  event    Event  @relation(fields: [eventId], references: [id])
+
+  @@id([playerId, eventId]) // Composite primary key
+  @@map("player_events")
+}
+
+model Volunteer {
+  id          Int      @id @default(autoincrement())
+  avatar      String?
+  name        String
+  phoneNumber String
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  volunteers   VolunteerEvent[]
+
+  @@map("volunteers")
+  @@index(name)
+}
+
+model VolunteerEvent {
+  volunteerId Int
+  eventId     Int
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id])
+  event       Event @relation(fields: [eventId], references: [id])
+
+  @@id([volunteerId, eventId]) // Composite primary key
+  @@map("volunteer_events")
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  dueDate     DateTime?
+  priorityId  Int
+  priority    TaskPriority @relation(fields: [priorityId], references: [id], map: "no_fk")
+  status      Status @default(TODO)
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  playerTasks  PlayerTask[]
+
+  @@map("tasks")
+  @@index(name)
+}
+
+model PlayerTask {
+  taskId      Int
+  playerId    Int
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  task     Task  @relation(fields: [taskId], references: [id])
+  player   Player @relation(fields: [playerId], references: [id])
+
+  @@id([taskId, playerId]) // Composite primary key
+  @@map("player_tasks")
+}
+
+model TaskPriority {
+  id          Int      @id @default(autoincrement())
+  name        String
+  weight      Int
+  createdAt   DateTime @default(now())
+  createdBy   Int
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int
+
+  tasks       Task[]
+
+  @@index(weight)
+  @@map("task_priorities")
+}

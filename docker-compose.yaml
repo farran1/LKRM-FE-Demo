@@ -1,0 +1,30 @@
+services:
+  # lkmr_be:
+  #   build: .
+  #   image: lkmr_be
+  #   container_name: lkmr_be
+  #   restart: unless-stopped
+  #   ports:
+  #     - '3001:3000'
+  #   depends_on:
+  #     - lkmr_db
+  #   volumes:
+  #     - .:/app
+  #     - /app/node_modules
+  #     - ./uploads:/app/uploads
+
+  lkmr_db:
+    image: postgres:17
+    container_name: lkmr_db
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lkmr
+    volumes:
+      - lkmr_db:/var/lib/postgresql/data
+
+volumes:
+  lkmr_db:
