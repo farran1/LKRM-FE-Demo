@@ -1,0 +1,17 @@
+.container {
+  display: flex;
+  span {
+    width: 15px;
+    height: 2px;
+    background-color: rgba(255, 255, 255);
+  }
+  span:first-child {
+    background-color: rgba(255, 255, 255);
+  }
+  span:nth-child(2) {
+    background-color: rgba(255, 255, 255, 0.4);
+  }
+  span:last-child {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}

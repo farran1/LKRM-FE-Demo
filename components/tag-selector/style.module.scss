@@ -1,0 +1,8 @@
+.tag {
+  &:global(.ant-tag) {
+    border-color: white;
+    border-radius: 4px;
+    padding: 4px 12px;
+    margin-bottom: 10px;
+  }
+}

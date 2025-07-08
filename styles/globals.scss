@@ -1,0 +1,20 @@
+@import 'antd/dist/reset.css';
+
+:root {
+  --header-height: 64px;
+  --sidebar-width: 256px;
+  --font-poppins: "Poppins", "Poppins Fallback";
+  --font-inter: "Inter", "Inter Fallback";
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  height: 100vh;
+  color: #fff;
+  overflow: hidden;
+}

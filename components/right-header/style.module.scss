@@ -1,0 +1,14 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  svg {
+    cursor: pointer;
+  }
+}
+.menu {
+  min-width: 150px !important;
+  :global(.ant-dropdown-menu) {
+    background-color: #005888 !important;
+  }
+}
