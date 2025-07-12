@@ -18,14 +18,17 @@ import useSWR from 'swr'
 import moment from 'moment'
 import classNames from 'classnames'
 import NewEvent from './components/new-event'
-import Filter from '@/app/(auth)/events/components/filter'
+// DEV-ONLY: Changed from alias import to relative path to fix module not found error in dev mode. Revert to alias if project structure changes back.
+import Filter from './components/filter'
+// DEV-ONLY: Changed from alias import to relative path to fix module not found error in dev mode. Revert to alias if project structure changes back.
+import EventDetailModal from './components/event-detail-modal'
+// DEV-ONLY: Changed from alias import to relative path to fix module not found error in dev mode. Revert to alias if project structure changes back.
+import EditEvent from './components/edit-event'
 import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons'
 import CalendarView from './components/calendar'
 import dayjs, { Dayjs } from 'dayjs'
 import LeftIcon from '@/components/icon/left.svg'
 import RightIcon from '@/components/icon/right.svg'
-import EventDetailModal from '@/app/(auth)/events/components/event-detail-modal'
-import EditEvent from '@/app/(auth)/events/components/edit-event'
 
 function Event() {
   const searchParams = useSearchParams()

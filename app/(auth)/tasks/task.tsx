@@ -23,11 +23,11 @@ import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import LeftIcon from '@/components/icon/left.svg'
 import RightIcon from '@/components/icon/right.svg'
-import NewTask from '@/app/(auth)/tasks/components/new-task'
+import NewTask from './components/new-task'
 import CalendarView from './components/calendar'
 import KanbanView from './components/kanban'
 import DetailModal from './components/detail-modal'
-import EditTask from '@/app/(auth)/tasks/components/edit-task'
+import EditTask from './components/edit-task'
 
 function Tasks() {
   const searchParams = useSearchParams()

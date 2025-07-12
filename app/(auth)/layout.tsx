@@ -9,7 +9,8 @@ import style from './style.module.scss'
 import RightHeader from '@/components/right-header'
 import { SWRConfig } from 'swr'
 import { fetcher } from '@/services/api'
-import { menus } from '@/utils/menu'
+// DEV-ONLY: Changed from alias import to relative path to fix module not found error in dev mode. Revert to alias if project structure changes back.
+import { menus } from '../../utils/menu'
 
 const { Header, Sider, Content, Footer } = Layout
 

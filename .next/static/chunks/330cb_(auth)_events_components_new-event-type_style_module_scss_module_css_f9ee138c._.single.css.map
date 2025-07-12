@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/(auth)/events/components/new-event-type/style.module.scss.module.css"],"sourcesContent":[".container :global(.ant-modal-content){background-color:#073853 !important}.title{font-weight:600;font-size:20px}.header svg{cursor:pointer}"],"names":[],"mappings":"AAAA;;;;AAA2E;;;;;AAAsC"}}]
+}

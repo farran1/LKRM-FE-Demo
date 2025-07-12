@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/(auth)/tasks/components/detail-modal/style.module.scss.module.css"],"sourcesContent":[".container :global(.ant-modal-content){background-color:#073853 !important}.container :global(.ant-modal-body){font-size:12px}.title{font-weight:600;font-size:20px}.header svg{cursor:pointer}.subtitle{font-weight:600;margin-bottom:10px}.sectionAssignee{margin-bottom:16px}.sectionAssignee .header{margin-bottom:12px}.sectionAssignee .header .title{display:flex;align-items:center;font-size:14px}.sectionAssignee .header svg{margin-right:10px}.priority{padding:4px 8px;border-radius:4px;margin-right:8px}.priority.High{background-color:#da2f36}.priority.Medium{background-color:#ff9800}.priority.Low{background-color:#1d75d0}.edit{font-size:20px}.edit:hover{color:#1d75d0}"],"names":[],"mappings":"AAAA;;;;AAA2E;;;;AAAmD;;;;;AAAsC;;;;AAA2B;;;;;AAA6C;;;;AAAoC;;;;AAA4C;;;;;;AAA+E;;;;AAA+C;;;;;;AAA6D;;;;AAAwC;;;;AAA0C;;;;AAAuC;;;;AAAqB"}}]
+}

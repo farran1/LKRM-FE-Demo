@@ -1,0 +1,36 @@
+/* [project]/app/(auth)/players/components/filter/style.module.scss.module.css [app-client] (css) */
+.style-module-scss-module__-CpjEW__drawer {
+  background-color: #073853 !important;
+}
+
+.style-module-scss-module__-CpjEW__drawer .ant-drawer-header {
+  display: none !important;
+}
+
+.style-module-scss-module__-CpjEW__drawer .ant-input-outlined {
+  background-color: unset;
+}
+
+.style-module-scss-module__-CpjEW__drawer .ant-form-item {
+  margin-bottom: 28px;
+}
+
+.style-module-scss-module__-CpjEW__drawer .ant-drawer-body {
+  padding-bottom: 24px !important;
+}
+
+.style-module-scss-module__-CpjEW__title {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.style-module-scss-module__-CpjEW__header svg {
+  cursor: pointer;
+}
+
+.style-module-scss-module__-CpjEW__subtitle {
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+/*# sourceMappingURL=app_%28auth%29_players_components_filter_style_module_scss_module_css_f9ee138c._.single.css.map*/

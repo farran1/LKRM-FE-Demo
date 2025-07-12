@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/(auth)/events/components/edit-event/style.module.scss.module.css"],"sourcesContent":[".drawer{background-color:#073853 !important}.drawer :global(.ant-drawer-header){display:none !important}.drawer :global(.ant-input-outlined){background-color:unset}.drawer :global(.ant-form-item){margin-bottom:28px}.drawer :global(.ant-drawer-body){padding-bottom:24px !important}.title{font-weight:600;font-size:32px}.header svg{cursor:pointer}.subtitle{font-weight:500;margin-bottom:16px}.addEventType{cursor:pointer;margin-left:8px}.addEventType:hover svg{color:#3e86ca}"],"names":[],"mappings":"AAAA;;;;AAA4C;;;;AAA4D;;;;AAA4D;;;;AAAmD;;;;AAAiE;;;;;AAAsC;;;;AAA2B;;;;;AAA6C;;;;;AAA6C"}}]
+}

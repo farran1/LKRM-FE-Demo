@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/app/%28auth%29/players/style.module.scss.module.css"],"sourcesContent":[".title{font-weight:500;font-size:32px;line-height:1.7rem}.container .search{border:unset;width:281px;background-color:hsla(0,0%,100%,.1)}.container .sort{background-color:hsla(0,0%,100%,.1)}.container .filter{background-color:hsla(0,0%,100%,.1)}.container :global(.ant-table-wrapper table){border-radius:8px}.header svg{cursor:pointer}.avatar{width:24px;height:24px;border-radius:50%}"],"names":[],"mappings":"AAAA;;;;;;AAAyD;;;;;;AAAgF;;;;AAA4G;;;;AAA+D;;;;AAA2B","debugId":null}},
+    {"offset": {"line": 33, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/app/%28auth%29/players/components/filter/style.module.scss.module.css"],"sourcesContent":[".drawer{background-color:#073853 !important}.drawer :global(.ant-drawer-header){display:none !important}.drawer :global(.ant-input-outlined){background-color:unset}.drawer :global(.ant-form-item){margin-bottom:28px}.drawer :global(.ant-drawer-body){padding-bottom:24px !important}.title{font-weight:600;font-size:32px}.header svg{cursor:pointer}.subtitle{font-weight:500;margin-bottom:16px}"],"names":[],"mappings":"AAAA;;;;AAA4C;;;;AAA4D;;;;AAA4D;;;;AAAmD;;;;AAAiE;;;;;AAAsC;;;;AAA2B","debugId":null}}]
+}

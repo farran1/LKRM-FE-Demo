@@ -17,13 +17,27 @@ const Login = () => {
   const {loading, setLoading} = useAppStore()
 
   const onSubmit = async (payload: any) => {
+    console.log('onSubmit called with:', payload) // DEV: Debug log to confirm handler is triggered
     setLoading(true)
+    // DEV-ONLY BYPASS: The following block is commented out to allow frontend development without a backend.
+    // This bypasses the real login API and always logs in with a fake token.
+    // To restore original behavior, uncomment the try/catch block below and remove the bypass code.
+    /*
     try {
       const res = await api.post('/api/login', payload)
       login(res.data.token)
       router.push(ROUTES.planner.event)
     } catch (error) {
     }
+    */
+    // BYPASS: Always log in with a fake token and redirect
+    // DEV-ONLY: Set a fake 'access_token' cookie so middleware allows navigation. Remove this for production.
+    document.cookie = 'access_token=dev-token; path=/';
+    console.log('Set access_token cookie for dev bypass')
+    login('dev-token')
+    console.log('Called login, now calling router.push')
+    router.push(ROUTES.planner.event)
+    console.log('Called router.push, now setting loading false')
     setLoading(false)
   }
 

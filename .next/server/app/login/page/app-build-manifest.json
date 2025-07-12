@@ -1,0 +1,27 @@
+{
+  "pages": {
+    "/login/page": [
+      "static/chunks/src_mocks_3ecbfca7._.js",
+      "static/chunks/node_modules_next_c30a19e4._.js",
+      "static/chunks/node_modules_@ant-design_cssinjs_es_8eaef1df._.js",
+      "static/chunks/node_modules_antd_es_5c5de4af._.js",
+      "static/chunks/node_modules_rc-field-form_es_4fb5d7cb._.js",
+      "static/chunks/node_modules_axios_lib_99999129._.js",
+      "static/chunks/node_modules_32fdc68b._.js",
+      "static/chunks/_e1f3f2da._.js",
+      "static/chunks/_4aaf1cbf._.css",
+      "static/chunks/app_layout_tsx_c0237562._.js",
+      "static/chunks/node_modules_d17ce380._.js",
+      "static/chunks/_c12c93ad._.js",
+      "static/chunks/app_login_style_module_scss_module_1ac00748.css",
+      "static/chunks/app_login_page_tsx_f1f5029f._.js",
+      "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_fd44f5a4._.js",
+      "static/chunks/node_modules_next_dist_compiled_2ce9398a._.js",
+      "static/chunks/node_modules_next_dist_client_8f19e6fb._.js",
+      "static/chunks/node_modules_next_dist_2ecbf5fa._.js",
+      "static/chunks/node_modules_@swc_helpers_cjs_00636ac3._.js",
+      "static/chunks/_e69f0d32._.js",
+      "static/chunks/_93808211._.js"
+    ]
+  }
+}

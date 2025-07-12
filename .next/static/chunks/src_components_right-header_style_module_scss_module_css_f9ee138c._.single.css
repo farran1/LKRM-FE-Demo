@@ -1,0 +1,20 @@
+/* [project]/src/components/right-header/style.module.scss.module.css [app-client] (css) */
+.style-module-scss-module__tmf5tW__container {
+  align-items: center;
+  gap: 12px;
+  display: flex;
+}
+
+.style-module-scss-module__tmf5tW__container svg {
+  cursor: pointer;
+}
+
+.style-module-scss-module__tmf5tW__menu {
+  min-width: 150px !important;
+}
+
+.style-module-scss-module__tmf5tW__menu .ant-dropdown-menu {
+  background-color: #005888 !important;
+}
+
+/*# sourceMappingURL=src_components_right-header_style_module_scss_module_css_f9ee138c._.single.css.map*/
