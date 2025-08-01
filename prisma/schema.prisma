@@ -102,6 +102,7 @@ model Event {
 
   playerEvents      PlayerEvent[]
   volunteerEvents   VolunteerEvent[]
+  tasks             Task[]
 
   @@map("events")
   @@index(name)
@@ -249,6 +250,8 @@ model Task {
   priorityId  Int
   priority    TaskPriority @relation(fields: [priorityId], references: [id], map: "no_fk")
   status      Status @default(TODO)
+  eventId     Int?
+  event       Event? @relation(fields: [eventId], references: [id])
   createdAt   DateTime @default(now())
   createdBy   Int
   updatedAt   DateTime @updatedAt

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 7, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/app/layout.tsx"],"sourcesContent":["import React from 'react';\r\nimport AntdWrapper from '@/components/antd-wrapper';\r\n\r\nexport default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {\r\n  return (\r\n    <html lang=\"en\">\r\n    <body>\r\n      <AntdWrapper>\r\n        {children}\r\n      </AntdWrapper>\r\n    </body>\r\n    </html>\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;;;;;;;;AAGe,SAAS,WAAW,EAAE,QAAQ,EAA2C;IACtF,qBACE,8OAAC;QAAK,MAAK;kBACX,cAAA,8OAAC;sBACC,cAAA,8OAAC;0BACE;;;;;;;;;;;;;;;;AAKT","debugId":null}},
-    {"offset": {"line": 45, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = require('../../module.compiled').vendored[\n  'react-rsc'\n].ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":";AAAAA,OAAOC,OAAO,GAAGC,QAAQ,4HAAyBC,QAAQ,CACxD,YACD,CAACC,kBAAkB","ignoreList":[0],"debugId":null}}]
-}

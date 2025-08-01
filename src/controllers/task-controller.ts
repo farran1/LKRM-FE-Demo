@@ -33,7 +33,7 @@ export default class TaskController {
   }
 
   async getCalendarView(data: any, userId: number, res: Response) {
-    const { name, dueDate, playerIds, priorityId, sortBy, sortDirection, viewMode, startDate, endDate } = data
+    const { name, dueDate, playerIds, priorityId, eventId, status, sortBy, sortDirection, viewMode, startDate, endDate } = data
 
     const filters: any = {}
 
@@ -68,6 +68,14 @@ export default class TaskController {
 
     if (priorityId) {
       filters.priorityId = priorityId
+    }
+
+    if (eventId) {
+      filters.eventId = eventId
+    }
+
+    if (status) {
+      filters.status = status
     }
 
     const [tasks] = await Promise.all([
@@ -79,7 +87,8 @@ export default class TaskController {
               player: true
             }
           },
-          priority: true
+          priority: true,
+          event: true
         }
       }),
     ])
@@ -90,7 +99,7 @@ export default class TaskController {
   }
 
   async getProgressView(data: any, userId: number, res: Response) {
-    const { name, dueDate, playerIds, priorityId, sortBy, sortDirection, viewMode, startDate, endDate } = data
+    const { name, dueDate, playerIds, priorityId, eventId, status, sortBy, sortDirection, viewMode, startDate, endDate } = data
 
     const filters: any = {}
 
@@ -127,56 +136,62 @@ export default class TaskController {
       filters.priorityId = priorityId
     }
 
-    const todoFilters = structuredClone(filters)
-    todoFilters.status = 'TODO'
-    const inprogressFilters = structuredClone(filters)
-    inprogressFilters.status = 'IN_PROGRESS'
-    const doneFilters = structuredClone(filters)
-    doneFilters.status = 'DONE'
+    if (eventId) {
+      filters.eventId = eventId
+    }
 
-    const [todos, inprogresses, dones] = await Promise.all([
-      db.task.findMany({
-        where: todoFilters,
-        include: {
-          playerTasks: {
-            include: {
-              player: true
-            }
-          },
-          priority: true
-        }
-      }),
-      db.task.findMany({
-        where: inprogressFilters,
-        include: {
-          playerTasks: {
-            include: {
-              player: true
-            }
-          },
-          priority: true
-        }
-      }),
-      db.task.findMany({
-        where: doneFilters,
-        include: {
-          playerTasks: {
-            include: {
-              player: true
-            }
-          },
-          priority: true
-        }
-      }),
-    ])
+    if (status) {
+      filters.status = status
+    }
+
+    const todoTasks = await db.task.findMany({
+      where: { ...filters, status: 'TODO' },
+      include: {
+        playerTasks: {
+          include: {
+            player: true
+          }
+        },
+        priority: true,
+        event: true
+      }
+    })
+
+    const inProgressTasks = await db.task.findMany({
+      where: { ...filters, status: 'IN_PROGRESS' },
+      include: {
+        playerTasks: {
+          include: {
+            player: true
+          }
+        },
+        priority: true,
+        event: true
+      }
+    })
+
+    const doneTasks = await db.task.findMany({
+      where: { ...filters, status: 'DONE' },
+      include: {
+        playerTasks: {
+          include: {
+            player: true
+          }
+        },
+        priority: true,
+        event: true
+      }
+    })
 
     return res.json({
-      todos, inprogresses, dones
+      todoTasks,
+      inProgressTasks,
+      doneTasks
     })
   }
 
   async getListView(data: any, userId: number, res: Response) {
-    const { name, dueDate, playerIds, priorityId, sortBy, sortDirection, viewMode, startDate, endDate } = data
+    const { name, dueDate, playerIds, priorityId, eventId, status, sortBy, sortDirection, viewMode, startDate, endDate } = data
     const page = data.page || 1
     const perPage = data.perPage || 20
     const skip = (page - 1) * perPage
@@ -213,6 +228,14 @@ export default class TaskController {
       filters.priorityId = priorityId
     }
 
+    if (eventId) {
+      filters.eventId = eventId
+    }
+
+    if (status) {
+      filters.status = status
+    }
+
     const sorts: any = {}
     if (sortBy && (!viewMode || viewMode === 'list')) {
       if (sortBy === 'assignee') {
@@ -238,7 +261,8 @@ export default class TaskController {
               player: true
             }
           },
-          priority: true
+          priority: true,
+          event: true
         }
       }),
       db.task.count({ where: filters }),
@@ -250,7 +274,7 @@ export default class TaskController {
         total,
         page,
         perPage,
-        totalPages: Math.ceil(total / perPage),
+        lastPage: Math.ceil(total / perPage),
       },
     })
   }
@@ -273,6 +297,7 @@ export default class TaskController {
       description,
       dueDate,
       priorityId,
+      eventId,
       status,
     } = validation.data
 
@@ -292,6 +317,14 @@ export default class TaskController {
         return res.status(404).json({ error: 'Priority not found' })
       }
 
+      // Validate event if provided
+      if (eventId) {
+        const event = await db.event.findUnique({ where: { id: eventId } })
+        if (!event) {
+          return res.status(404).json({ error: 'Event not found' })
+        }
+      }
+
       const players = await db.player.findMany({ where: { id: { in: playerIds } } })
       if (playerIds && playerIds.length > 0 && players.length != playerIds?.length) {
         return res.status(400).json({ error: 'Asignee is not valid' })
@@ -303,6 +336,7 @@ export default class TaskController {
           description,
           dueDate: isoDueDate,
           priorityId: priority.id,
+          eventId,
           status: status || 'TODO',
           createdBy: userId,
           updatedBy: userId
@@ -326,12 +360,23 @@ export default class TaskController {
         })
       }
 
-      return res.status(201).json({
-        event: newTask
+      const task = await db.task.findUnique({
+        where: { id: newTask.id },
+        include: {
+          playerTasks: {
+            include: {
+              player: true
+            }
+          },
+          priority: true,
+          event: true
+        },
       })
+
+      return res.status(201).json({ task })
     } catch (error) {
-      console.error(error)
-      return res.status(500).json({ error: 'Internal server error' })
+      console.error('Error creating task:', error)
+      return res.status(500).json({ error: 'Internal Server Error' })
     }
   }
 
@@ -368,6 +413,7 @@ export default class TaskController {
         description,
         dueDate,
         priorityId,
+        eventId,
         status,
       } = validation.data
   
@@ -387,6 +433,14 @@ export default class TaskController {
           return res.status(404).json({ error: 'Priority not found' })
         }
 
+        // Validate event if provided
+        if (eventId) {
+          const event = await db.event.findUnique({ where: { id: eventId } })
+          if (!event) {
+            return res.status(404).json({ error: 'Event not found' })
+          }
+        }
+
         const players = await db.player.findMany({ where: { id: { in: playerIds } } })
         if (playerIds && playerIds.length > 0 && players.length != playerIds?.length) {
           return res.status(400).json({ error: 'Asignee is not valid' })
@@ -399,6 +453,7 @@ export default class TaskController {
             description,
             dueDate: isoDueDate,
             priorityId: priority.id,
+            eventId,
             status: status || 'TODO',
             updatedBy: userId
           },
@@ -422,13 +477,24 @@ export default class TaskController {
             data: playerTasks,
           })
         }
-  
-        return res.status(201).json({
-          event: newTask
+
+        const task = await db.task.findUnique({
+          where: { id: newTask.id },
+          include: {
+            playerTasks: {
+              include: {
+                player: true
+              }
+            },
+            priority: true,
+            event: true
+          },
         })
+  
+        return res.status(201).json({ task })
       } catch (error) {
-        console.error(error)
-        return res.status(500).json({ error: 'Internal server error' })
+        console.error('Error updating task:', error)
+        return res.status(500).json({ error: 'Internal Server Error' })
       }
     }
 }

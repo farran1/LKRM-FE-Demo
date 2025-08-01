@@ -3,11 +3,11 @@
 "[project]/src/mocks/handlers.ts [app-client] (ecmascript)": ((__turbopack_context__) => {
 "use strict";
 
-var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+var { k: __turbopack_refresh__, m: module } = __turbopack_context__;
 {
 // DEV-ONLY: MSW handlers for API mocking. Expand as needed for more endpoints.
 __turbopack_context__.s({
-    "handlers": (()=>handlers)
+    "handlers": ()=>handlers
 });
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$http$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/msw/lib/core/http.mjs [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$HttpResponse$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/msw/lib/core/HttpResponse.mjs [app-client] (ecmascript)");
@@ -36,7 +36,7 @@ const handlers = [
                 {
                     id: 2,
                     name: 'Game',
-                    color: '#f44336',
+                    color: '#4ecdc4',
                     txtColor: '#fff'
                 },
                 {
@@ -54,9 +54,24 @@ const handlers = [
             data: [
                 {
                     id: 1,
-                    name: 'Practice 1',
-                    startTime: '2024-07-10T10:00:00Z',
-                    endTime: '2024-07-10T12:00:00Z',
+                    name: 'Eagles vs Hawks',
+                    startTime: '2025-03-15T19:00:00Z',
+                    endTime: '2025-03-15T21:00:00Z',
+                    eventType: {
+                        id: 2,
+                        name: 'Game',
+                        color: '#4ecdc4',
+                        txtColor: '#fff'
+                    },
+                    location: 'HOME',
+                    venue: 'Home Court',
+                    isRepeat: false
+                },
+                {
+                    id: 2,
+                    name: 'Practice Session',
+                    startTime: '2025-03-12T16:00:00Z',
+                    endTime: '2025-03-12T18:00:00Z',
                     eventType: {
                         id: 1,
                         name: 'Practice',
@@ -64,21 +79,8 @@ const handlers = [
                         txtColor: '#fff'
                     },
                     location: 'HOME',
-                    venue: 'Main Field'
-                },
-                {
-                    id: 2,
-                    name: 'Game 1',
-                    startTime: '2024-07-12T15:00:00Z',
-                    endTime: '2024-07-12T17:00:00Z',
-                    eventType: {
-                        id: 2,
-                        name: 'Game',
-                        color: '#f44336',
-                        txtColor: '#fff'
-                    },
-                    location: 'AWAY',
-                    venue: 'Stadium'
+                    venue: 'Training Ground',
+                    isRepeat: false
                 }
             ],
             meta: {
@@ -86,6 +88,37 @@ const handlers = [
                 page: 1,
                 perPage: 20
             }
+        });
+    }),
+    // Mock event players
+    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$http$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["http"].get('/api/events/:id/players', ()=>{
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$HttpResponse$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["HttpResponse"].json({
+            data: [
+                {
+                    id: 1,
+                    name: 'Player One',
+                    position: {
+                        id: 1,
+                        name: 'Forward'
+                    }
+                },
+                {
+                    id: 2,
+                    name: 'Player Two',
+                    position: {
+                        id: 2,
+                        name: 'Goalkeeper'
+                    }
+                },
+                {
+                    id: 3,
+                    name: 'Player Three',
+                    position: {
+                        id: 3,
+                        name: 'Defender'
+                    }
+                }
+            ]
         });
     }),
     // Mock profile
@@ -110,7 +143,6 @@ const handlers = [
                         name: 'Forward'
                     },
                     jersey: '10',
-                    weight: 75,
                     height: 180
                 },
                 {
@@ -121,47 +153,225 @@ const handlers = [
                         name: 'Goalkeeper'
                     },
                     jersey: '1',
-                    weight: 80,
                     height: 185
+                },
+                {
+                    id: 3,
+                    name: 'Player Three',
+                    position: {
+                        id: 3,
+                        name: 'Defender'
+                    },
+                    jersey: '5',
+                    height: 178
                 }
             ],
             meta: {
-                total: 2,
+                total: 3,
                 page: 1,
                 perPage: 20
             }
         });
     }),
-    // Mock tasks
-    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$http$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["http"].get('/api/tasks', ()=>{
+    // Mock positions
+    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$http$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["http"].get('/api/positions', ()=>{
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$HttpResponse$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["HttpResponse"].json({
             data: [
                 {
                     id: 1,
-                    name: 'Task 1',
-                    dueDate: '2024-07-15',
-                    priority: {
-                        id: 1,
-                        weight: 1
-                    },
-                    status: 'TODO'
+                    name: 'Forward'
                 },
                 {
                     id: 2,
-                    name: 'Task 2',
-                    dueDate: '2024-07-20',
-                    priority: {
-                        id: 2,
-                        weight: 2
-                    },
-                    status: 'IN_PROGRESS'
+                    name: 'Goalkeeper'
+                },
+                {
+                    id: 3,
+                    name: 'Defender'
+                },
+                {
+                    id: 4,
+                    name: 'Midfielder'
                 }
-            ],
+            ]
+        });
+    }),
+    // Mock tasks with eventId support
+    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$http$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["http"].get('/api/tasks', (param)=>{
+        let { request } = param;
+        const url = new URL(request.url);
+        const eventId = url.searchParams.get('eventId');
+        const status = url.searchParams.get('status');
+        const priorityId = url.searchParams.get('priorityId');
+        // Mock tasks for game event (eventId = 1)
+        const gameTasks = [
+            {
+                id: 1,
+                name: 'Set up equipment',
+                description: 'Prepare court and equipment for the game',
+                dueDate: '2025-03-15',
+                priority: {
+                    id: 1,
+                    name: 'High',
+                    weight: 1
+                },
+                status: 'TODO',
+                eventId: 1,
+                event: {
+                    id: 1,
+                    name: 'Eagles vs Hawks',
+                    venue: 'Home Court'
+                },
+                playerTasks: [
+                    {
+                        player: {
+                            id: 1,
+                            name: 'Player One'
+                        }
+                    }
+                ]
+            },
+            {
+                id: 2,
+                name: 'Team warm-up',
+                description: 'Complete pre-game warm-up routine',
+                dueDate: '2025-03-15',
+                priority: {
+                    id: 2,
+                    name: 'Medium',
+                    weight: 2
+                },
+                status: 'IN_PROGRESS',
+                eventId: 1,
+                event: {
+                    id: 1,
+                    name: 'Eagles vs Hawks',
+                    venue: 'Home Court'
+                },
+                playerTasks: [
+                    {
+                        player: {
+                            id: 1,
+                            name: 'Player One'
+                        }
+                    },
+                    {
+                        player: {
+                            id: 2,
+                            name: 'Player Two'
+                        }
+                    }
+                ]
+            },
+            {
+                id: 3,
+                name: 'Review game plan',
+                description: 'Final review of strategies and plays',
+                dueDate: '2025-03-15',
+                priority: {
+                    id: 1,
+                    name: 'High',
+                    weight: 1
+                },
+                status: 'DONE',
+                eventId: 1,
+                event: {
+                    id: 1,
+                    name: 'Eagles vs Hawks',
+                    venue: 'Home Court'
+                },
+                playerTasks: []
+            },
+            {
+                id: 4,
+                name: 'Check uniforms',
+                description: 'Ensure all players have proper uniforms',
+                dueDate: '2025-03-15',
+                priority: {
+                    id: 2,
+                    name: 'Medium',
+                    weight: 2
+                },
+                status: 'TODO',
+                eventId: 1,
+                event: {
+                    id: 1,
+                    name: 'Eagles vs Hawks',
+                    venue: 'Home Court'
+                },
+                playerTasks: [
+                    {
+                        player: {
+                            id: 3,
+                            name: 'Player Three'
+                        }
+                    }
+                ]
+            }
+        ];
+        // General tasks not tied to events
+        const generalTasks = [
+            {
+                id: 5,
+                name: 'Update player stats',
+                description: 'Update season statistics',
+                dueDate: '2025-03-20',
+                priority: {
+                    id: 3,
+                    name: 'Low',
+                    weight: 3
+                },
+                status: 'TODO',
+                eventId: null,
+                event: null,
+                playerTasks: []
+            }
+        ];
+        let tasks = [
+            ...gameTasks,
+            ...generalTasks
+        ];
+        // Filter by eventId if provided
+        if (eventId) {
+            tasks = tasks.filter((task)=>task.eventId === parseInt(eventId));
+        }
+        // Filter by status if provided
+        if (status) {
+            tasks = tasks.filter((task)=>task.status === status);
+        }
+        // Filter by priorityId if provided
+        if (priorityId) {
+            tasks = tasks.filter((task)=>task.priority.id === parseInt(priorityId));
+        }
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$HttpResponse$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["HttpResponse"].json({
+            data: tasks,
             meta: {
-                total: 2,
+                total: tasks.length,
                 page: 1,
                 perPage: 20
             }
+        });
+    }),
+    // Mock priorities
+    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$http$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["http"].get('/api/priorities', ()=>{
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$core$2f$HttpResponse$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["HttpResponse"].json({
+            data: [
+                {
+                    id: 1,
+                    name: 'High',
+                    weight: 1
+                },
+                {
+                    id: 2,
+                    name: 'Medium',
+                    weight: 2
+                },
+                {
+                    id: 3,
+                    name: 'Low',
+                    weight: 3
+                }
+            ]
         });
     }),
     // Mock login
@@ -178,11 +388,11 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 "[project]/src/mocks/browser.ts [app-client] (ecmascript)": ((__turbopack_context__) => {
 "use strict";
 
-var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+var { k: __turbopack_refresh__, m: module } = __turbopack_context__;
 {
 // DEV-ONLY: MSW browser setup for API mocking.
 __turbopack_context__.s({
-    "worker": (()=>worker)
+    "worker": ()=>worker
 });
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$msw$2f$lib$2f$browser$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/msw/lib/browser/index.mjs [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$mocks$2f$handlers$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/mocks/handlers.ts [app-client] (ecmascript)");

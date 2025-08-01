@@ -28,6 +28,7 @@ import CalendarView from './components/calendar'
 import KanbanView from './components/kanban'
 import DetailModal from './components/detail-modal'
 import EditTask from './components/edit-task'
+import TaskMentionInput from '../dashboard3/components/TaskMentionInput'
 
 function Tasks() {
   const searchParams = useSearchParams()
@@ -36,6 +37,7 @@ function Tasks() {
   const {data: dataSource, isLoading, isValidating, mutate} = useSWR(API_KEY)
   const [isOpenFilter, showFilter] = useState(false)
   const [isShowNewTask, showNewTask] = useState(false)
+  const [isShowMentionTask, setIsShowMentionTask] = useState(false)
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(dayjs())
   const [isSort, enableSort] = useState(false)
@@ -103,22 +105,32 @@ function Tasks() {
     {
       title: 'Assignee',
       render: (data: any) => {
-        if (!data.playerTasks.length) return ''
+        if (!data.playerTasks || !data.playerTasks.length) return ''
         if (data.playerTasks.length <= 3) {
-          return data.playerTasks.map((item: any) => '👤 ' + item.player.name).join(', ')
+          return data.playerTasks.map((item: any) => '👤 ' + (item?.player?.name || 'Unknown Player')).join(', ')
         }
-        return data.playerTasks.slice(0, 3).map((item: any) => '👤 ' + item.player.name).join(', ') + '...'
+        return data.playerTasks.slice(0, 3).map((item: any) => '👤 ' + (item?.player?.name || 'Unknown Player')).join(', ') + '...'
+      }
+    },
+    {
+      title: 'Event',
+      render: (data: any) => {
+        if (!data.event || !data.event.name) return 'No event'
+        return data.event.name
       }
     },
     {
       title: 'Description',
       render: (data: any) => {
-        return data.description
+        return data.description || 'No description'
       }
     },
     {
       title: renderHeader('Priority Level', 'priority'),
       render: (data: any) => {
+        if (!data.priority || !data.priority.name) {
+          return <span className={classNames(style.priority, style['no-priority'])}>No priority</span>
+        }
         return <span className={classNames(style.priority, style[data.priority.name])}>{data.priority.name}</span>
       }
     },
@@ -185,7 +197,7 @@ function Tasks() {
   }
 
   const openNewTask = (defaultValues = {}) => {
-    showNewTask(true)
+    setIsShowMentionTask(true)
     setTaskDefaultVals(defaultValues)
   }
 
@@ -234,6 +246,28 @@ function Tasks() {
     showEditTask(true)
     showDetailModal(false)
   }
+
+  // Handle task creation with mentions
+  const handleTaskCreate = (task: {
+    title: string;
+    description: string;
+    mentions: any[];
+    assignedTo?: string;
+    priority: 'high' | 'medium' | 'low';
+    dueDate?: string;
+    event?: string;
+  }) => {
+    console.log('New task created with mentions:', task);
+    setIsShowMentionTask(false);
+    refreshTask(); // Refresh the task list
+    // Here you would typically save the task to your backend
+    // For now, we'll just log it and close the modal
+  };
+
+  // Handle task creation cancel
+  const handleTaskCancel = () => {
+    setIsShowMentionTask(false);
+  };
 
   return (
     <>

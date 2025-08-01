@@ -1,3 +1,5 @@
+'use client'
+
 import { App, Avatar, Button, Drawer, Flex, Form, Input, Select } from 'antd'
 import { memo, useEffect, useRef, useState } from 'react'
 import style from './style.module.scss'

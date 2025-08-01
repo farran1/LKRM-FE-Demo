@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/src/components/app-initializer/style.module.scss.module.css"],"sourcesContent":[".container{position:absolute;background:rgba(28,28,28,.6705882353);z-index:9999;display:flex;align-items:center;justify-content:center;width:100vw;height:100vh}"],"names":[],"mappings":"AAAA","debugId":null}}]
-}

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 6, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/src/msw-init.ts"],"sourcesContent":["// DEV-ONLY: MSW initialization for browser API mocking\r\nif (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {\r\n  import('./mocks/browser').then(({ worker }) => {\r\n    worker.start()\r\n  })\r\n} "],"names":[],"mappings":"AAAA,uDAAuD;AAClB;AAArC,wCAA6E;IAC3E,2HAA0B,IAAI,CAAC,CAAC,EAAE,MAAM,EAAE;QACxC,OAAO,KAAK;IACd;AACF","debugId":null}},
-    {"offset": {"line": 22, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Andrew%20Farrell/Desktop/Big%20Test/big-test/app/layout.tsx"],"sourcesContent":["'use client'\nimport '../src/msw-init'\nimport React from 'react';\nimport AntdWrapper from '@/components/antd-wrapper';\nimport { App as AntdApp } from 'antd';\n\n// DEV-ONLY: Initialize MSW for API mocking in development mode.\nif (process.env.NODE_ENV === 'development') {\n  import('../src/mocks/index')\n}\n\nexport default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {\n  return (\n    <html lang=\"en\">\n      <body>\n        <AntdApp>\n          {children}\n        </AntdApp>\n      </body>\n    </html>\n  )\n}\n"],"names":[],"mappings":";;;AAOI;;AANJ;AAGA;AAJA;;;;AAMA,gEAAgE;AAChE,wCAA4C;;AAE5C;AAEe,SAAS,WAAW,EAAE,QAAQ,EAA2C;IACtF,qBACE,6LAAC;QAAK,MAAK;kBACT,cAAA,6LAAC;sBACC,cAAA,6LAAC,+KAAA,CAAA,MAAO;0BACL;;;;;;;;;;;;;;;;AAKX;KAVwB","debugId":null}}]
-}

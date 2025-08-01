@@ -14,6 +14,8 @@ export const listTaskSchema = z.object({
     .transform((val) => (Array.isArray(val) ? val : [val]))
     .optional(),
   priorityId: z.coerce.number().optional(),
+  eventId: z.coerce.number().optional(),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional(),
   page: z.number().optional(),
   perPage: z.number().optional(),
   sortBy: z.string().optional(),
@@ -32,6 +34,7 @@ export const createTaskSchema = z.object({
     .transform((val) => (Array.isArray(val) ? val : [val]))
     .optional(),
   priorityId: z.number(),
+  eventId: z.number().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']),
 })
 
@@ -47,5 +50,6 @@ export const updateTaskSchema = z.object({
     .transform((val) => (Array.isArray(val) ? val : [val]))
     .optional(),
   priorityId: z.number(),
+  eventId: z.number().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']),
 })

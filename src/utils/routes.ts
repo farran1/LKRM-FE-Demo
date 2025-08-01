@@ -1,8 +1,7 @@
 export const ROUTES = {
-  statistic: 'statistics',
+  statistic: 'live-stat-tracker',
   planner: {
     event: '/events',
-    volunteer: '/volunteers',
   },
   team: {
     player: '/players',
@@ -16,4 +15,4 @@ export const ROUTES = {
     form: '/forms',
     email: '/emails'
   },
-} 
+}; 

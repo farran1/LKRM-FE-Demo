@@ -17,6 +17,7 @@ function Filter({ isOpen, showOpen } : any) {
   const [loading, setLoading] = useState(false)
   const [players, setPlayers] = useState([])
   const [priorities, setPriorities] = useState([])
+  const [events, setEvents] = useState([])
   const [form] = Form.useForm()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -24,6 +25,7 @@ function Filter({ isOpen, showOpen } : any) {
   useEffect(() => {
     getPlayers()
     getPriorities()
+    getEvents()
   }, [])
 
   async function getPlayers() {
@@ -42,6 +44,23 @@ function Filter({ isOpen, showOpen } : any) {
     if (res?.data?.data.length > 0) {
       const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
       setPriorities(types)
+    }
+    setLoading(false)
+  }
+
+  async function getEvents() {
+    setLoading(true)
+    try {
+      const res = await api.get('/api/events')
+      if (res?.data?.data.length > 0) {
+        const eventOptions = res?.data?.data.map((item: any) => ({
+          label: `${item.name} - ${dayjs(item.date).format('MMM D, YYYY')}`, 
+          value: item.id
+        }))
+        setEvents(eventOptions)
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error)
     }
     setLoading(false)
   }
@@ -104,6 +123,9 @@ function Filter({ isOpen, showOpen } : any) {
       <Form layout="vertical" onFinish={onSubmit} form={form}>
         <Form.Item label="Assignee" name="playerIds">
           <Select mode="multiple" allowClear showSearch options={players} optionFilterProp="label"/>
+        </Form.Item>
+        <Form.Item label="Event" name="eventId">
+          <Select placeholder="Select Event" allowClear showSearch options={events} optionFilterProp="label"/>
         </Form.Item>
         <Form.Item label="Due Date" name="dueDate">
           <DatePicker placeholder="Select Due Date" style={{ width: '100%' }} />

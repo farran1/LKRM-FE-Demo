@@ -1,26 +1,26 @@
 module.exports = {
 
-"[externals]/react/jsx-runtime [external] (react/jsx-runtime, cjs)": (function(__turbopack_context__) {
+"[externals]/react/jsx-runtime [external] (react/jsx-runtime, cjs)": ((__turbopack_context__) => {
 
-var { g: global, __dirname, m: module, e: exports } = __turbopack_context__;
+var { m: module, e: exports } = __turbopack_context__;
 {
 const mod = __turbopack_context__.x("react/jsx-runtime", () => require("react/jsx-runtime"));
 
 module.exports = mod;
 }}),
-"[externals]/react [external] (react, cjs)": (function(__turbopack_context__) {
+"[externals]/react [external] (react, cjs)": ((__turbopack_context__) => {
 
-var { g: global, __dirname, m: module, e: exports } = __turbopack_context__;
+var { m: module, e: exports } = __turbopack_context__;
 {
 const mod = __turbopack_context__.x("react", () => require("react"));
 
 module.exports = mod;
 }}),
-"[project]/node_modules/@swc/helpers/cjs/_interop_require_default.cjs [ssr] (ecmascript)": (function(__turbopack_context__) {
-
-var { g: global, __dirname, m: module, e: exports } = __turbopack_context__;
-{
+"[project]/node_modules/@swc/helpers/cjs/_interop_require_default.cjs [ssr] (ecmascript)": ((__turbopack_context__) => {
 "use strict";
+
+var { m: module, e: exports } = __turbopack_context__;
+{
 function _interop_require_default(obj) {
     return obj && obj.__esModule ? obj : {
         default: obj
@@ -28,11 +28,11 @@ function _interop_require_default(obj) {
 }
 exports._ = _interop_require_default;
 }}),
-"[project]/node_modules/next/dist/shared/lib/utils.js [ssr] (ecmascript)": (function(__turbopack_context__) {
-
-var { g: global, __dirname, m: module, e: exports } = __turbopack_context__;
-{
+"[project]/node_modules/next/dist/shared/lib/utils.js [ssr] (ecmascript)": ((__turbopack_context__) => {
 "use strict";
+
+var { m: module, e: exports } = __turbopack_context__;
+{
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
@@ -242,11 +242,11 @@ function stringifyError(error) {
     });
 } //# sourceMappingURL=utils.js.map
 }}),
-"[project]/node_modules/next/dist/pages/_app.js [ssr] (ecmascript)": (function(__turbopack_context__) {
-
-var { g: global, __dirname, m: module, e: exports } = __turbopack_context__;
-{
+"[project]/node_modules/next/dist/pages/_app.js [ssr] (ecmascript)": ((__turbopack_context__) => {
 "use strict";
+
+var { m: module, e: exports } = __turbopack_context__;
+{
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
@@ -288,9 +288,9 @@ if ((typeof exports.default === 'function' || typeof exports.default === 'object
     module.exports = exports.default;
 } //# sourceMappingURL=_app.js.map
 }}),
-"[project]/node_modules/next/app.js [ssr] (ecmascript)": (function(__turbopack_context__) {
+"[project]/node_modules/next/app.js [ssr] (ecmascript)": ((__turbopack_context__) => {
 
-var { g: global, __dirname, m: module, e: exports } = __turbopack_context__;
+var { m: module, e: exports } = __turbopack_context__;
 {
 module.exports = __turbopack_context__.r("[project]/node_modules/next/dist/pages/_app.js [ssr] (ecmascript)");
 }}),

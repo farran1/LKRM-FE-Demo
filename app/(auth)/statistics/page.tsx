@@ -1,5 +1,5 @@
-import Statistics from './statistics'
+import AdvancedStatsOverview from "./advanced";
 
-export default function StatisticsPage() {
-  return <Statistics />
+export default function AdvancedStatsOverviewPage() {
+  return <AdvancedStatsOverview />;
 } 

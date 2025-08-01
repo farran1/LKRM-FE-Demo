@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/(auth)/tasks/style.module.scss.module.css"],"sourcesContent":[".title{font-weight:500;font-size:32px;line-height:1.7rem}.container .search{border:unset;width:281px;background-color:hsla(0,0%,100%,.1)}.container .filter{background-color:hsla(0,0%,100%,.1)}.container .sort{background-color:hsla(0,0%,100%,.1)}.container :global(.ant-table-wrapper table){border-radius:8px}.priority{padding:4px 8px;border-radius:4px}.priority.High{background-color:#da2f36}.priority.Medium{background-color:#ff9800}.priority.Low{background-color:#1d75d0}.header svg{cursor:pointer}.monthControll{display:flex;align-items:center;font-size:20px;font-weight:500;gap:10px}.btnMonth{cursor:pointer;padding:0 8px}.btnMonth:hover{color:#1c66b4}.month{width:160px}"],"names":[],"mappings":"AAAA;;;;;;AAAyD;;;;;;AAAgF;;;;AAA4G;;;;AAA+D;;;;;AAA4C;;;;AAAwC;;;;AAA0C;;;;AAAuC;;;;AAA2B;;;;;;;;AAAuF;;;;;AAAuC;;;;AAA8B"}}]
-}

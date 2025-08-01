@@ -31,7 +31,7 @@ function BaseTable({
       {...props}
       loading={loading}
       scroll={{ x: 'max-content' }}
-      columns={columns}
+      columns={Array.isArray(columns) ? columns : []}
       pagination={{
         onChange: onChangePage,
         total: dataSource?.meta?.total,

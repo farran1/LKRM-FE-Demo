@@ -1,8 +1,8 @@
 export const ROUTES = {
-  statistic: 'statistics',
+  statistic: '/live-stat-tracker',
+  statsDash: '/stats-dash',
   planner: {
     event: '/events',
-    volunteer: '/volunteers',
   },
   team: {
     player: '/players',

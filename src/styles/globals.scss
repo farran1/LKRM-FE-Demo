@@ -1,7 +1,9 @@
-@import 'antd/dist/reset.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --header-height: 64px;
+  --header-height: 48px;
   --sidebar-width: 256px;
   --font-poppins: "Poppins", "Poppins Fallback";
   --font-inter: "Inter", "Inter Fallback";
@@ -16,5 +18,19 @@
 body {
   height: 100vh;
   color: #fff;
+  overflow: hidden;
+}
+
+/* Manual Layout Styles */
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Module Content */
+.module-content {
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }

@@ -1,0 +1,861 @@
+// Stats Dashboard Styles - PRD-Based Design
+// Professional basketball analytics dashboard styling
+
+.dashboardContainer {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+  padding: 0;
+  margin: 0;
+}
+
+// Dashboard Header
+.dashboardHeader {
+  background: linear-gradient(90deg, #17375c 0%, #1e3a5f 100%);
+  border-bottom: 1px solid #2a4a6b;
+  padding: 24px 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  .headerContent {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1400px;
+    margin: 0 auto;
+
+    .headerLeft {
+      h2 {
+        color: #ffffff;
+        margin: 0 0 8px 0;
+        font-weight: 600;
+      }
+
+      span {
+        color: #b8c5d3;
+        font-size: 14px;
+      }
+    }
+
+    .headerRight {
+      .ant-space {
+        .ant-btn {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: #ffffff;
+          
+          &:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+          }
+
+          &.ant-btn-primary {
+            background: #1890ff;
+            border-color: #1890ff;
+            
+            &:hover {
+              background: #40a9ff;
+              border-color: #40a9ff;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Navigation Tabs
+.navigationTabs {
+  background: rgba(23, 55, 92, 0.8);
+  border-bottom: 1px solid #2a4a6b;
+  padding: 0 32px;
+
+  .dashboardTabs {
+    max-width: 1400px;
+    margin: 0 auto;
+
+    .ant-tabs-nav {
+      margin: 0;
+      background: transparent;
+
+      .ant-tabs-tab {
+        background: transparent;
+        border: none;
+        color: #b8c5d3;
+        padding: 12px 16px;
+        margin: 0 4px 0 0;
+        border-radius: 6px 6px 0 0;
+        transition: all 0.3s ease;
+
+        &:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        &.ant-tabs-tab-active {
+          background: #17375c;
+  color: #ffffff;
+          border-bottom: 2px solid #1890ff;
+}
+
+        .anticon {
+          margin-right: 8px;
+        }
+      }
+
+      .ant-tabs-ink-bar {
+        background: #1890ff;
+        height: 2px;
+}
+    }
+  }
+}
+
+// Main Content
+.mainContent {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px;
+  min-height: calc(100vh - 200px);
+}
+
+// Overview Section
+.overviewSection {
+  .kpiCard {
+    background: rgba(23, 55, 92, 0.6);
+    border: 1px solid #2a4a6b;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+
+    &:hover {
+      border-color: #1890ff;
+      box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+    }
+
+    .ant-card-body {
+      padding: 20px;
+      text-align: center;
+
+      .ant-statistic {
+        .ant-statistic-title {
+          color: #b8c5d3;
+          font-size: 14px;
+          margin-bottom: 8px;
+        }
+
+        .ant-statistic-content {
+          color: #ffffff;
+          font-size: 24px;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+
+  .chartCard {
+    background: rgba(23, 55, 92, 0.6);
+    border: 1px solid #2a4a6b;
+  border-radius: 8px;
+    height: 300px;
+
+    .ant-card-head {
+      background: transparent;
+      border-bottom: 1px solid #2a4a6b;
+
+      .ant-card-head-title {
+        color: #ffffff;
+        font-weight: 600;
+      }
+    }
+
+    .ant-card-body {
+  padding: 24px;
+      height: calc(100% - 57px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  .actionCard {
+    background: rgba(23, 55, 92, 0.6);
+  border: 1px solid #2a4a6b;
+    border-radius: 8px;
+    height: 300px;
+
+    .ant-card-head {
+      background: transparent;
+      border-bottom: 1px solid #2a4a6b;
+
+      .ant-card-head-title {
+        color: #ffffff;
+        font-weight: 600;
+      }
+    }
+
+    .ant-card-body {
+      padding: 24px;
+      height: calc(100% - 57px);
+      display: flex;
+      align-items: center;
+    }
+
+    .ant-space {
+      width: 100%;
+
+      .ant-btn {
+        height: 40px;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+
+        &.ant-btn-primary {
+          background: #1890ff;
+          border-color: #1890ff;
+          
+          &:hover {
+            background: #40a9ff;
+            border-color: #40a9ff;
+          }
+        }
+
+        &:not(.ant-btn-primary) {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  
+  &:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Live Game Section
+.liveGameSection {
+  .liveCard {
+    background: rgba(23, 55, 92, 0.6);
+    border: 1px solid #2a4a6b;
+    border-radius: 8px;
+    height: 200px;
+
+    .ant-card-head {
+      background: transparent;
+      border-bottom: 1px solid #2a4a6b;
+
+      .ant-card-head-title {
+        color: #ffffff;
+        font-weight: 600;
+      }
+    }
+
+    .ant-card-body {
+      padding: 20px;
+      height: calc(100% - 57px);
+    }
+  }
+
+  .scoreboard {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+
+    .teamScore {
+      text-align: center;
+      flex: 1;
+
+      .teamName {
+        display: block;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .score {
+        display: block;
+        color: #1890ff;
+        font-size: 32px;
+        font-weight: 700;
+      }
+    }
+
+    .gameInfo {
+      text-align: center;
+      flex: 1;
+
+      .period {
+        display: block;
+        color: #b8c5d3;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .timeout {
+        display: block;
+        color: #fa8c16;
+        font-size: 12px;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .playerGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+
+    .playerStat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(42, 74, 107, 0.3);
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .playerName {
+        color: #ffffff;
+        font-weight: 500;
+      }
+
+      .statValue {
+        color: #52c41a;
+        font-weight: 600;
+  }
+}
+  }
+}
+
+// Chart Placeholder
+.chartPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: rgba(42, 74, 107, 0.2);
+  border-radius: 6px;
+  border: 2px dashed rgba(42, 74, 107, 0.5);
+}
+
+// Section Placeholder
+.sectionPlaceholder {
+  text-align: center;
+  padding: 60px 20px;
+  background: rgba(23, 55, 92, 0.3);
+  border-radius: 8px;
+  border: 1px solid #2a4a6b;
+
+  h3 {
+    color: #ffffff;
+  margin-bottom: 16px;
+  }
+
+  .ant-typography {
+    color: #b8c5d3;
+  font-size: 16px;
+    line-height: 1.6;
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .dashboardHeader {
+    padding: 16px 20px;
+
+    .headerContent {
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+
+      .headerRight {
+        .ant-space {
+          justify-content: center;
+        }
+      }
+    }
+  }
+
+  .navigationTabs {
+    padding: 0 20px;
+
+    .dashboardTabs {
+      .ant-tabs-nav {
+        .ant-tabs-tab {
+          padding: 8px 12px;
+          font-size: 12px;
+
+          .anticon {
+            margin-right: 4px;
+          }
+        }
+      }
+    }
+  }
+
+  .mainContent {
+    padding: 20px;
+  }
+
+  .overviewSection {
+    .kpiCard {
+      margin-bottom: 16px;
+    }
+
+    .chartCard,
+    .actionCard {
+      height: 250px;
+    }
+  }
+
+  .liveGameSection {
+    .liveCard {
+      height: 180px;
+      margin-bottom: 16px;
+    }
+  }
+}
+
+// Analysis Card Styles
+.analysisCard {
+  background: rgba(23, 55, 92, 0.6);
+  border: 1px solid #2a4a6b;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: #1890ff;
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+}
+
+  .ant-card-head {
+    background: transparent;
+    border-bottom: 1px solid #2a4a6b;
+
+    .ant-card-head-title {
+      color: #ffffff;
+      font-weight: 600;
+}
+  }
+
+  .ant-card-body {
+    padding: 20px;
+}
+}
+
+// Game Analysis Section
+.gameAnalysisSection {
+  .ant-timeline {
+    .ant-timeline-item {
+      .ant-timeline-item-content {
+        color: #ffffff;
+      }
+    }
+  }
+}
+
+// Team Analytics Section
+.teamAnalyticsSection {
+  .analysisCard {
+    height: 200px;
+}
+}
+
+// Strategic Insights Section
+.strategicInsightsSection {
+  .analysisCard {
+    min-height: 300px;
+  }
+}
+
+// Focus Mode Styles (for future implementation)
+.focusedPanel {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+.focusControls {
+  position: fixed;
+  top: 100px;
+  right: 20px;
+  z-index: 1000;
+  background: rgba(23, 55, 92, 0.95);
+  border: 1px solid #2a4a6b;
+  border-radius: 8px;
+  padding: 12px;
+  backdrop-filter: blur(10px);
+
+  .ant-space {
+    .ant-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+  
+  &.ant-btn-primary {
+        background: #1890ff;
+        border-color: #1890ff;
+        
+        &:hover {
+          background: #40a9ff;
+          border-color: #40a9ff;
+        }
+      }
+
+      &:disabled {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.5);
+      }
+    }
+  }
+}
+
+// Player Development Section
+.playerDevelopmentSection {
+  .playerCard {
+    background: rgba(23, 55, 92, 0.6);
+    border: 1px solid #2a4a6b;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+      border-color: #1890ff;
+      box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    &.selectedPlayer {
+      border-color: #52c41a;
+      box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
+      background: rgba(82, 196, 26, 0.1);
+    }
+
+    .ant-card-body {
+      padding: 16px;
+    }
+  }
+
+  .developmentProgress {
+    .progressBar {
+      background: #2a4a6b;
+      border-radius: 4px;
+      overflow: hidden;
+      height: 8px;
+      margin-top: 4px;
+
+      .progressFill {
+        height: 100%;
+        transition: width 0.3s ease;
+        border-radius: 4px;
+
+        &.excellent {
+          background: #52c41a;
+  }
+
+        &.good {
+          background: #1890ff;
+        }
+
+        &.needsImprovement {
+          background: #fa8c16;
+        }
+      }
+    }
+  }
+
+  .skillAssessment {
+    .skillRow {
+      margin-bottom: 12px;
+
+      .skillLabel {
+        color: #b8c5d3;
+        text-transform: capitalize;
+        font-size: 14px;
+      }
+
+      .skillValue {
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 14px;
+      }
+    }
+  }
+
+  .playerComparison {
+    .comparisonChart {
+      height: 250px;
+    }
+  }
+
+  .performanceTrends {
+    .trendChart {
+      height: 300px;
+    }
+  }
+
+  .playerProfile {
+    .statistic {
+      .ant-statistic-title {
+        color: #b8c5d3;
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      .ant-statistic-content {
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .developmentInsights {
+    .strengthTag {
+      background: rgba(82, 196, 26, 0.2);
+      border-color: #52c41a;
+      color: #52c41a;
+    }
+
+    .improvementTag {
+      background: rgba(250, 140, 22, 0.2);
+      border-color: #fa8c16;
+      color: #fa8c16;
+    }
+  }
+} 
+
+// EVENTS MODULE STYLES
+.eventsModuleCard {
+  background: #032a3f !important;
+  border-radius: 16px;
+  box-shadow: 0px 14px 42px 0px rgba(8, 15, 52, 0.06);
+  width: 100%;
+  min-width: 280px;
+}
+
+.eventsModuleContainer {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.eventsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.eventsMonth {
+  color: #fff;
+  font-size: 18px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.eventsNav {
+  display: flex;
+  gap: 12px;
+}
+
+.eventsNavIcon {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.eventsCalendarRow {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.eventsCalendarBg {
+  position: relative;
+  background: #002032;
+  border-radius: 14px;
+  height: 76px;
+  width: 248px;
+  margin: 0 auto;
+}
+
+.eventsCalendarBorder {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #414955;
+  border-radius: 14px;
+  pointer-events: none;
+}
+
+.eventsCalendarHighlight {
+  position: absolute;
+  left: 115px;
+  top: 8px;
+  width: 29px;
+  height: 60px;
+  background: #1d75d0;
+  border-radius: 10px;
+  box-shadow: 0px 2px 10px 0px rgba(43, 63, 242, 0.5);
+}
+
+.eventsCalendarDay {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+}
+
+.eventsCalendarDayLabel {
+  color: #fff;
+  font-size: 7px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 300;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.eventsCalendarDayDate {
+  color: #fff;
+  font-size: 12px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.eventsCalendarDot {
+  position: absolute;
+  left: 127px;
+  top: 60px;
+  width: 4px;
+  height: 4px;
+}
+
+.eventsTodaySummary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.eventsTodayText {
+  color: #76ffb9;
+  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.eventsTodayDot {
+  width: 4px;
+  height: 4px;
+}
+
+.eventsDaySection {
+  margin-bottom: 12px;
+}
+
+.eventsDayHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.eventsDayHeaderToday {
+  color: #76ffb9;
+  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.eventsDayHeaderOther {
+  color: rgba(255,255,255,0.7);
+  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.eventsDayDot {
+  width: 4px;
+  height: 4px;
+}
+
+.eventsActivitiesList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eventsActivity {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  padding: 8px;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.eventsActivityIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.eventsActivityAvatar {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%;
+}
+
+.eventsActivityText {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.eventsActivityTitle {
+  color: #fff;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.eventsActivityTime {
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.eventsActivityNoEvents {
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  line-height: 16px;
+  margin-left: 8px;
+} 

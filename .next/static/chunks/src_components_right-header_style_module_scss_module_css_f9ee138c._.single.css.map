@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/src/components/right-header/style.module.scss.module.css"],"sourcesContent":[".container{display:flex;align-items:center;gap:12px}.container svg{cursor:pointer}.menu{min-width:150px !important}.menu :global(.ant-dropdown-menu){background-color:#005888 !important}"],"names":[],"mappings":"AAAA;;;;;;AAAoD;;;;AAA8B;;;;AAAiC"}}]
-}

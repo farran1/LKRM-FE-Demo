@@ -52,6 +52,11 @@ function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
 
     payload.status = defaultValues?.status || 'TODO'
     
+    // Include eventId from defaultValues if provided
+    if (defaultValues?.eventId) {
+      payload.eventId = defaultValues.eventId
+    }
+    
     setLoading(true)
     try {
       const res = await api.post('/api/tasks', payload)

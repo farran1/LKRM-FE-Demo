@@ -15,8 +15,6 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
   const [loading, setLoading] = useState(false)
   const [playerLoading, setPlayerLoading] = useState(false)
   const [players, setPlayers] = useState([])
-  const [volunteerLoading, setVolunteerLoading] = useState(false)
-  const [volunteers, setVolunteers] = useState([])
   const router = useRouter()
 
   useEffect(() => {
@@ -26,7 +24,6 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
 
     // fetchDetail()
     fetchPlayer()
-    fetchVolunteer()
   }, [event])
 
   // const fetchDetail = async () => {
@@ -41,13 +38,6 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
     const res = await api.get(`/api/events/${event.id}/players`)
     setPlayers(res.data.data)
     setPlayerLoading(false)
-  }
-
-  const fetchVolunteer = async () => {
-    setVolunteerLoading(true)
-    const res = await api.get(`/api/events/${event.id}/volunteers`)
-    setVolunteers(res.data.data)
-    setVolunteerLoading(false)
   }
 
   const openEventLanding = () => {
@@ -102,19 +92,6 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
               )}
             </div>
             <div className={style.line}></div>
-            <div className={style.sectionVolunteer}>
-              <Flex justify="space-between" align="center" className={style.header}>
-                <div className={style.title}><UserIcon /><span>{volunteers.length} Volunteers</span></div>
-                {volunteers.length > 0 && <div>0 yes, 0 no, {volunteers.length} awaiting</div>}
-              </Flex>
-              {volunteerLoading && <Skeleton active />}
-              {volunteers.map((item: any) =>
-                <Row key={item.id}>
-                  <Col span={8}>👤 {item.name}</Col>
-                  <Col span={6}>Going</Col>
-                </Row>
-              )}
-            </div>
             <div className={style.sectionBudget}>
               <div className={style.title}>Budget</div>
               <div className={style.card}>Empty</div>

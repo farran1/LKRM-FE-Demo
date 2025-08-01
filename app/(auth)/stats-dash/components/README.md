@@ -1,0 +1,8 @@
+# Stats-Dash Components Directory
+
+All reusable components for the /stats-dash dashboard should be placed here.
+ 
+**Before adding a new component:**
+- Check COMPONENT_LOG.md and this directory to ensure it does not already exist.
+- Add a log entry to COMPONENT_LOG.md after creating a new component.
+- Follow the project's styling and UI conventions. 

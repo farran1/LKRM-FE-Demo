@@ -57,9 +57,9 @@ function TaskDetailModal({isShowModal, onClose, task, openEdit}: any) {
             </div>
             <div className={style.sectionAssignee}>
               <Flex justify="space-between" align="center" className={style.header}>
-                <div className={style.title}><UserIcon /><span>{task?.playerTasks.length} Asignees</span></div>
+                <div className={style.title}><UserIcon /><span>{Array.isArray(task?.playerTasks) ? task.playerTasks.length : 0} Asignees</span></div>
               </Flex>
-              {task?.playerTasks.map((item: any) =>
+              {Array.isArray(task?.playerTasks) && task.playerTasks.map((item: any) =>
                 <Row key={item.player.id}>
                   <Col span={8}>👤 {item.player.name}</Col>
                 </Row>

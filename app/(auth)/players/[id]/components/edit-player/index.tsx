@@ -137,23 +137,6 @@ function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
           <Form.Item name="phoneNumber" rules={[{ required: true }]} label="Phone Number">
             <Input placeholder="Enter Phone Number" />
           </Form.Item>
-          <Form.Item name="weight" label="Weight"
-            rules={[
-              { required: true },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (value === undefined) {
-                    return Promise.resolve();
-                  }
-                  if (value > 200) {
-                    return Promise.reject(new Error('Weight must be at most 200lbs'));
-                  }
-                  return Promise.resolve();
-                },
-              }),
-            ]}>
-            <Input type="number" placeholder="Enter Weight" />
-          </Form.Item>
           <Form.Item name="height" label="Height"
             rules={[
               { required: true },

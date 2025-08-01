@@ -9,7 +9,7 @@ import api from '@/services/api'
 import Upload from './components/upload'
 import Review from './components/review'
 import DownloadIcon from '@/components/icon/document-arrow-down.svg'
-import UploadPreferenceModal from '@/app/(auth)/players/import/components/upload-preference-modal'
+import UploadPreferenceModal from './components/upload-preference-modal'
 import { downloadURI } from '@/utils/app'
 
 function NewPlayer() {

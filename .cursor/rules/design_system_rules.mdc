@@ -1,0 +1,155 @@
+# LKRM Dashboard Design System Rules
+
+## 1. Token Definitions
+
+- **Location:**  
+  - Colors, typography, and spacing tokens are primarily defined in `src/styles/globals.scss` and Ant Design theme overrides in `src/components/antd-wrapper/index.tsx`.
+- **Format:**  
+  - CSS custom properties (e.g., `--header-height`, `--sidebar-width`, `--font-inter`) and SCSS variables.
+  - Ant Design tokens are set via the `ConfigProvider` in the AntD wrapper.
+- **Transformation:**  
+  - No automated token transformation system; tokens are referenced directly in SCSS and AntD theme config.
+
+**Example:**
+```scss
+:root {
+  --header-height: 48px;
+  --sidebar-width: 256px;
+  --font-inter: "Inter", "Inter Fallback";
+}
+```
+
+---
+
+## 2. Component Library
+
+- **Location:**  
+  - UI components are in `src/components/` and `app/(auth)/stats-overview/components/`.
+- **Architecture:**  
+  - Functional React components with TypeScript.
+  - Ant Design components are used as the base UI library.
+- **Documentation:**  
+  - No Storybook or formal documentation detected, but components are modular and reusable.
+
+---
+
+## 3. Frameworks & Libraries
+
+- **UI Framework:**  
+  - React (with Next.js for routing and SSR).
+- **Styling:**  
+  - SCSS modules (e.g., `style.module.scss`).
+  - Ant Design for component styling and theming.
+- **Build System:**  
+  - Next.js (uses Webpack under the hood).
+
+---
+
+## 4. Asset Management
+
+- **Storage:**  
+  - Assets are stored in `public/imgs/` and referenced via relative paths.
+- **Optimization:**  
+  - No explicit asset optimization pipeline, but Next.js static asset handling is used.
+- **CDN:**  
+  - No custom CDN configuration detected.
+
+---
+
+## 5. Icon System
+
+- **Storage:**  
+  - SVG icons in `src/components/icon/` and Ant Design icon imports.
+- **Usage:**  
+  - Imported as React components or via AntD’s icon library.
+- **Naming:**  
+  - PascalCase for custom icons, AntD icon names for library icons.
+
+**Example:**
+```tsx
+import { TrophyOutlined } from "@ant-design/icons";
+import Logo from '@/components/icon/logo_small.svg';
+```
+
+---
+
+## 6. Styling Approach
+
+- **Methodology:**  
+  - SCSS Modules for local component styles (e.g., `style.module.scss`).
+  - Global styles in `src/styles/globals.scss`.
+- **Responsiveness:**  
+  - Media queries in SCSS modules.
+  - Ant Design’s grid system (`Row`, `Col`) for layout.
+- **Global Styles:**  
+  - Applied via `globals.scss` and AntD theme overrides.
+
+**Example:**
+```scss
+.dashboardContainer {
+  padding: 16px 8px;
+  min-height: 100vh;
+}
+@media (max-width: 900px) {
+  .summaryStatsRow {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+```
+
+---
+
+## 7. Project Structure
+
+- **Organization:**  
+  - Feature-based folders under `app/(auth)/` (e.g., `stats-overview`, `stats-dash`).
+  - Shared components in `src/components/`.
+  - Styles in `src/styles/` and local `style.module.scss` files.
+- **Patterns:**  
+  - Each feature/page has its own directory with components and styles.
+  - Global layout in `app/(auth)/layout.tsx` for header/sidebar.
+
+---
+
+## 8. Figma Integration Best Practices
+
+- **Pixel-Perfect Layout:**  
+  - Use Ant Design’s grid and spacing utilities.
+  - Reference Figma spacing, color, and typography tokens in SCSS and AntD theme.
+- **Component Reuse:**  
+  - Build new UI as modular React components in `app/(auth)/stats-overview/components/`.
+- **Theming:**  
+  - Override AntD theme tokens in `src/components/antd-wrapper/index.tsx` for color/typography consistency.
+- **Responsiveness:**  
+  - Use AntD’s grid and SCSS media queries to match Figma breakpoints.
+
+---
+
+## 9. Example: Card Component Pattern
+
+```tsx
+// app/(auth)/stats-overview/components/StatCard.tsx
+import { Card } from 'antd';
+import styles from '../style.module.scss';
+
+export default function StatCard({ title, value, icon }) {
+  return (
+    <Card className={styles.summaryStatCard} bordered={false}>
+      <div className={styles.statContent}>
+        <span className={styles.statIcon}>{icon}</span>
+        <span className={styles.statValue}>{value}</span>
+      </div>
+      <div className={styles.statLabel}>{title}</div>
+    </Card>
+  );
+}
+```
+
+---
+
+**Follow these rules for all Figma-to-code implementations to ensure consistency, maintainability, and pixel-perfect accuracy.**
+description:
+globs:
+alwaysApply: false
+---

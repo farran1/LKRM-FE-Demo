@@ -93,19 +93,6 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
         <Form.Item label="Jersey #" name="jersey">
           <Input placeholder="Enter Jersey #" />
         </Form.Item>
-
-        <div className={style.subtitle}>Weight</div>
-        <Flex align='center' style={{ marginBottom: 28 }}>
-          <Form.Item name="fromWeight" style={{ marginBottom: 0 }}>
-            <Input type="number" placeholder="Min Weight" />
-          </Form.Item>
-          <span style={{ fontSize: 18, marginInline: 8 }}>-</span>
-          <Form.Item name="toWeight" style={{ marginBottom: 0 }}>
-            <Input type="number" placeholder="Max Weight" />
-          </Form.Item>
-          <span style={{ fontSize: 18, marginLeft: 8 }}>lb</span>
-        </Flex>
-
         <div className={style.subtitle}>Height</div>
         <Flex align='center'>
           <Form.Item name="fromHeight" style={{ marginBottom: 0 }}>

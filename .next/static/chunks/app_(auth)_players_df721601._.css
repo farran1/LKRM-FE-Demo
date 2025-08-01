@@ -7,12 +7,12 @@
 
 .style-module-scss-module__0pqqSq__container .style-module-scss-module__0pqqSq__search {
   border: unset;
-  background-color: #ffffff1a;
+  background-color: rgba(255, 255, 255, .1);
   width: 281px;
 }
 
 .style-module-scss-module__0pqqSq__container .style-module-scss-module__0pqqSq__sort, .style-module-scss-module__0pqqSq__container .style-module-scss-module__0pqqSq__filter {
-  background-color: #ffffff1a;
+  background-color: rgba(255, 255, 255, .1);
 }
 
 .style-module-scss-module__0pqqSq__container .ant-table-wrapper table {
@@ -28,7 +28,6 @@
   width: 24px;
   height: 24px;
 }
-
 
 /* [project]/app/(auth)/players/components/filter/style.module.scss.module.css [app-client] (css) */
 .style-module-scss-module__-CpjEW__drawer {
@@ -64,6 +63,5 @@
   margin-bottom: 16px;
   font-weight: 500;
 }
-
 
 /*# sourceMappingURL=app_%28auth%29_players_df721601._.css.map*/

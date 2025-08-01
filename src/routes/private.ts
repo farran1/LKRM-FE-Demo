@@ -44,9 +44,6 @@ router.post('/events', async (req: Request, res: Response) => {
 router.get('/events/:id/players', async (req: Request, res: Response) => {
   await playerController.getPlayerByEvent(req, res)
 })
-router.get('/events/:id/volunteers', async (req: Request, res: Response) => {
-  await volunteerController.getByEvent(req, res)
-})
 
 router.get('/eventTypes', async (req: Request, res: Response) => {
   await eventTypeController.getAll(req, res)
@@ -94,10 +91,6 @@ router.post('/players/:id/goals', async (req: Request, res: Response) => {
 
 router.get('/positions', async (req: Request, res: Response) => {
   await playerController.getPositions(req, res)
-})
-
-router.post('/volunteers', imageUpload.single('avatar'), async (req: Request, res: Response) => {
-  await volunteerController.create(req, res)
 })
 
 router.get('/tasks', async (req: Request, res: Response) => {

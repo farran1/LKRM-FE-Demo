@@ -61,11 +61,6 @@ const ReviewPage = (props: any) => {
       render: renderCell
     },
     {
-      title: 'Weight',
-      dataIndex: 'weight',
-      render: renderCell
-    },
-    {
       title: 'Height',
       dataIndex: 'height',
       render: renderCell

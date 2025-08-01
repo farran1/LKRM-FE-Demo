@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/src/components/tag-selector/style.module.scss.module.css"],"sourcesContent":[".tag:global(.ant-tag){border-color:#fff;border-radius:4px;padding:4px 12px;margin-bottom:10px}"],"names":[],"mappings":"AAAA"}}]
-}

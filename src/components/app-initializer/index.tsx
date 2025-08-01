@@ -1,15 +1,14 @@
 'use client'
 
 import { memo, useEffect } from 'react'
-import { Alert, App, Spin } from 'antd'
+import { App } from 'antd'
 import { setErrorHandler } from '@/services/api'
-import { LoadingOutlined } from '@ant-design/icons';
-import style from './style.module.scss'
-import useAppStore from '@/store/app';
+// import { LoadingOutlined } from '@ant-design/icons';
+// import style from './style.module.scss'
+// import useAppStore from '@/store/app';
 
 const AppInitializer = () => {
-  const { message, notification } = App.useApp()
-  const {loading} = useAppStore()
+  const { notification } = App.useApp()
 
   useEffect(() => {
     setErrorHandler((msg) =>
@@ -26,13 +25,6 @@ const AppInitializer = () => {
       })
     )
   }, [notification])
-
-  if (loading)
-    return (
-      <div className={style.container}>
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: 'white' }} spin />} />
-      </div>
-    )
 
   return null
 }

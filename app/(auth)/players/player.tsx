@@ -81,12 +81,6 @@ function Player() {
       dataIndex: 'jersey',
     },
     {
-      title: renderHeader('Weight', 'weight'),
-      render: (data: any) => {
-        return data?.weight ? data?.weight + 'lbs' : ''
-      }
-    },
-    {
       title: renderHeader('Height', 'height'),
       render: (data: any) => {
         return data?.height ? data?.height + '"' : ''

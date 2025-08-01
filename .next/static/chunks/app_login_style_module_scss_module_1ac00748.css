@@ -4,8 +4,16 @@
   display: flex;
 }
 
-.style-module-scss-module__PTl8Ta__container .ant-input-outlined, .style-module-scss-module__PTl8Ta__container .ant-input-outlined:hover, .style-module-scss-module__PTl8Ta__container .ant-input-outlined:focus-within {
-  background-color: #0000;
+.style-module-scss-module__PTl8Ta__container .ant-input-outlined {
+  background-color: rgba(0, 0, 0, 0);
+}
+
+.style-module-scss-module__PTl8Ta__container .ant-input-outlined:hover {
+  background-color: rgba(0, 0, 0, 0);
+}
+
+.style-module-scss-module__PTl8Ta__container .ant-input-outlined:focus-within {
+  background-color: rgba(0, 0, 0, 0);
 }
 
 .style-module-scss-module__PTl8Ta__container .ant-form-vertical .ant-form-item:not(.ant-form-item-horizontal) .ant-form-item-label {
@@ -44,7 +52,7 @@
 }
 
 .style-module-scss-module__PTl8Ta__logo .style-module-scss-module__PTl8Ta__des {
-  color: #ffffffb3;
+  color: rgba(255, 255, 255, .7);
   margin-bottom: 32px;
   font-size: 16px;
   font-weight: 500;
@@ -88,6 +96,5 @@
   color: #1d75d0;
   text-decoration: underline;
 }
-
 
 /*# sourceMappingURL=app_login_style_module_scss_module_1ac00748.css.map*/

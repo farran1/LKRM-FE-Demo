@@ -1,0 +1,342 @@
+.fundsContainer {
+  padding: 24px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1b2736 0%, #23272f 100%);
+  color: #fff;
+
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    
+    h2 {
+      color: #fff;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    
+    p {
+      color: #bfc9d1;
+      font-size: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+  }
+
+  .tabContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+    justify-content: center;
+    
+    .tabButton {
+      border-radius: 8px;
+      height: 40px;
+      font-weight: 500;
+      
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+    }
+  }
+
+  .content {
+    .statCard {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      
+      :global(.ant-card-body) {
+        padding: 20px;
+      }
+      
+      :global(.ant-statistic-title) {
+        color: #bfc9d1;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      
+      :global(.ant-statistic-content) {
+        color: #fff;
+      }
+    }
+
+    .progressCard {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      
+      :global(.ant-card-head) {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        
+        .ant-card-head-title {
+          color: #fff;
+          font-weight: 600;
+        }
+      }
+      
+      :global(.ant-card-body) {
+        padding: 24px;
+      }
+    }
+
+    .recentCard, .teamCard {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      height: 100%;
+      
+      :global(.ant-card-head) {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        
+        .ant-card-head-title {
+          color: #fff;
+          font-weight: 600;
+        }
+      }
+      
+      :global(.ant-card-body) {
+        padding: 16px;
+      }
+      
+      :global(.ant-list-item) {
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        
+        &:last-child {
+          border-bottom: none;
+        }
+      }
+      
+      :global(.ant-list-item-meta-title) {
+        color: #fff;
+        font-weight: 500;
+      }
+      
+      :global(.ant-list-item-meta-description) {
+        color: #bfc9d1;
+      }
+    }
+
+    .formCard, .peerCard, .commCard, .sponsorCard, .paymentCard {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      
+      :global(.ant-card-head) {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        
+        .ant-card-head-title {
+          color: #fff;
+          font-weight: 600;
+        }
+      }
+      
+      :global(.ant-card-body) {
+        padding: 24px;
+      }
+      
+      :global(.ant-card) {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        
+        :global(.ant-card-head) {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          
+          .ant-card-head-title {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+          }
+        }
+        
+        :global(.ant-card-body) {
+          padding: 16px;
+        }
+      }
+    }
+
+    .formInput {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      
+      &::placeholder {
+        color: #bfc9d1;
+      }
+      
+      &:focus {
+        outline: none;
+        border-color: #1890ff;
+        box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+      }
+      
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    .formTextarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      transition: all 0.3s ease;
+      
+      &::placeholder {
+        color: #bfc9d1;
+      }
+      
+      &:focus {
+        outline: none;
+        border-color: #1890ff;
+        box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+      }
+      
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    .formPreview {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      
+      .previewHeader {
+        margin-bottom: 16px;
+        
+        h4 {
+          color: #fff;
+          margin-bottom: 12px;
+        }
+        
+        p {
+          color: #bfc9d1;
+          margin-bottom: 8px;
+        }
+      }
+    }
+
+    :global(.ant-btn) {
+      border-radius: 6px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+    }
+
+    :global(.ant-progress) {
+      .ant-progress-text {
+        color: #fff;
+      }
+    }
+
+    :global(.ant-tag) {
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    :global(.ant-avatar) {
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    :global(.ant-badge) {
+      .ant-badge-status-text {
+        color: #fff;
+        font-size: 12px;
+      }
+    }
+
+    :global(.ant-space) {
+      width: 100%;
+    }
+
+    :global(.ant-space-vertical) {
+      width: 100%;
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .fundsContainer {
+    padding: 16px;
+    
+    .header {
+      margin-bottom: 24px;
+      
+      h2 {
+        font-size: 24px;
+      }
+      
+      p {
+        font-size: 14px;
+      }
+    }
+    
+    .tabContainer {
+      gap: 4px;
+      
+      .tabButton {
+        font-size: 12px;
+        padding: 0 12px;
+      }
+    }
+    
+    .content {
+      .statCard {
+        :global(.ant-card-body) {
+          padding: 16px;
+        }
+      }
+      
+      .formCard, .peerCard, .commCard, .sponsorCard, .paymentCard {
+        :global(.ant-card-body) {
+          padding: 16px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .fundsContainer {
+    padding: 12px;
+    
+    .tabContainer {
+      flex-direction: column;
+      align-items: center;
+      
+      .tabButton {
+        width: 100%;
+        max-width: 200px;
+      }
+    }
+  }
+} 

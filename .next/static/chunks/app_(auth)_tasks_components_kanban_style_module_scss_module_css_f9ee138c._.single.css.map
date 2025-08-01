@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/(auth)/tasks/components/kanban/style.module.scss.module.css"],"sourcesContent":[".list{flex:1;padding:16px;padding-bottom:4px;background-color:rgba(7,56,83,.4);border-radius:16px;min-height:400px}.list .heading{margin-bottom:24px}.card{background-color:rgba(0,32,50,.6);border-radius:16px;padding:16px;margin-bottom:12px}.card .header{font-size:20px;font-weight:600;display:flex;justify-content:space-between;margin-bottom:12px}.card .content{margin-bottom:24px}.card .priority{border-radius:4px;padding:2px 8px;font-size:14px;line-height:1.3;font-weight:normal;height:22px}.card .priority.High{background-color:#da2f36}.card .priority.Medium{background-color:#ff9800}.card .priority.Low{background-color:#1d75d0}.card .footer{display:flex;justify-content:space-between}.card .footer .duedate{font-size:12px;color:hsla(0,0%,100%,.7)}.btnAdd{cursor:pointer}"],"names":[],"mappings":"AAAA;;;;;;;;AAAmH;;;;AAAkC;;;;;;;AAA2F;;;;;;;;AAA2G;;;;AAAkC;;;;;;;;;AAAgH;;;;AAA8C;;;;AAAgD;;;;AAA6C;;;;;AAAyD;;;;;AAA+D"}}]
-}

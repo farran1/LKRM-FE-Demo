@@ -13,9 +13,9 @@ import CreditIcon from '@/components/icon/credit-card.svg'
 import api from '@/services/api'
 import dayjs from 'dayjs'
 import BaseTable from '@/components/base-table'
-import NewPlayer from '@/app/(auth)/events/components/new-player'
+import NewPlayer from '../../../components/new-player'
 import ProfileIcon from '@/components/icon/profile.svg'
-import NewVolunteer from '@/app/(auth)/events/components/new-volunteer'
+import NewVolunteer from '../../../components/new-volunteer'
 import { useRouter } from 'next/navigation'
 import SortIcon from '@/components/icon/sort.svg'
 import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons'
@@ -31,12 +31,8 @@ function EventDetail({
 
   const [playerLoading, setPlayerLoading] = useState(false)
   const [players, setPlayers] = useState([])
-  const [volunteerLoading, setVolunteerLoading] = useState(false)
-  const [volunteer, setVolunteer] = useState([])
   const [isShowNewPlayer, showNewPlayer] = useState(false)
-  const [isShowNewVolunteer, showNewVolunteer] = useState(false)
   const [sortHeaderPlayer, setSortHeaderPlayer] = useState<any>(null)
-  const [sortHeaderVolunteer, setSortHeaderVolunteer] = useState<any>(null)
 
   useEffect(() => {
     if (!eventId) {
@@ -45,7 +41,6 @@ function EventDetail({
 
     fetchDetail()
     fetchPlayer()
-    fetchVolunteer()
   }, [eventId])
 
   const fetchDetail = async () => {
@@ -67,24 +62,8 @@ function EventDetail({
     setPlayerLoading(false)
   }
 
-  const fetchVolunteer = async (sortParams: any = null) => {
-    setVolunteerLoading(true)
-    let res
-    if (sortParams?.sortBy && sortParams?.sortDirection) {
-      res = await api.get(`/api/events/${eventId}/volunteers?sortBy=${sortParams.sortBy}&sortDirection=${sortParams.sortDirection}`)
-    } else {
-      res = await api.get(`/api/events/${eventId}/volunteers`)
-    }
-    setVolunteer(res.data)
-    setVolunteerLoading(false)
-  }
-
   const addPlayer = () => {
     showNewPlayer(true)
-  }
-
-  const addVolunteer = () => {
-    showNewVolunteer(true)
   }
 
   const sortPlayer = useCallback((sortBy: string, sortDirection = 'desc') => {
@@ -102,22 +81,6 @@ function EventDetail({
       </Flex>
     )
   }, [sortHeaderPlayer])
-
-  const sortVolunteer = useCallback((sortBy: string, sortDirection = 'desc') => {
-    setSortHeaderVolunteer({ sortBy, sortDirection })
-    fetchVolunteer({ sortBy, sortDirection })
-    }, [])
-
-  const renderHeaderVolunteer = useCallback((title: string, dataIndex: string) => {
-    return (
-      <Flex className={style.header} justify='space-between' align='center'>
-        <span>{title}</span>
-        {(!sortHeaderVolunteer?.sortBy || sortHeaderVolunteer?.sortBy !== dataIndex) && <SortIcon onClick={() => sortVolunteer(dataIndex)} />}
-        {(sortHeaderVolunteer?.sortBy === dataIndex && sortHeaderVolunteer?.sortDirection === 'desc') && <ArrowUpOutlined onClick={() => sortVolunteer(dataIndex, 'asc')} />}
-        {(sortHeaderVolunteer?.sortBy === dataIndex && sortHeaderVolunteer?.sortDirection === 'asc') && <ArrowDownOutlined onClick={() => sortVolunteer(dataIndex, 'desc')} />}
-      </Flex>
-    )
-  }, [sortHeaderVolunteer])
 
   const playerColumns = useMemo(() => [
     {
@@ -154,35 +117,8 @@ function EventDetail({
     },
   ], [sortHeaderPlayer])
 
-  const volunteerColumns = useMemo(() => [
-    {
-      title: 'Image',
-      render: (data: any) => {
-        return data?.avatar ? <img src={data.avatar} width={24} height={24} className={style.avatar} /> : <ProfileIcon />
-      }
-    },
-    {
-      title: renderHeaderVolunteer('Name', 'name'),
-      dataIndex: 'name',
-    },
-    {
-      title: renderHeaderVolunteer('Phone Number', 'phoneNumber'),
-      dataIndex: 'phoneNumber',
-    },
-    {
-      title: 'Status',
-      render: (data: any) => {
-        return <span className={style.pending}>Pending</span>
-      }
-    },
-  ], [sortHeaderVolunteer])
-
   const refreshPlayer = () => {
     fetchPlayer()
-  }
-
-  const refreshVolunteer = () => {
-    fetchVolunteer()
   }
 
   const goBack = () => {
@@ -256,17 +192,6 @@ function EventDetail({
                 dataSource={players}
                 columns={playerColumns}
                 loading={playerLoading}
-              />
-
-              <Flex align='center' justify='space-between' style={{ marginBottom: 24 }}>
-                <div className={style.title2}>Volunteers</div>
-                <Button icon={<PlusIcon />} onClick={addVolunteer}>Add Volunteer</Button>
-              </Flex>
-              <BaseTable
-                style={{ marginBottom: 24 }}
-                dataSource={volunteer}
-                columns={volunteerColumns}
-                loading={volunteerLoading}
               />
             </Card>
           </div>
@@ -349,7 +274,6 @@ function EventDetail({
         </Flex>
       </div>
       <NewPlayer isOpen={isShowNewPlayer} showOpen={showNewPlayer} onRefresh={refreshPlayer} eventId={eventId} />
-      <NewVolunteer isOpen={isShowNewVolunteer} showOpen={showNewVolunteer} onRefresh={refreshVolunteer} eventId={eventId} />
     </>
   )
 }

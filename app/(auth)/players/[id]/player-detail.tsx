@@ -11,14 +11,14 @@ import SearchIcon from '@/components/icon/search.svg'
 import ArrowRiseIcon from '@/components/icon/ArrowRise.svg'
 import ArrowFallIcon from '@/components/icon/ArrowFall.svg'
 import OffensiveStatsLine from '@/components/offensive-stats-line'
-import LineChart from '@/app/(auth)/players/[id]/components/line-chart'
-import BarChart from '@/app/(auth)/players/[id]/components/bar-chart'
+import LineChart from './components/line-chart'
+import BarChart from './components/bar-chart'
 import DefaultAvatar from '@/components/icon/avatar.svg'
 import AddIcon from '@/components/icon/plus-circle.svg'
-import Setting from '@/app/(auth)/players/[id]/components/setting'
-import EditPlayer from '@/app/(auth)/players/[id]/components/edit-player'
-import AddNote from '@/app/(auth)/players/[id]/components/add-note'
-import AddGoal from '@/app/(auth)/players/[id]/components/add-goal'
+import Setting from './components/setting'
+import EditPlayer from './components/edit-player'
+import AddNote from './components/add-note'
+import AddGoal from './components/add-goal'
 
 
 function Detail({
@@ -50,22 +50,37 @@ function Detail({
 
   const fetchDetail = async () => {
     setLoading(true)
-    const res = await api.get('/api/players/' + playerId)
-    setPlayer(res.data.player)
+    try {
+      const res = await api.get('/api/players/' + playerId)
+      setPlayer(res.data.player)
+    } catch (error) {
+      console.error('Error fetching player:', error)
+      setPlayer(null)
+    }
     setLoading(false)
   }
 
   const fetchNotes = async () => {
     setLoadingNote(true)
-    const res = await api.get(`/api/players/${playerId}/notes`)
-    setNotes(res.data.notes)
+    try {
+      const res = await api.get(`/api/players/${playerId}/notes`)
+      setNotes(res.data.notes || [])
+    } catch (error) {
+      console.error('Error fetching notes:', error)
+      setNotes([])
+    }
     setLoadingNote(false)
   }
 
   const fetchGoals = async () => {
     setLoadingGoal(true)
-    const res = await api.get(`/api/players/${playerId}/goals`)
-    setGoals(res.data.goals)
+    try {
+      const res = await api.get(`/api/players/${playerId}/goals`)
+      setGoals(res.data.goals || [])
+    } catch (error) {
+      console.error('Error fetching goals:', error)
+      setGoals([])
+    }
     setLoadingGoal(false)
   }
 
@@ -219,10 +234,6 @@ function Detail({
                 <div className={style.value}>{player?.phoneNumber}</div>
               </div>
               <div className={style.item}>
-                <div>Weight</div>
-                <div className={style.value}>{player?.weight}lbs</div>
-              </div>
-              <div className={style.item}>
                 <div>Height</div>
                 <div className={style.value}>{player?.height}</div>
               </div>
@@ -233,7 +244,7 @@ function Detail({
                 <AddIcon className={style.addIcon} onClick={addNote} />
               </Flex>
               {loadingNote && <Skeleton />}
-              {!loadingNote && notes.map((item: any) => (
+              {!loadingNote && notes && notes.map((item: any) => (
                 <div className={style.note} key={item.id}>
                   <div>{item.note}</div>
                   <div className={style.author}>By Coach {item.createdUser.profile.firstName}</div>
@@ -246,7 +257,7 @@ function Detail({
                 <AddIcon className={style.addIcon} onClick={addGoal} />
               </Flex>
               {loadingGoal && <Skeleton />}
-              {!loadingGoal && goals.map((item: any) => (
+              {!loadingGoal && goals && goals.map((item: any) => (
                 <div className={style.goal} key={item.id}>
                   <div>{item.note}</div>
                   <div className={style.author}>By Coach {item.createdUser.profile.firstName}</div>
