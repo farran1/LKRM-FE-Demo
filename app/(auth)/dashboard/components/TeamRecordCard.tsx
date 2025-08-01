@@ -1,7 +1,20 @@
 import React from "react";
 import { Card, Statistic, Tag } from "antd";
 
-export default function TeamRecordCard({ record = {}, standing = null, nextOpponent = null, overflowClass = '' }) {
+interface TeamRecord {
+  wins: number;
+  losses: number;
+  streak: string;
+}
+
+interface TeamRecordCardProps {
+  record?: TeamRecord;
+  standing?: any;
+  nextOpponent?: any;
+  overflowClass?: string;
+}
+
+export default function TeamRecordCard({ record = { wins: 0, losses: 0, streak: '0' }, standing = null, nextOpponent = null, overflowClass = '' }: TeamRecordCardProps) {
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}

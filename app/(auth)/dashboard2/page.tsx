@@ -173,7 +173,13 @@ function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
 }
 
-const UpcomingEventsCardTop = forwardRef(function UpcomingEventsCardTop({ overflowMode, width, height }, ref) {
+interface CardProps {
+  overflowMode?: string;
+  width: number;
+  height: number;
+}
+
+const UpcomingEventsCardTop = forwardRef<HTMLDivElement, CardProps>(function UpcomingEventsCardTop({ overflowMode, width, height }, ref) {
   // Responsive scaling: allow scale > 1 for growth
   const minFont = 11;
   const maxFont = 32;
@@ -227,7 +233,7 @@ const UpcomingEventsCardTop = forwardRef(function UpcomingEventsCardTop({ overfl
   );
 });
 
-const UpcomingEventsCardFill = forwardRef(function UpcomingEventsCardFill({ overflowMode, width, height }, ref) {
+const UpcomingEventsCardFill = forwardRef<HTMLDivElement, CardProps>(function UpcomingEventsCardFill({ overflowMode, width, height }, ref) {
   // Responsive scaling: allow scale > 1 for growth
   const minFont = 11;
   const maxFont = 32;
@@ -295,7 +301,7 @@ const UpcomingEventsCardFill = forwardRef(function UpcomingEventsCardFill({ over
   );
 });
 
-const GamedayChecklistCard = forwardRef(function GamedayChecklistCard({ overflowMode, width, height }, ref) {
+const GamedayChecklistCard = forwardRef<HTMLDivElement, CardProps>(function GamedayChecklistCard({ overflowMode, width, height }, ref) {
   // Responsive scaling: allow scale > 1 for growth
   const minFont = 11;
   const maxFont = 32;
@@ -550,7 +556,7 @@ const GamedayChecklistCard = forwardRef(function GamedayChecklistCard({ overflow
   );
 });
 
-const FixedGamedayChecklistCard = forwardRef(function FixedGamedayChecklistCard({ overflowMode, width, height }, ref) {
+const FixedGamedayChecklistCard = forwardRef<HTMLDivElement, CardProps>(function FixedGamedayChecklistCard({ overflowMode, width, height }, ref) {
   // Fixed sizing - no responsive scaling
   const fontSize = 16;
   const titleFont = 22;
@@ -796,7 +802,7 @@ const FixedGamedayChecklistCard = forwardRef(function FixedGamedayChecklistCard(
   );
 });
 
-const TeamTasksCard = forwardRef(function TeamTasksCard({ overflowMode, width, height }, ref) {
+const TeamTasksCard = forwardRef<HTMLDivElement, CardProps>(function TeamTasksCard({ overflowMode, width, height }, ref) {
   // Fixed sizing - no responsive scaling
   const fontSize = 16;
   const titleFont = 22;
@@ -1044,7 +1050,7 @@ const TeamTasksCard = forwardRef(function TeamTasksCard({ overflowMode, width, h
   );
 });
 
-const CompactGamedayChecklistCard = forwardRef(function CompactGamedayChecklistCard({ overflowMode, width, height }, ref) {
+const CompactGamedayChecklistCard = forwardRef<HTMLDivElement, CardProps>(function CompactGamedayChecklistCard({ overflowMode, width, height }, ref) {
   // Fixed sizing for compact design
   const fontSize = 14;
   const titleFont = 18;
@@ -1233,7 +1239,7 @@ const CompactGamedayChecklistCard = forwardRef(function CompactGamedayChecklistC
   );
 });
 
-const CompactTeamTasksCard = forwardRef(function CompactTeamTasksCard({ overflowMode, width, height }, ref) {
+const CompactTeamTasksCard = forwardRef<HTMLDivElement, CardProps>(function CompactTeamTasksCard({ overflowMode, width, height }, ref) {
   // Fixed sizing - no responsive scaling
   const fontSize = 14;
   const titleFont = 18;
@@ -1437,7 +1443,7 @@ const CompactTeamTasksCard = forwardRef(function CompactTeamTasksCard({ overflow
 });
 
   // Fixed Compact Gameday Checklist Card (no resizing logic)
-  const FixedCompactGamedayChecklistCard = forwardRef(function FixedCompactGamedayChecklistCard({ overflowMode, width, height }, ref) {
+  const FixedCompactGamedayChecklistCard = forwardRef<HTMLDivElement, CardProps>(function FixedCompactGamedayChecklistCard({ overflowMode, width, height }, ref) {
     // Fixed sizing - no responsive scaling
     const fontSize = 14;
     const titleFont = 18;

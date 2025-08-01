@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card, Input, Button, DatePicker } from "antd";
-import { MenuOutlined, DragOutlined, ArrowsAltOutlined } from "@ant-design/icons";
+import { MenuOutlined, DragOutlined, ArrowsAltOutlined } from "@ant-design/icons/lib/icons";
 import dayjs, { Dayjs } from "dayjs";
 import Frame from "../stats-overview/components/Frame";
 import GameFlowChart from "../stats-overview/components/GameFlowChart";

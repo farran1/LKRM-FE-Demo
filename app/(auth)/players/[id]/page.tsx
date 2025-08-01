@@ -14,6 +14,19 @@ type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
+// Generate static params for static export
+export async function generateStaticParams() {
+  // For demo purposes, generate a few common player IDs
+  // In a real app, you'd fetch this from your API
+  return [
+    { id: '1' },
+    { id: '2' },
+    { id: '3' },
+    { id: '4' },
+    { id: '5' },
+  ]
+}
+
 export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
