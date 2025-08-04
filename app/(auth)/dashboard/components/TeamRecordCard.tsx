@@ -14,7 +14,9 @@ interface TeamRecordCardProps {
   overflowClass?: string;
 }
 
-export default function TeamRecordCard({ record = { wins: 0, losses: 0, streak: '0' }, standing = null, nextOpponent = null, overflowClass = '' }: TeamRecordCardProps) {
+export default function TeamRecordCard({ record, standing = null, nextOpponent = null, overflowClass = '' }: TeamRecordCardProps) {
+  const defaultRecord: TeamRecord = { wins: 0, losses: 0, streak: '0' };
+  const displayRecord = record || defaultRecord;
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
@@ -23,9 +25,9 @@ export default function TeamRecordCard({ record = { wins: 0, losses: 0, streak: 
       bordered={false}
     >
       <div className={overflowClass}>
-        <Statistic title="Wins" value={record.wins} valueStyle={{ color: '#52c41a' }} />
-        <Statistic title="Losses" value={record.losses} valueStyle={{ color: '#f5222d' }} />
-        <div style={{ marginTop: 16, color: '#fff' }}>Streak: <Tag color="blue">{record.streak}</Tag></div>
+        <Statistic title="Wins" value={displayRecord.wins} valueStyle={{ color: '#52c41a' }} />
+        <Statistic title="Losses" value={displayRecord.losses} valueStyle={{ color: '#f5222d' }} />
+        <div style={{ marginTop: 16, color: '#fff' }}>Streak: <Tag color="blue">{displayRecord.streak}</Tag></div>
       </div>
     </Card>
   );
