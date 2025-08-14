@@ -3,8 +3,8 @@ import styles from './style.module.scss';
 import Link from 'next/link';
 import NewReceiptForm from './NewReceiptForm';
 
-export default function NewReceiptPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default async function NewReceiptPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   return (
     <main className={styles.pageRoot}>
       <div className={styles.headerBar}>
