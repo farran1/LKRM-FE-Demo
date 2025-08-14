@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   // Enable static export for GitHub Pages
   output: 'export',
   // Set base path for GitHub Pages (will be your repo name)
-  basePath: process.env.NODE_ENV === 'production' ? '/LKRM-Demo' : '',
+  basePath: process.env.NODE_ENV === 'production' ? '/LKRM-FE-Demo' : '',
   // Disable image optimization for static export
   images: {
     unoptimized: true,
