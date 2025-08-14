@@ -12,11 +12,34 @@ export default class EventTypeController {
     }
 
     try {
-      const eventTypes = await db.eventType.findMany();
+      let eventTypes = await db.eventType.findMany();
 
-      return res.json({
-        data: eventTypes
-      });
+      // Seed defaults if empty so UI always has common types
+      if (!eventTypes || eventTypes.length === 0) {
+        const defaults = [
+          { name: 'Practice',   color: '#2196f3', txtColor: '#ffffff' },
+          { name: 'Game',       color: '#4ecdc4', txtColor: '#ffffff' },
+          { name: 'Workout',    color: '#9c27b0', txtColor: '#ffffff' },
+          { name: 'Meeting',    color: '#4caf50', txtColor: '#ffffff' },
+          { name: 'Scrimmage',  color: '#ff9800', txtColor: '#ffffff' },
+          { name: 'Tournament', color: '#ff5722', txtColor: '#ffffff' },
+        ]
+
+        // createMany will ignore duplicates if skipDuplicates supported
+        // fall back to creating one-by-one if needed
+        try {
+          // @ts-ignore - prisma createMany skipDuplicates available in runtime
+          await db.eventType.createMany({ data: defaults, skipDuplicates: true })
+        } catch {
+          for (const d of defaults) {
+            try { await db.eventType.create({ data: d }) } catch {}
+          }
+        }
+
+        eventTypes = await db.eventType.findMany();
+      }
+
+      return res.json({ data: eventTypes });
     } catch (error) {
       console.error('Error fetching event types:', error);
       return res.status(500).json({ error: 'Internal Server Error' });

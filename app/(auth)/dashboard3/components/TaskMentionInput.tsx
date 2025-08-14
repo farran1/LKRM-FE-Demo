@@ -9,7 +9,7 @@ import {
   saveNotification,
   Mention,
   COACHES
-} from '../../../../utils/mentions';
+} from '@/utils/mentions';
 
 interface TaskMentionInputProps {
   onTaskCreate: (task: {

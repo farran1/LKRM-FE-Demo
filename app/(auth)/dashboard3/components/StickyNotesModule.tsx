@@ -8,7 +8,7 @@ import {
   createMentionActivity, 
   saveNotification,
   Mention 
-} from '../../../../utils/mentions';
+} from '@/utils/mentions';
 
 interface Note {
   id: string;

@@ -6,7 +6,7 @@ import {
   getUnreadNotificationCount, 
   markNotificationAsRead,
   Notification 
-} from '../../utils/mentions';
+} from '@/utils/mentions';
 
 interface NotificationBellProps {
   style?: React.CSSProperties;

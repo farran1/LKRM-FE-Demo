@@ -10,7 +10,7 @@ import RightHeader from '@/components/right-header'
 import { SWRConfig } from 'swr'
 import { fetcher } from '@/services/api'
 // DEV-ONLY: Changed from alias import to relative path to fix module not found error in dev mode. Revert to alias if project structure changes back.
-import { menus } from '../../utils/menu'
+import { menus } from '@/utils/menu'
 import { MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons';
 
 const { Header, Sider, Content, Footer } = Layout
@@ -109,16 +109,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <div key={section.key} style={{ width: '100%' }}>
                   {section.children && section.children.map((item) => (
                     <Tooltip key={item.key} title={item.label.props ? item.label.props.children : item.label} placement="right">
-                      <span style={{ 
-                        width: item.key === '/dashboard' ? '45px' : '38px',
-                        height: item.key === '/dashboard' ? '45px' : '38px',
-                        color: item.key === '/dashboard' ? '#B58842' : '#fff', 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center', 
-                        margin: '10px 7px'
-                      }}>
+                      <span
+                        onClick={() => router.push(item.key)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={item.label.props ? item.label.props.children : item.label}
+                        style={{ 
+                          width: item.key === '/dashboard' ? '45px' : '38px',
+                          height: item.key === '/dashboard' ? '45px' : '38px',
+                          color: item.key === '/dashboard' ? '#B58842' : '#fff', 
+                          cursor: 'pointer', 
+                          display: 'flex', 
+                          justifyContent: 'center', 
+                          alignItems: 'center', 
+                          margin: '10px 7px'
+                        }}
+                      >
                         {item.icon}
                       </span>
                     </Tooltip>

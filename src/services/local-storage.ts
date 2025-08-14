@@ -285,10 +285,12 @@ class LocalStorageService {
   // Default data
   private getDefaultEventTypes(): LocalEventType[] {
     return [
-      { id: 1, name: 'Practice', color: '#2196f3', txtColor: '#fff' },
-      { id: 2, name: 'Game', color: '#4ecdc4', txtColor: '#fff' },
-      { id: 3, name: 'Team Meeting', color: '#4caf50', txtColor: '#fff' },
-      { id: 4, name: 'Scrimmage', color: '#ff9800', txtColor: '#fff' },
+      { id: 1, name: 'Practice',   color: '#2196f3', txtColor: '#fff' },
+      { id: 2, name: 'Game',       color: '#4ecdc4', txtColor: '#fff' },
+      { id: 3, name: 'Workout',    color: '#9c27b0', txtColor: '#fff' },
+      { id: 4, name: 'Meeting',    color: '#4caf50', txtColor: '#fff' },
+      { id: 5, name: 'Scrimmage',  color: '#ff9800', txtColor: '#fff' },
+      { id: 6, name: 'Tournament', color: '#ff5722', txtColor: '#fff' },
     ];
   }
 

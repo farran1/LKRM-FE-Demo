@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Coach, getMentionSuggestions, parseMentions, Mention } from '../../../../utils/mentions';
+import { Coach, getMentionSuggestions, parseMentions, Mention } from '@/utils/mentions';
 
 interface MentionInputProps {
   value: string;

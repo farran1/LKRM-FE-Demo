@@ -1,0 +1,180 @@
+ .pageRoot {
+   padding: 16px 12px 24px 0;
+   min-height: 100vh;
+   background: #202c3e;
+ }
+ 
+ .toolbar {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+  gap: 16px;
+  margin: 8px auto 20px auto;
+   max-width: 1400px;
+ }
+ 
+ .titleRow {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+ }
+ 
+ .pageTitle {
+   color: #ffffff;
+   font-size: 32px;
+   font-weight: 600;
+   margin: 0;
+ }
+ 
+ .filterBtn {
+   background: rgba(255,255,255,0.1);
+   color: #fff;
+   border: none;
+ }
+ 
+ .actionsRow {
+   display: flex;
+   align-items: center;
+   gap: 12px;
+ }
+ 
+ .search {
+   width: 280px;
+   background: rgba(255,255,255,0.1);
+   color: #fff;
+   border-radius: 8px;
+ }
+ 
+ .primaryBtn {
+   background: #1d75d0;
+   border-color: #1d75d0;
+ }
+ 
+ .sectionCard {
+   background: rgba(7,56,83,0.4);
+   border-radius: 16px;
+  padding: 24px;
+   max-width: 1400px;
+  margin: 0 auto 20px auto;
+ }
+ 
+ .sectionHeader {
+   color: #fff;
+   font-size: 24px;
+   font-weight: 600;
+   margin-bottom: 16px;
+   h2 { margin: 0; font-weight: 600; font-size: 24px; }
+ }
+ 
+.rowContainer { margin-top: 12px; }
+ .grid3 {
+   display: grid;
+   grid-template-columns: repeat(3, 1fr);
+   gap: 16px;
+ }
+ 
+.budgetCard {
+  background: rgba(0,32,50,0.6);
+   border-radius: 16px;
+   padding: 16px;
+   color: #fff;
+   display: flex;
+   flex-direction: column;
+   gap: 12px;
+  text-decoration: none;
+ }
+ 
+ .cardHeader { display: flex; flex-direction: column; gap: 6px; }
+ .cardTitle { font-size: 20px; font-weight: 600; }
+ .cardSub { color: rgba(255,255,255,0.9); font-size: 16px; }
+ 
+ .rowBetween { display: flex; align-items: center; justify-content: space-between; color: #fff; font-weight: 500; }
+ 
+ .progressTrack {
+   background: #e0e0e2;
+   height: 10px;
+  width: 100%;
+   border-radius: 8px;
+   overflow: hidden;
+ }
+ 
+ .progressFill { height: 100%; border-radius: 8px; }
+ 
+ .viewAllRow { display: flex; justify-content: flex-start; margin-top: 8px; }
+ .linkBtn { background: transparent; color: rgba(255,255,255,0.7); border: none; padding: 8px 12px; cursor: pointer; }
+ 
+ .masterBudget {
+   background: #002032;
+   border-radius: 16px;
+  padding: 24px;
+   color: #fff;
+   display: flex;
+   flex-direction: column;
+  gap: 14px;
+ }
+ .masterHead { display: flex; align-items: center; gap: 20px; justify-content: space-between; flex-wrap: wrap; }
+ .masterTitle { font-size: 20px; font-weight: 600; }
+.masterMeta { display: flex; align-items: center; gap: 10px; }
+ .masterActions { margin-top: 8px; }
+.ghostBtn {
+  background: transparent;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+.ghostBtn:hover,
+.ghostBtn:focus {
+  color: #ffffff;
+  border-color: #ffffff;
+  background: rgba(255,255,255,0.1);
+}
+ 
+ .grid2x2 {
+   display: grid;
+   grid-template-columns: 1fr;
+   gap: 12px;
+   margin-top: 12px;
+ }
+ 
+.bucketGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+.bucketCard {
+  background: rgba(3,42,63,0.6);
+  border-radius: 16px;
+  padding: 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inlineStats { display: flex; gap: 24px; color: rgba(255,255,255,0.9); }
+
+.listRow {
+  background: rgba(0,32,50,0.6);
+  border-radius: 16px;
+  padding: 24px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 12px;
+}
+.listRowBody { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.listRowHead { display: flex; gap: 16px; align-items: center; }
+.rightActions { flex: none; }
+.nestedBuckets { padding: 12px 4px 0 4px; }
+ 
+ @media (max-width: 1200px) {
+   .grid3 { grid-template-columns: repeat(2, 1fr); }
+  .bucketGrid { grid-template-columns: repeat(2, 1fr); }
+ }
+ @media (max-width: 768px) {
+   .grid3 { grid-template-columns: 1fr; }
+  .bucketGrid { grid-template-columns: 1fr; }
+ }
+ 
+

@@ -215,7 +215,7 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
           display: 'flex',
           flexDirection: 'column',
           gap: '14px',
-          width: sidebarCollapsed ? '100%' : '350px',
+          width: '100%',
           height: '100%',
           minHeight: '280px', // Increased from 200px
           maxHeight: '320px', // Increased from 250px

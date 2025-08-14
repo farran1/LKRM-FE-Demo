@@ -1,0 +1,69 @@
+.container {
+	padding: 16px;
+}
+
+.filters {
+	margin-bottom: 8px;
+}
+
+.tableCard {
+	.ant-table {
+		--row-height: 44px;
+	}
+
+	.ant-table-thead > tr > th {
+		background: #0f2741;
+		color: #cfe3f2;
+		font-weight: 600;
+		border-bottom: 0;
+		height: var(--row-height);
+		padding: 8px 12px;
+	}
+
+	.ant-table-tbody > tr > td {
+		height: var(--row-height);
+		padding: 8px 12px;
+		background: #0b2134;
+		color: #e6f0f7;
+		border-bottom: 1px solid #12324e;
+	}
+
+	.ant-table-tbody > tr:hover > td {
+		background: #10375a;
+	}
+
+	.amountCell {
+		text-align: right;
+		font-weight: 600;
+		color: #9ad1ff;
+	}
+
+	.categoryTag {
+		background: rgba(154, 209, 255, 0.08);
+		border: 1px solid rgba(154, 209, 255, 0.25);
+		color: #9ad1ff;
+	}
+
+	.categoryEquipment {
+		background: rgba(38, 166, 91, 0.18);
+		border-color: rgba(38, 166, 91, 0.45);
+		color: #7be0a6;
+	}
+
+	.categoryMaintenance {
+		background: rgba(255, 229, 100, 0.25);
+		border-color: rgba(255, 229, 100, 0.6);
+		color: #ffec8a;
+	}
+
+	.categoryTravel {
+		background: rgba(59, 130, 246, 0.2);
+		border-color: rgba(59, 130, 246, 0.45);
+		color: #9cc7ff;
+	}
+
+	.receiptCell { display: flex; align-items: center; }
+	.ellipsis { display: inline-block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+

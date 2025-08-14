@@ -224,6 +224,10 @@ const Statistics = () => {
     { id: 15, name: 'Nathan Clark', number: '55', position: 'C', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
   ])
 
+  // Opponent on-court jersey slots (5) and selection
+  const [opponentOnCourt, setOpponentOnCourt] = useState<string[]>(['', '', '', '', ''])
+  const [selectedOpponentSlot, setSelectedOpponentSlot] = useState<number | null>(null)
+
   const [events, setEvents] = useState<StatEvent[]>([])
   const [lineups, setLineups] = useState<Lineup[]>([])
   const [showHalftimeReport, setShowHalftimeReport] = useState(false)
@@ -892,6 +896,46 @@ const Statistics = () => {
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
   }, [players, gameState.quarter, gameState.currentTime, settings.foulTroubleAlert, actionHistory])
 
+  // Record opponent stat by jersey number only (no player object updates)
+  const handleOpponentStatEvent = useCallback((jerseyNumber: string, eventType: string, value?: number) => {
+    if (!jerseyNumber) return
+
+    // Save current state for undo
+    const previousState = {
+      players: players,
+      gameState: gameState,
+      events: events
+    }
+
+    const newEvent: StatEvent = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      playerId: -1, // indicates opponent jersey-based
+      playerName: `#${jerseyNumber}`,
+      eventType,
+      value,
+      quarter: gameState.quarter,
+      gameTime: (settings.quarterDuration * 60) - gameState.currentTime,
+      opponentEvent: true
+    }
+
+    setEvents(prev => [newEvent, ...prev])
+
+    // Update opponent team score for points
+    if (eventType.includes('made') || eventType === 'points') {
+      const points = eventType === 'three_made' ? 3 : eventType === 'ft_made' ? 1 : value || 2
+      setGameState(prev => ({ ...prev, opponentScore: prev.opponentScore + points }))
+    }
+
+    // Add to action history for undo
+    setActionHistory(prev => [{
+      type: 'stat',
+      timestamp: Date.now(),
+      data: { jerseyNumber, eventType, value, isOpponent: true },
+      previousState
+    }, ...prev.slice(0, 49)])
+  }, [players, gameState.quarter, gameState.currentTime, events, settings.quarterDuration])
+
   // DEV-ONLY: Auto-export functionality
   useEffect(() => {
     if (settings.autoExport && gameState.isPlaying) {
@@ -1026,6 +1070,44 @@ const Statistics = () => {
       assistToTurnoverRatio: totalTurnovers > 0 ? (totalAssists / totalTurnovers).toFixed(2) : '0.00',
       pace,
       projectedFinal: Math.round(pace * 0.4)
+    }
+  }
+
+  // DEV-ONLY: Calculate opponent statistics from event feed
+  const calculateOpponentStats = () => {
+    const opp = events.filter(e => e.opponentEvent)
+    const points = opp.reduce((sum, e) => {
+      if (e.eventType === 'three_made') return sum + 3
+      if (e.eventType === 'ft_made') return sum + 1
+      if (e.eventType === 'fg_made' || e.eventType === 'points') return sum + (e.value || 2)
+      return sum
+    }, 0)
+    const rebounds = opp.filter(e => e.eventType.includes('rebound')).length
+    const assists = opp.filter(e => e.eventType === 'assist').length
+    const steals = opp.filter(e => e.eventType === 'steal').length
+    const blocks = opp.filter(e => e.eventType === 'block').length
+    const turnovers = opp.filter(e => e.eventType === 'turnover').length
+    const fgMade = opp.filter(e => e.eventType === 'fg_made').length + opp.filter(e => e.eventType === 'three_made').length
+    const fgMissed = opp.filter(e => e.eventType === 'fg_missed').length + opp.filter(e => e.eventType === 'three_missed').length
+    const threeMade = opp.filter(e => e.eventType === 'three_made').length
+    const threeMissed = opp.filter(e => e.eventType === 'three_missed').length
+    const ftMade = opp.filter(e => e.eventType === 'ft_made').length
+    const ftMissed = opp.filter(e => e.eventType === 'ft_missed').length
+
+    const fgAttempted = fgMade + fgMissed
+    const threeAttempted = threeMade + threeMissed
+    const ftAttempted = ftMade + ftMissed
+
+    return {
+      totalPoints: points,
+      totalRebounds: rebounds,
+      totalAssists: assists,
+      totalTurnovers: turnovers,
+      totalSteals: steals,
+      totalBlocks: blocks,
+      fgPercentage: fgAttempted > 0 ? Math.round((fgMade / fgAttempted) * 100) : 0,
+      threePercentage: threeAttempted > 0 ? Math.round((threeMade / threeAttempted) * 100) : 0,
+      ftPercentage: ftAttempted > 0 ? Math.round((ftMade / ftAttempted) * 100) : 0,
     }
   }
 
@@ -1391,16 +1473,16 @@ const Statistics = () => {
       key: 'tracking',
       label: 'Live Tracking',
       children: (
-        <Row gutter={[16, 16]}>
+        <Row gutter={[16, 8]}>
           {settings.workflowMode === 'player-first' ? (
             <>
               <Col span={12}>
                 {/* Player box */}
-                <Card title="Player" size={settings.compactMode ? 'small' : 'default'}>
-                  <Row gutter={[8, 8]}>
+                 <Card title="Player" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
+                     <Row gutter={[8, 6]}>
                     <Col span={12}>
                       {players.slice(0, 3).map(player => (
-                        <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`}>
+                        <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`} style={{ padding: 6, margin: '2px 0' }}>
                           <div onClick={() => setSelectedPlayer(player)} style={{ cursor: 'pointer', flex: 1 }}>
                             <Text strong style={{ fontSize: settings.compactMode ? '0.8rem' : '0.9rem' }}>{settings.showPlayerNumbers && `#${player.number} `}{player.name}</Text>
                             {settings.showPositions && (<><br /><Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}>{player.position}</Text></>)}
@@ -1438,7 +1520,7 @@ const Statistics = () => {
                     </Col>
                     <Col span={12}>
                       {players.slice(3, 5).map(player => (
-                        <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`}>
+                        <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`} style={{ padding: 6, margin: '2px 0' }}>
                           <div onClick={() => setSelectedPlayer(player)} style={{ cursor: 'pointer', flex: 1 }}>
                             <Text strong style={{ fontSize: settings.compactMode ? '0.8rem' : '0.9rem' }}>{settings.showPlayerNumbers && `#${player.number} `}{player.name}</Text>
                             {settings.showPositions && (<><br /><Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}>{player.position}</Text></>)}
@@ -1490,18 +1572,80 @@ const Statistics = () => {
                       </div>
                     </Col>
                   </Row>
+                  <Divider style={{ margin: settings.compactMode ? '8px 0' : '12px 0' }} />
+                  <div>
+                    <Text strong style={{ display: 'block', marginBottom: 8 }}>Opponent On-Court</Text>
+                     <Row gutter={[8, 6]}>
+                      {opponentOnCourt.map((jersey, idx) => {
+                        const isSelected = selectedOpponentSlot === idx
+                        return (
+                          <Col key={idx} span={12}>
+                            <div
+                              onClick={() => setSelectedOpponentSlot(idx)}
+                              style={{
+                                display: 'flex',
+                                gap: 8,
+                                alignItems: 'center',
+                                padding: 8,
+                                borderRadius: 6,
+                                border: isSelected ? '1px solid #2563eb' : '1px solid #334155',
+                                background: isSelected ? '#0b2a4a' : '#0f2741',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Input
+                                placeholder="Opp #"
+                                value={jersey}
+                                onChange={(e) => {
+                                  const next = [...opponentOnCourt]
+                                  next[idx] = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+                                  setOpponentOnCourt(next)
+                                }}
+                                style={{ width: 80 }}
+                              />
+                              <Button
+                                size="small"
+                                danger
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const next = [...opponentOnCourt]
+                                  next[idx] = ''
+                                  setOpponentOnCourt(next)
+                                  if (selectedOpponentSlot === idx) setSelectedOpponentSlot(null)
+                                }}
+                              >
+                                Sub
+                              </Button>
+                              {jersey && <Badge count={`#${jersey}`} />}
+                            </div>
+                          </Col>
+                        )
+                      })}
+                    </Row>
+                  </div>
                 </Card>
               </Col>
               <Col span={12}>
                 {/* Action box */}
-                <Card title="Action" size={settings.compactMode ? 'small' : 'default'}>
+                <Card title="Action" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
+                  {(() => {
+                    const canRecordOpponent = selectedOpponentSlot !== null && !!opponentOnCourt[selectedOpponentSlot!]?.trim()
+                    const recordAction = (eventType: string) => {
+                      if (canRecordOpponent) {
+                        handleOpponentStatEvent(opponentOnCourt[selectedOpponentSlot!], eventType)
+                      } else if (selectedPlayer) {
+                        handleStatEvent(selectedPlayer.id, eventType)
+                      }
+                    }
+                    const isDisabled = !(selectedPlayer || canRecordOpponent)
+                    return (
                   <Row gutter={[8, 8]}>
                     <Col span={8}>
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'fg_made')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('fg_made')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         2PT Made
@@ -1511,8 +1655,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'fg_missed')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('fg_missed')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         2PT Miss
@@ -1522,8 +1666,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'three_made')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('three_made')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         3PT Made
@@ -1533,8 +1677,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'three_missed')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('three_missed')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         3PT Miss
@@ -1544,8 +1688,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'ft_made')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('ft_made')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         FT Made
@@ -1555,8 +1699,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'ft_missed')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('ft_missed')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         FT Miss
@@ -1566,8 +1710,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'rebound')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('rebound')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         Rebound
@@ -1577,8 +1721,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'assist')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('assist')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         Assist
@@ -1588,8 +1732,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'steal')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('steal')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         Steal
@@ -1599,8 +1743,8 @@ const Statistics = () => {
                       <Button 
                         size="middle"
                         block 
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'block')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('block')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         Block
@@ -1611,8 +1755,8 @@ const Statistics = () => {
                         size="middle"
                         block 
                         danger
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'turnover')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('turnover')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         Turnover
@@ -1623,18 +1767,18 @@ const Statistics = () => {
                         size="middle"
                         block 
                         danger
-                        onClick={() => selectedPlayer && handleStatEvent(selectedPlayer.id, 'foul')}
-                        disabled={!selectedPlayer}
+                        onClick={() => recordAction('foul')}
+                        disabled={isDisabled}
                         className={style.quickStatButton}
                       >
                         Foul
                       </Button>
                     </Col>
                   </Row>
+                    )
+                  })()}
                 </Card>
-              </Col>
-              <Col span={12}>
-                <Card title="Play by Play" size="small">
+                <Card title="Play by Play" size="small" styles={{ body: { paddingTop: 8 } }} style={{ marginTop: 8 }}>
                   <div className={style.eventsFeed}>
                     {events.slice(0, 10).map(event => (
                       <div key={event.id} className={style.eventItem}>
@@ -1648,68 +1792,12 @@ const Statistics = () => {
                   </div>
                 </Card>
               </Col>
-              <Col span={12}>
-                <Card title="Player Statistics" size="small">
-                  {selectedPlayer ? (
-                    <div>
-                      <Title level={4}>
-                        {settings.showPlayerNumbers && `#${selectedPlayer.number} `}{selectedPlayer.name}
-                        {settings.showPositions && ` (${selectedPlayer.position})`}
-                      </Title>
-                      <Row gutter={16}>
-                        <Col span={8}>
-                          <Statistic title="Points" value={selectedPlayer.points} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Rebounds" value={selectedPlayer.rebounds} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Assists" value={selectedPlayer.assists} />
-                        </Col>
-                      </Row>
-                      <Row gutter={16}>
-                        <Col span={8}>
-                          <Statistic title="Steals" value={selectedPlayer.steals} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Blocks" value={selectedPlayer.blocks} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Fouls" value={selectedPlayer.fouls} />
-                        </Col>
-                      </Row>
-                      <Divider />
-                      <Text>FG: {selectedPlayer.fgMade}/{selectedPlayer.fgAttempted} ({selectedPlayer.fgAttempted > 0 ? Math.round((selectedPlayer.fgMade / selectedPlayer.fgAttempted) * 100) : 0}%)</Text>
-                      <br />
-                      <Text>3PT: {selectedPlayer.threeMade}/{selectedPlayer.threeAttempted} ({selectedPlayer.threeAttempted > 0 ? Math.round((selectedPlayer.threeMade / selectedPlayer.threeAttempted) * 100) : 0}%)</Text>
-                      <br />
-                      <Text>FT: {selectedPlayer.ftMade}/{selectedPlayer.ftAttempted} ({selectedPlayer.ftAttempted > 0 ? Math.round((selectedPlayer.ftMade / selectedPlayer.ftAttempted) * 100) : 0}%)</Text>
-                      <br />
-                      <Text>+/-: {selectedPlayer.plusMinus}</Text>
-                      {settings.showEfficiencyRatings && (
-                        <>
-                          <br />
-                          <Text>Efficiency: {selectedPlayer.points + selectedPlayer.rebounds + selectedPlayer.assists + selectedPlayer.steals + selectedPlayer.blocks - selectedPlayer.turnovers - selectedPlayer.fouls}</Text>
-                        </>
-                      )}
-                      {settings.showTrends && selectedPlayer.plusMinus > 0 && (
-                        <>
-                          <br />
-                          <Text type="success">📈 Positive impact on court</Text>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <Text type="secondary">No player selected</Text>
-                  )}
-                </Card>
-              </Col>
             </>
           ) : (
             <>
               <Col span={12}>
                 {/* Action box */}
-                <Card title="Action" size={settings.compactMode ? 'small' : 'default'}>
+                <Card title="Action" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
                   <Row gutter={[8, 8]}>
                     <Col span={settings.compactMode ? 12 : 8}>
                       <Button 
@@ -1838,14 +1926,15 @@ const Statistics = () => {
               </Col>
               <Col span={12}>
                 {/* Player Selection for Action First */}
-                <Card title="Player" size={settings.compactMode ? 'small' : 'default'}>
+                <Card title="Player" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
                   <Row gutter={[8, 8]}>
                     {/* First Column - Players 1-3 */}
-                    <Col span={12}>
-                      {players.slice(0, 3).map(player => (
+                     <Col span={12}>
+                       {players.slice(0, 3).map(player => (
                         <div 
                           key={player.id} 
                           className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`}
+                          style={{ padding: 6, margin: '2px 0' }}
                           onClick={() => {
                             if (selectedAction) {
                               // If an action is selected, record it for this player
@@ -1882,11 +1971,12 @@ const Statistics = () => {
                       ))}
                     </Col>
                     {/* Second Column - Players 4-5 + Substitution Button */}
-                    <Col span={12}>
-                      {players.slice(3, 5).map(player => (
+                     <Col span={12}>
+                       {players.slice(3, 5).map(player => (
                         <div 
                           key={player.id} 
                           className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`}
+                          style={{ padding: 6, margin: '2px 0' }}
                           onClick={() => {
                             if (selectedAction) {
                               // If an action is selected, record it for this player
@@ -1971,8 +2061,68 @@ const Statistics = () => {
                       </div>
                     </Col>
                   </Row>
+                  <Divider style={{ margin: settings.compactMode ? '8px 0' : '12px 0' }} />
+                  <div>
+                    <Text strong style={{ display: 'block', marginBottom: 8 }}>Opponent On-Court</Text>
+                    <Row gutter={[8, 8]}>
+                      {opponentOnCourt.map((jersey, idx) => {
+                        const isSelected = selectedOpponentSlot === idx
+                        return (
+                          <Col key={idx} span={12}>
+                            <div
+                              onClick={() => {
+                                if (selectedAction && jersey) {
+                                  handleOpponentStatEvent(jersey, selectedAction)
+                                  setSelectedAction(null)
+                                  setSelectedOpponentSlot(idx)
+                                } else {
+                                  setSelectedOpponentSlot(idx)
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                gap: 8,
+                                alignItems: 'center',
+                                padding: 8,
+                                borderRadius: 6,
+                                border: isSelected ? '1px solid #2563eb' : '1px solid #334155',
+                                background: isSelected ? '#0b2a4a' : '#0f2741',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Input
+                                placeholder="Opp #"
+                                value={jersey}
+                                onChange={(e) => {
+                                  const next = [...opponentOnCourt]
+                                  next[idx] = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+                                  setOpponentOnCourt(next)
+                                }}
+                                style={{ width: 90 }}
+                              />
+                              <Button
+                                size="small"
+                                danger
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const next = [...opponentOnCourt]
+                                  next[idx] = ''
+                                  setOpponentOnCourt(next)
+                                  if (selectedOpponentSlot === idx) setSelectedOpponentSlot(null)
+                                }}
+                              >
+                                Sub
+                              </Button>
+                              {jersey && <Badge count={`#${jersey}`} />}
+                            </div>
+                          </Col>
+                        )
+                      })}
+                    </Row>
+                  </div>
                 </Card>
               </Col>
+              <Col span={12} />
               <Col span={12}>
                 <Card title="Play by Play" size="small">
                   <div className={style.eventsFeed}>
@@ -1986,62 +2136,6 @@ const Statistics = () => {
                       </div>
                     ))}
                   </div>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card title="Player Statistics" size="small">
-                  {selectedPlayer ? (
-                    <div>
-                      <Title level={4}>
-                        {settings.showPlayerNumbers && `#${selectedPlayer.number} `}{selectedPlayer.name}
-                        {settings.showPositions && ` (${selectedPlayer.position})`}
-                      </Title>
-                      <Row gutter={16}>
-                        <Col span={8}>
-                          <Statistic title="Points" value={selectedPlayer.points} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Rebounds" value={selectedPlayer.rebounds} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Assists" value={selectedPlayer.assists} />
-                        </Col>
-                      </Row>
-                      <Row gutter={16}>
-                        <Col span={8}>
-                          <Statistic title="Steals" value={selectedPlayer.steals} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Blocks" value={selectedPlayer.blocks} />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic title="Fouls" value={selectedPlayer.fouls} />
-                        </Col>
-                      </Row>
-                      <Divider />
-                      <Text>FG: {selectedPlayer.fgMade}/{selectedPlayer.fgAttempted} ({selectedPlayer.fgAttempted > 0 ? Math.round((selectedPlayer.fgMade / selectedPlayer.fgAttempted) * 100) : 0}%)</Text>
-                      <br />
-                      <Text>3PT: {selectedPlayer.threeMade}/{selectedPlayer.threeAttempted} ({selectedPlayer.threeAttempted > 0 ? Math.round((selectedPlayer.threeMade / selectedPlayer.threeAttempted) * 100) : 0}%)</Text>
-                      <br />
-                      <Text>FT: {selectedPlayer.ftMade}/{selectedPlayer.ftAttempted} ({selectedPlayer.ftAttempted > 0 ? Math.round((selectedPlayer.ftMade / selectedPlayer.ftAttempted) * 100) : 0}%)</Text>
-                      <br />
-                      <Text>+/-: {selectedPlayer.plusMinus}</Text>
-                      {settings.showEfficiencyRatings && (
-                        <>
-                          <br />
-                          <Text>Efficiency: {selectedPlayer.points + selectedPlayer.rebounds + selectedPlayer.assists + selectedPlayer.steals + selectedPlayer.blocks - selectedPlayer.turnovers - selectedPlayer.fouls}</Text>
-                        </>
-                      )}
-                      {settings.showTrends && selectedPlayer.plusMinus > 0 && (
-                        <>
-                          <br />
-                          <Text type="success">📈 Positive impact on court</Text>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <Text type="secondary">No player selected</Text>
-                  )}
                 </Card>
               </Col>
             </>
@@ -2103,6 +2197,44 @@ const Statistics = () => {
                   </>
                 )}
               </Row>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card title="Opponent Statistics" className={style.teamStatsCard}>
+              {(() => {
+                const oppStats = calculateOpponentStats()
+                return (
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Statistic title="Total Points" value={oppStats.totalPoints} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="Total Rebounds" value={oppStats.totalRebounds} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="Total Assists" value={oppStats.totalAssists} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="Total Turnovers" value={oppStats.totalTurnovers} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="FG%" value={`${oppStats.fgPercentage}%`} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="3PT%" value={`${oppStats.threePercentage}%`} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="FT%" value={`${oppStats.ftPercentage}%`} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="Steals" value={oppStats.totalSteals} />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic title="Blocks" value={oppStats.totalBlocks} />
+                    </Col>
+                  </Row>
+                )
+              })()}
             </Card>
           </Col>
           <Col span={12}>

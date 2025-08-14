@@ -119,7 +119,7 @@ export function getMentionSuggestions(input: string): Coach[] {
 // Create notification for mentioned users
 export interface Notification {
   id: string;
-  type: 'mention';
+  type: 'mention' | 'assignment' | 'deadline' | 'priority' | 'completion';
   fromUserId: string;
   fromUserName: string;
   toUserId: string;
@@ -129,6 +129,7 @@ export interface Notification {
   contextId: string; // ID of the task, note, etc.
   timestamp: string;
   read: boolean;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export function createMentionNotifications(
@@ -227,5 +228,106 @@ export function markNotificationAsRead(notificationId: string): void {
 
 export function getUnreadNotificationCount(): number {
   return getNotifications().filter(n => !n.read).length;
+}
+
+// Create assignment notification for task assignments
+export function createAssignmentNotification(
+  taskTitle: string,
+  taskId: string,
+  fromUser: { id: string; name: string },
+  toUserId: string,
+  toUserName: string,
+  priority: 'high' | 'medium' | 'low',
+  dueDate?: string
+): Notification {
+  return {
+    id: Date.now().toString() + Math.random(),
+    type: 'assignment',
+    fromUserId: fromUser.id,
+    fromUserName: fromUser.name,
+    toUserId,
+    toUserName,
+    content: `New task assigned: ${taskTitle}`,
+    context: 'task assignment',
+    contextId: taskId,
+    timestamp: new Date().toISOString(),
+    read: false
+  };
+}
+
+// Create sample notifications for demo purposes
+export function createSampleNotifications(): void {
+  const sampleNotifications: Notification[] = [
+    {
+      id: Date.now().toString() + Math.random(),
+      type: 'mention',
+      fromUserId: 'cs',
+      fromUserName: 'Coach Smith',
+      toUserId: 'current-user',
+      toUserName: 'Current User',
+      content: 'Great work on the last game! @Current User, can you review the stats?',
+      context: 'in game review',
+      contextId: 'game-123',
+      timestamp: new Date().toISOString(),
+      read: false
+    },
+    {
+      id: Date.now().toString() + Math.random(),
+      type: 'assignment',
+      fromUserId: 'ad',
+      fromUserName: 'Assistant Coach Davis',
+      toUserId: 'current-user',
+      toUserName: 'Current User',
+      content: 'New task assigned: Prepare player performance report',
+      context: 'task assignment',
+      contextId: 'task-456',
+      timestamp: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+      read: false
+    },
+    {
+      id: Date.now().toString() + Math.random(),
+      type: 'deadline',
+      fromUserId: 'cm',
+      fromUserName: 'Coach Martinez',
+      toUserId: 'current-user',
+      toUserName: 'Current User',
+      content: 'Reminder: Team meeting tomorrow at 9 AM',
+      context: 'team meeting',
+      contextId: 'meeting-789',
+      timestamp: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+      read: false
+    },
+    {
+      id: Date.now().toString() + Math.random(),
+      type: 'priority',
+      fromUserId: 'sl',
+      fromUserName: 'Stats Coordinator Lee',
+      toUserId: 'current-user',
+      toUserName: 'Current User',
+      content: 'changed task priority to high',
+      context: 'stats analysis',
+      contextId: 'stats-101',
+      timestamp: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
+      read: false
+    },
+    {
+      id: Date.now().toString() + Math.random(),
+      type: 'completion',
+      fromUserId: 'tc',
+      fromUserName: 'Team Captain Wilson',
+      toUserId: 'current-user',
+      toUserName: 'Current User',
+      content: 'completed a task',
+      context: 'player evaluation',
+      contextId: 'eval-202',
+      timestamp: new Date(Date.now() - 1200000).toISOString(), // 20 minutes ago
+      read: false
+    }
+  ];
+
+  // Save all sample notifications
+  sampleNotifications.forEach(notification => {
+    saveNotification(notification);
+  });
 } 
  

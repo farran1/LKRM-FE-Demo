@@ -1,0 +1,24 @@
+.pageRoot { padding: 16px 12px 24px 0; min-height: 100vh; background: #202c3e; }
+.headerBar { width: 1172px; margin: 0 auto 16px auto; display: flex; align-items: center; justify-content: space-between; }
+.backRow { display: flex; align-items: center; gap: 12px; }
+.backLink { color: #fff; opacity: 0.8; text-decoration: none; }
+.pageTitle { color: #fff; font-size: 28px; font-weight: 600; margin: 0; }
+
+.formGrid { width: 1172px; margin: 0 auto; display: grid; grid-template-columns: 1fr 540px; gap: 24px; }
+.uploadPanel { background: rgba(7,56,83,0.4); border-radius: 16px; padding: 24px; }
+.uploadDrop { background: #032a3f; border-radius: 12px; height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed rgba(255,255,255,0.3); cursor: pointer; text-align: center; }
+.uploadIcon { font-size: 28px; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+.uploadText { color: rgba(255,255,255,0.7); }
+.detailsPanel { background: rgba(7,56,83,0.4); border-radius: 16px; padding: 24px; color: #fff; display: flex; flex-direction: column; gap: 14px; }
+.panelTitle { font-size: 18px; font-weight: 600; }
+.panelHint { color: rgba(255,255,255,0.7); font-size: 14px; margin-top: -6px; }
+.fieldRow { display: flex; flex-direction: column; gap: 6px; }
+.fieldRow label { font-weight: 600; }
+.fieldRow input, .fieldRow select { background: #002032; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; height: 36px; padding: 0 10px; }
+.pillRow { display: flex; gap: 8px; }
+.pill { background: #08364e; color: #a9a9a9; border: none; padding: 6px 12px; border-radius: 14px; cursor: pointer; }
+.pillActive { background: #00131e; color: #fff; }
+
+.ghostBtn { background: transparent; color: #fff; border: 1px solid #fff; border-radius: 8px; height: 36px; padding: 0 14px; text-decoration: none; display: inline-flex; align-items: center; }
+.primaryBtn { background: #1d75d0; color: #fff; border: 1px solid #1d75d0; border-radius: 8px; height: 32px; padding: 0 12px; }
+
