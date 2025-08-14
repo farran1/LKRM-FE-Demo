@@ -118,9 +118,10 @@
   border: none;
   outline: none;
   resize: vertical;
-}
-::placeholder {
-  color: rgba(255,255,255,0.75);
+  
+  &::placeholder {
+    color: rgba(255,255,255,0.75);
+  }
 }
 
 .pillRow {
