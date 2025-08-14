@@ -28,13 +28,21 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+
+      - name: Disable unsupported features for static export
+        run: |
+          if [ -f middleware.ts ]; then mv middleware.ts middleware.disabled.ts; fi
 
       - name: Build and export static site
         env:
           NODE_ENV: production
         run: |
           npm run export
+
+      - name: Restore middleware file (not included in artifact)
+        run: |
+          if [ -f middleware.disabled.ts ]; then mv middleware.disabled.ts middleware.ts; fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
