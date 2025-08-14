@@ -257,7 +257,7 @@
   }
 
   .halftimeReport {
-    background: linear-gradient(135deg, #faad14 0%, #d48806 100%);
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
     color: white;
 
     .ant-card-head {
@@ -299,7 +299,7 @@
 
   // DEV-ONLY: Timeout report styling with different color scheme
   .timeoutReport {
-    background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
     color: white;
 
     .ant-card-head {

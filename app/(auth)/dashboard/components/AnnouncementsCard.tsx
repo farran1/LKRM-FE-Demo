@@ -1,7 +1,18 @@
 import React from "react";
 import { Card, List, Tag } from "antd";
 
-export default function AnnouncementsCard({ announcements = [], overflowClass = '' }) {
+interface Announcement {
+  title: string;
+  message: string;
+  urgent?: boolean;
+}
+
+interface AnnouncementsCardProps {
+  announcements?: Announcement[];
+  overflowClass?: string;
+}
+
+export default function AnnouncementsCard({ announcements = [], overflowClass = '' }: AnnouncementsCardProps) {
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
