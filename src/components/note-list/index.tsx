@@ -4,17 +4,32 @@ import { Flex } from 'antd'
 import TrashIcon from '@/components/icon/trash.svg'
 import { useAuthStore } from '@/store/auth'
 
-function NoteList({ notes, deleteNote }: any) {
+interface Note {
+  id?: number;
+  note: string;
+  createdUser?: {
+    profile: {
+      firstName: string;
+    };
+  };
+}
+
+interface NoteListProps {
+  notes: Note[];
+  deleteNote: (index: number) => void;
+}
+
+function NoteList({ notes, deleteNote }: NoteListProps) {
   const { user } = useAuthStore()
 
-  const renderAuthor = useCallback((item: any) => {
+  const renderAuthor = useCallback((item: Note) => {
     if (item?.createdUser) return <div className={style.createdBy}>By Coach {item?.createdUser.profile.firstName}</div>
     return <div className={style.createdBy}>By Coach {user?.profile.firstName}</div>
   }, [user])
 
   return (
-    notes.map((item: any, index: number) =>
-      <div className={style.cardNote} key={index + item?.id || 0}>
+    notes.map((item: Note, index: number) =>
+              <div className={style.cardNote} key={index + (item.id || 0)}>
         <Flex justify='space-between'>
           <div>
             <div className={style.note}>{item.note}</div>

@@ -374,7 +374,7 @@ export default function StatsDashboardPage() {
           type="error"
           showIcon
           action={
-            <Button size="small" danger onClick={refetch}>
+            <Button danger onClick={refetch}>
               Retry
             </Button>
           }

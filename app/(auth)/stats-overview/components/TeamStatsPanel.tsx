@@ -120,7 +120,7 @@ const TeamStatsPanel: React.FC<TeamStatsPanelProps> = ({ stats, config, filters 
             </div>
             <Progress 
               percent={winRate} 
-              size="small" 
+       
               strokeColor="#52c41a"
               trailColor="#3a4a5d"
               showInfo={false}

@@ -16,7 +16,7 @@ const locations = [{label: 'Home', value: 'HOME'}, {label: 'Away', value: 'AWAY'
 
 function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
-  const [eventTypes, setEventTypes] = useState([])
+  const [eventTypes, setEventTypes] = useState<Array<{id: number, name: string}>>([])
   const [isShowModalNewType, showModalNewType] = useState(false)
 
   useEffect(() => {

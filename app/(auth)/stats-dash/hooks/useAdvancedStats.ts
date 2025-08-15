@@ -5,31 +5,37 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { advancedStatsService, LiveGameData, GameAnalysis, PlayerDevelopment, TeamAnalytics, StrategicInsights } from '../services/advancedStatsService';
 
-// Advanced fetcher for complex data
-const advancedFetcher = async (key: string) => {
-  const [method, ...params] = key.split(':');
-  
-  switch (method) {
-    case 'liveGame':
-      return await advancedStatsService.getLiveGameData(params[0]);
-    case 'gameAnalysis':
-      return await advancedStatsService.getGameAnalysis(params[0]);
-    case 'playerDevelopment':
-      return await advancedStatsService.getPlayerDevelopment(params[0], params[1]);
-    case 'teamAnalytics':
-      return await advancedStatsService.getTeamAnalytics(params[0]);
-    case 'strategicInsights':
-      return await advancedStatsService.getStrategicInsights(params[0]);
-    default:
-      throw new Error(`Unknown method: ${method}`);
-  }
+// Type-safe fetchers for each data type
+const liveGameFetcher = async (key: string) => {
+  const gameId = key.split(':')[1];
+  return await advancedStatsService.getLiveGameData(gameId);
+};
+
+const gameAnalysisFetcher = async (key: string) => {
+  const gameId = key.split(':')[1];
+  return await advancedStatsService.getGameAnalysis(gameId);
+};
+
+const playerDevelopmentFetcher = async (key: string) => {
+  const [, playerId, season] = key.split(':');
+  return await advancedStatsService.getPlayerDevelopment(playerId, season);
+};
+
+const teamAnalyticsFetcher = async (key: string) => {
+  const season = key.split(':')[1];
+  return await advancedStatsService.getTeamAnalytics(season);
+};
+
+const strategicInsightsFetcher = async (key: string) => {
+  const season = key.split(':')[1];
+  return await advancedStatsService.getStrategicInsights(season);
 };
 
 // Live Game Hook
 export const useLiveGame = (gameId: string | null) => {
   const { data, error, isLoading, mutate } = useSWR<LiveGameData>(
     gameId ? `liveGame:${gameId}` : null,
-    advancedFetcher,
+    liveGameFetcher,
     {
       refreshInterval: 5000, // Refresh every 5 seconds for live data
       revalidateOnFocus: true,
@@ -50,7 +56,7 @@ export const useLiveGame = (gameId: string | null) => {
 export const useGameAnalysis = (gameId: string | null) => {
   const { data, error, isLoading, mutate } = useSWR<GameAnalysis>(
     gameId ? `gameAnalysis:${gameId}` : null,
-    advancedFetcher,
+    gameAnalysisFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000, // 1 minute for game analysis
@@ -70,7 +76,7 @@ export const useGameAnalysis = (gameId: string | null) => {
 export const usePlayerDevelopment = (playerId: string | null, season: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<PlayerDevelopment>(
     playerId ? `playerDevelopment:${playerId}:${season}` : null,
-    advancedFetcher,
+    playerDevelopmentFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 300000, // 5 minutes for player data
@@ -90,7 +96,7 @@ export const usePlayerDevelopment = (playerId: string | null, season: string = '
 export const useTeamAnalytics = (season: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<TeamAnalytics>(
     `teamAnalytics:${season}`,
-    advancedFetcher,
+    teamAnalyticsFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 300000, // 5 minutes for team data
@@ -110,7 +116,7 @@ export const useTeamAnalytics = (season: string = '2023-24') => {
 export const useStrategicInsights = (season: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<StrategicInsights>(
     `strategicInsights:${season}`,
-    advancedFetcher,
+    strategicInsightsFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 600000, // 10 minutes for strategic data

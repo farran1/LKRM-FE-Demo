@@ -155,7 +155,7 @@ const FundsPage: React.FC = () => {
       <Card title="Create Donation Form" className={styles.formCard}>
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <Card title="Form Builder" size="small">
+            <Card title="Form Builder">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>Campaign Title</Text>
@@ -193,7 +193,7 @@ const FundsPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="Form Preview" size="small">
+            <Card title="Form Preview">
               <div className={styles.formPreview}>
                 <div className={styles.previewHeader}>
                   <Title level={4}>Sample Campaign</Title>
@@ -219,7 +219,7 @@ const FundsPage: React.FC = () => {
       <Card title="Peer-to-Peer Fundraising" className={styles.peerCard}>
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <Card title="Team Member Pages" size="small">
+            <Card title="Team Member Pages">
               <List
                 dataSource={teamMembers}
                 renderItem={(member) => (
@@ -244,7 +244,7 @@ const FundsPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="Create Personal Page" size="small">
+            <Card title="Create Personal Page">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>Player Name</Text>
@@ -286,7 +286,7 @@ const FundsPage: React.FC = () => {
       <Card title="Automated Communications" className={styles.commCard}>
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <Card title="Email Campaigns" size="small">
+            <Card title="Email Campaigns">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>Import Contacts</Text>
@@ -318,7 +318,7 @@ const FundsPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="SMS Campaigns" size="small">
+            <Card title="SMS Campaigns">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>SMS Message</Text>
@@ -360,7 +360,7 @@ const FundsPage: React.FC = () => {
       <Card title="Sponsor Management" className={styles.sponsorCard}>
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <Card title="Current Sponsors" size="small">
+            <Card title="Current Sponsors">
               <List
                 dataSource={sponsors}
                 renderItem={(sponsor) => (
@@ -380,7 +380,7 @@ const FundsPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="Add New Sponsor" size="small">
+            <Card title="Add New Sponsor">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>Sponsor Name</Text>
@@ -431,7 +431,7 @@ const FundsPage: React.FC = () => {
       <Card title="Payment Management" className={styles.paymentCard}>
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <Card title="One-Time Payments" size="small">
+            <Card title="One-Time Payments">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>Payment Type</Text>
@@ -474,7 +474,7 @@ const FundsPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="Recurring Donations" size="small">
+            <Card title="Recurring Donations">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text strong>Monthly Amount</Text>

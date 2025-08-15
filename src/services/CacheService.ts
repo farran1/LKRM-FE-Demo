@@ -1,24 +1,11 @@
-import { RedisClientType, createClient } from 'redis';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
+// Mock Redis client for frontend static export
 class CacheService {
   private static instance: CacheService;
-  private redisClient: RedisClientType;
-  private isConnected: boolean = false;
+  private cache: Map<string, { value: any; ttl: number }> = new Map();
+  private isConnected: boolean = true;
 
   private constructor() {
-    this.redisClient = createClient({
-      url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
-      password: process.env.REDIS_PASSWORD || undefined,
-    });
-
-    this.redisClient.on('error', (err) => console.error('Redis Client Error:', err));
-    this.redisClient.on('connect', () => {
-      this.isConnected = true;
-      console.log('Redis Client Connected');
-    });
+    console.log('Mock Redis Client Connected');
   }
 
   public static getInstance(): CacheService {
@@ -29,15 +16,17 @@ class CacheService {
   }
 
   public async connect(): Promise<void> {
-    if (!this.isConnected) {
-      await this.redisClient.connect();
-    }
+    // Mock connection - always connected
+    this.isConnected = true;
   }
 
   public async get<T>(key: string): Promise<T | null> {
     try {
-      const data = await this.redisClient.get(key);
-      return data ? JSON.parse(data) : null;
+      const item = this.cache.get(key);
+      if (item && Date.now() < item.ttl) {
+        return item.value;
+      }
+      return null;
     } catch (error) {
       console.error('Cache get error:', error);
       return null;
@@ -46,7 +35,8 @@ class CacheService {
 
   public async set(key: string, value: any, ttl: number = 3600): Promise<void> {
     try {
-      await this.redisClient.set(key, JSON.stringify(value), { EX: ttl });
+      const expiryTime = Date.now() + (ttl * 1000);
+      this.cache.set(key, { value, ttl: expiryTime });
     } catch (error) {
       console.error('Cache set error:', error);
     }
@@ -54,17 +44,15 @@ class CacheService {
 
   public async del(key: string): Promise<void> {
     try {
-      await this.redisClient.del(key);
+      this.cache.delete(key);
     } catch (error) {
       console.error('Cache delete error:', error);
     }
   }
 
   public async disconnect(): Promise<void> {
-    if (this.isConnected) {
-      await this.redisClient.quit();
-      this.isConnected = false;
-    }
+    // Mock disconnect
+    this.isConnected = false;
   }
 }
 

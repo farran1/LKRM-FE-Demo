@@ -51,7 +51,7 @@ export const Frame = ({ timeframe, setTimeframe, events, setEvents, players, set
               allowClear
               style={{ background: "#23272f", color: "#fff", width: '100%' }}
               format="YYYY-MM-DD"
-              getPopupContainer={trigger => trigger.parentElement}
+              getPopupContainer={trigger => trigger.parentElement || document.body}
             />
           </div>
         )}

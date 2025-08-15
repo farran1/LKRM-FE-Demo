@@ -26,7 +26,7 @@ export default function GamedayStatusModal({
   eventId = 1 // Default to event ID 1 for the Eagles vs Hawks game
 }: GamedayStatusModalProps) {
   const [loading, setLoading] = useState(false);
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState<Array<{id: number, name: string, status: string}>>([]);
 
   useEffect(() => {
     if (isOpen && statusId) {

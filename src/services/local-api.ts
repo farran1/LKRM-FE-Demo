@@ -338,7 +338,7 @@ class LocalApiService {
     return { data: { player: playerWithStats } };
   }
 
-  async getPlayerNotes(playerId: number): Promise<ApiResponse<any[]>> {
+  async getPlayerNotes(playerId: number): Promise<ApiResponse<any>> {
     await this.delay();
     
     // Mock notes data for demo
@@ -384,7 +384,7 @@ class LocalApiService {
     return { data: { notes: mockNotes } };
   }
 
-  async getPlayerGoals(playerId: number): Promise<ApiResponse<any[]>> {
+  async getPlayerGoals(playerId: number): Promise<ApiResponse<any>> {
     await this.delay();
     
     // Mock goals data for demo

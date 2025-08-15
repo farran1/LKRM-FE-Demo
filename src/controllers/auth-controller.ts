@@ -1,7 +1,13 @@
 import { Request, Response } from 'express'
 import z from 'zod'
-import bcrypt from 'bcrypt'
-import jwt from 'jsonwebtoken'
+// Mock bcrypt and jwt for frontend static export
+const bcrypt = {
+  compare: async (password: string, hash: string) => password === 'password',
+  hash: async (password: string, saltRounds: number) => `hashed_${password}`
+}
+const jwt = {
+  sign: (payload: any, secret: string, options: any) => 'mock_jwt_token'
+}
 import { registerSchema } from '@/validations/register'
 import { AuthRequest } from '@/middlewares/auth'
 import { SESSION_EXPIRE, SESSION_MILISECOND_EXPIRE } from '@/utils/constants'

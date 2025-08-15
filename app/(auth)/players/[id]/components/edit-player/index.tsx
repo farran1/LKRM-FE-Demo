@@ -7,7 +7,7 @@ import DefaultAvatar from '@/components/icon/avatar.svg'
 
 function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
-  const [positions, setPositions] = useState([])
+  const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
   const { message } = App.useApp()
   const [form] = Form.useForm()
 

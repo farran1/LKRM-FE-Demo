@@ -10,7 +10,7 @@ import classNames from 'classnames'
 
 const ReviewPage = (props: any) => {
   const { importId } = props
-  const [dataSource, setDataSource] = useState([])
+  const [dataSource, setDataSource] = useState<Array<{id: number, name: string, position: string}>>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {

@@ -9,7 +9,7 @@ import { PlusOutlined } from '@ant-design/icons'
 
 function NewPlayer({ eventId, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
-  const [positions, setPositions] = useState([])
+  const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
   const { message } = App.useApp()
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)

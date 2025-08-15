@@ -21,9 +21,9 @@ import SeasonArcVisualization from "../stats-overview/components/SeasonArcVisual
 import TeamBalanceMetrics from "../stats-overview/components/TeamBalanceMetrics";
 import ClutchPerformancePanel from "../stats-overview/components/ClutchPerformancePanel";
 import LineupEfficiencyHeatmap from "../stats-overview/components/LineupEfficiencyHeatmap";
-import SituationalBreakdownChart from "./components/SituationalBreakdownChart";
-import ContextPerformancePanel from "./components/ContextPerformancePanel";
-import StrategicRecommendations from "./components/StrategicRecommendations";
+import SituationalBreakdownChart from "../stats-overview/components/SituationalBreakdownChart";
+import ContextPerformancePanel from "../stats-overview/components/ContextPerformancePanel";
+import StrategicRecommendations from "../stats-overview/components/StrategicRecommendations";
 import styles from "../stats-overview/style.module.scss";
 import { Responsive, WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -35,6 +35,33 @@ import Link from "next/link";
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const imgUpload = "http://localhost:3845/assets/0949b5e892c7c87c77e810499883bad9a3464405.svg";
 const CONFIG_STORAGE_KEY = 'advancedDashConfigs';
+
+// Utility functions for config management
+interface LayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW: number;
+  minH: number;
+  maxH: number;
+}
+
+const saveConfig = (name: string, layout: LayoutItem[]) => {
+  const configs = loadConfigs();
+  configs[name] = layout;
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(configs));
+};
+
+const loadConfigs = () => {
+  try {
+    const stored = localStorage.getItem(CONFIG_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
 
 const mockTeamStats = {
   name: "Wildcats",
@@ -111,17 +138,25 @@ const GRID_ROW_HEIGHT = 90;
 const GRID_MARGIN = 16; // gap between items
 const GRID_WIDTH = 1200; // fallback, will use container width if possible
 
+// Define the filters interface
+interface Filters {
+  timeframe: string;
+  events: string;
+  players: string;
+  customDateRange?: [Dayjs, Dayjs];
+}
+
 // Define moduleDefs and getDefaultLayout outside the component
 const moduleDefs = [
-  { id: "team-stats", render: (filters: any) => <TeamStatsPanel stats={mockTeamStats} config={mockTeamStatsConfig} filters={filters} /> },
-  { id: "player-comparison", render: (filters: any) => <PlayerComparisonMatrix filters={filters} /> },
-  { id: "game-stats", render: (filters: any) => <GameStatsPanel games={mockGameStats} filters={filters} /> },
-  { id: "shot-selection", render: (filters: any) => <ShotSelectionPanel filters={filters} /> },
-  { id: "quarter-performance", render: (filters: any) => <QuarterPerformancePanel filters={filters} /> },
-  { id: "team-trend-lines", render: (filters: any) => <TeamTrendLines filters={filters} /> },
-  { id: "trend-lines", render: (filters: any) => <PerformanceTrendLines filters={filters} /> },
-  { id: "efficiency-comparison", render: (filters: any) => <EfficiencyComparisonChart filters={filters} /> },
-  { id: "performance-distribution", render: (filters: any) => <PerformanceDistributionChart filters={filters} /> },
+  { id: "team-stats", render: (filters: Filters) => <TeamStatsPanel stats={mockTeamStats} config={mockTeamStatsConfig} filters={filters} /> },
+  { id: "player-comparison", render: (filters: Filters) => <PlayerComparisonMatrix filters={filters} /> },
+  { id: "game-stats", render: (filters: Filters) => <GameStatsPanel games={mockGameStats} filters={filters} /> },
+  { id: "shot-selection", render: (filters: Filters) => <ShotSelectionPanel filters={filters} /> },
+  { id: "quarter-performance", render: (filters: Filters) => <QuarterPerformancePanel filters={filters} /> },
+  { id: "team-trend-lines", render: (filters: Filters) => <TeamTrendLines filters={filters} /> },
+  { id: "trend-lines", render: (filters: Filters) => <PerformanceTrendLines filters={filters} /> },
+  { id: "efficiency-comparison", render: (filters: Filters) => <EfficiencyComparisonChart filters={filters} /> },
+  { id: "performance-distribution", render: (filters: Filters) => <PerformanceDistributionChart filters={filters} /> },
 ];
 
 const getDefaultLayout = (containerWidth: number) => {
@@ -147,7 +182,12 @@ const AdvancedStatsOverview: React.FC = () => {
   const [events, setEvents] = useState("All");
   const [players, setPlayers] = useState("All");
   const [customDateRange, setCustomDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
-  const filters = useMemo(() => ({ timeframe, events, players, customDateRange }), [timeframe, events, players, customDateRange]);
+  const filters = useMemo(() => ({ 
+    timeframe, 
+    events, 
+    players, 
+    customDateRange: customDateRange[0] && customDateRange[1] ? [customDateRange[0], customDateRange[1]] as [Dayjs, Dayjs] : undefined 
+  }), [timeframe, events, players, customDateRange]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
 
@@ -365,7 +405,7 @@ const AdvancedStatsOverview: React.FC = () => {
         rowHeight={GRID_ROW_HEIGHT}
         isResizable
         isDraggable
-        onLayoutChange={(l: any) => setLayout(l)}
+        onLayoutChange={(l: LayoutItem[]) => setLayout(l)}
         measureBeforeMount={false}
         compactType="vertical"
         preventCollision={false}

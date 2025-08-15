@@ -29,7 +29,7 @@ const GameStatsPanel: React.FC<GameStatsPanelProps> = ({ games, filters }) => {
     if (filters.timeframe === 'Custom' && filters.customDateRange && filters.customDateRange[0] && filters.customDateRange[1]) {
       filteredGames = games.filter(g => {
         const gameDate = dayjs(g.date);
-        return gameDate.isSameOrAfter(filters.customDateRange[0], 'day') && gameDate.isSameOrBefore(filters.customDateRange[1], 'day');
+        return gameDate.isSameOrAfter(filters.customDateRange![0], 'day') && gameDate.isSameOrBefore(filters.customDateRange![1], 'day');
       });
     } else if (filters.timeframe === 'Last 7 Days') {
       filteredGames = games.slice(-3);
@@ -51,7 +51,7 @@ const GameStatsPanel: React.FC<GameStatsPanelProps> = ({ games, filters }) => {
         columns={columns}
         dataSource={filteredGames.map((g, i) => ({ ...g, key: i }))}
         pagination={false}
-        size="small"
+
         style={{ width: '100%' }}
         scroll={{ y: 'calc(100% - 40px)' }}
       />

@@ -11,8 +11,74 @@ import { TrophyOutlined, FireOutlined, ArrowUpOutlined, ArrowDownOutlined, MenuO
 // Removed: import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Modal, Checkbox, Space } from "antd";
 
+// Define types
+interface TeamStats {
+  name: string;
+  wins: number;
+  losses: number;
+  ppg: number;
+  oppg: number;
+  fgPct: number;
+  threePct: number;
+  ftPct: number;
+}
+
+interface TeamStatsConfig {
+  // Shots
+  showFieldGoals: boolean;
+  showTwoPointers: boolean;
+  showThreePointers: boolean;
+  showFreeThrows: boolean;
+  
+  // Points
+  showPointsFor: boolean;
+  showPointsAgainst: boolean;
+  showPointsPerGame: boolean;
+  
+  // Shooting Efficiencies
+  showFGPercent: boolean;
+  showTwoPointPercent: boolean;
+  showThreePointPercent: boolean;
+  showFreeThrowPercent: boolean;
+  showEffectiveFGPercent: boolean;
+  
+  // Shot Type
+  showPointsInPaint: boolean;
+  
+  // Advanced Efficiencies
+  showInboundEfficiency: boolean;
+  showPlusMinus: boolean;
+  showLineupEfficiency: boolean;
+  showIndividualMinutes: boolean;
+  showValuePointSystem: boolean;
+  showPointsPerPossession: boolean;
+  showFreeThrowFactor: boolean;
+  
+  // Rebounding
+  showDefensiveRebounds: boolean;
+  showDefensiveReboundPercent: boolean;
+  showOffensiveRebounds: boolean;
+  showOffensiveReboundPercent: boolean;
+  showSecondChancePoints: boolean;
+  
+  // Defense
+  showPersonalFouls: boolean;
+  showChargesTaken: boolean;
+  showBlocks: boolean;
+  showSteals: boolean;
+  showDeflections: boolean;
+  
+  // Assists and Turnovers
+  showAssists: boolean;
+  showTurnovers: boolean;
+  showAssistTurnoverRatio: boolean;
+  showTurnoverPercent: boolean;
+  showPointsOffTurnovers: boolean;
+  showTransitionPoints: boolean;
+}
+
 // Mock data (can be replaced with real data service)
-const mockTeamStats = {
+const mockTeamStats: TeamStats = {
   name: "Wildcats",
   wins: 18,
   losses: 4,
@@ -88,7 +154,7 @@ const summaryStats = [
   },
 ];
 
-const createDefaultModules = (teamStatsConfig: any) => [
+const createDefaultModules = (teamStatsConfig: TeamStatsConfig) => [
   { id: "quick-actions", width: 360, height: 220, render: () => <QuickActionsCard /> },
   { id: "summary-stats", width: 600, height: 220, render: () => (
       <div className={styles.summaryStatsRow}>

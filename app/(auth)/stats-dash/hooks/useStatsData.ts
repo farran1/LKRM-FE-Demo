@@ -4,29 +4,32 @@
 import useSWR from 'swr';
 import { statsService, TeamStats, GameStats, PlayerStats, SeasonData } from '../services/statsService';
 
-// Fetcher function for SWR
-const fetcher = async (key: string) => {
-  const [method, ...params] = key.split(':');
-  
-  switch (method) {
-    case 'teamStats':
-      return await statsService.fetchTeamStats(params[0]);
-    case 'gameStats':
-      return await statsService.fetchGameStats(params[0]);
-    case 'playerStats':
-      return await statsService.fetchPlayerStats(params[0]);
-    case 'seasonData':
-      return await statsService.fetchSeasonData(params[0]);
-    default:
-      throw new Error(`Unknown method: ${method}`);
-  }
+// Type-safe fetchers for each data type
+const teamStatsFetcher = async (key: string) => {
+  const seasonId = key.split(':')[1];
+  return await statsService.fetchTeamStats(seasonId);
+};
+
+const gameStatsFetcher = async (key: string) => {
+  const seasonId = key.split(':')[1];
+  return await statsService.fetchGameStats(seasonId);
+};
+
+const playerStatsFetcher = async (key: string) => {
+  const seasonId = key.split(':')[1];
+  return await statsService.fetchPlayerStats(seasonId);
+};
+
+const seasonDataFetcher = async (key: string) => {
+  const seasonId = key.split(':')[1];
+  return await statsService.fetchSeasonData(seasonId);
 };
 
 // Hook for team stats
 export const useTeamStats = (seasonId: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<TeamStats>(
     `teamStats:${seasonId}`,
-    fetcher,
+    teamStatsFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000, // 30 seconds
@@ -46,7 +49,7 @@ export const useTeamStats = (seasonId: string = '2023-24') => {
 export const useGameStats = (seasonId: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<GameStats[]>(
     `gameStats:${seasonId}`,
-    fetcher,
+    gameStatsFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
@@ -66,7 +69,7 @@ export const useGameStats = (seasonId: string = '2023-24') => {
 export const usePlayerStats = (seasonId: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<PlayerStats[]>(
     `playerStats:${seasonId}`,
-    fetcher,
+    playerStatsFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
@@ -86,7 +89,7 @@ export const usePlayerStats = (seasonId: string = '2023-24') => {
 export const useSeasonData = (seasonId: string = '2023-24') => {
   const { data, error, isLoading, mutate } = useSWR<SeasonData>(
     `seasonData:${seasonId}`,
-    fetcher,
+    seasonDataFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000, // 1 minute for season data

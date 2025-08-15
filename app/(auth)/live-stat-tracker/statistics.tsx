@@ -1497,7 +1497,6 @@ const Statistics = () => {
                             </div>
                             {player.isOnCourt && (
                               <Button 
-                                size="small" 
                                 type="primary"
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1535,7 +1534,6 @@ const Statistics = () => {
                             </div>
                             {player.isOnCourt && (
                               <Button 
-                                size="small" 
                                 type="primary"
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1565,9 +1563,9 @@ const Statistics = () => {
                             setPlayers(prev => prev.map(p => ({ ...p, isOnCourt: firstFivePlayers.includes(p.id) })))
                           }
                           setShowQuickSubModal(true)
-                        }} size="small" block style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#fff', fontWeight: 600, height: 40, fontSize: '0.9rem' }}>{currentLineup ? 'Quick Substitution' : 'Start Lineup & Sub'}</Button>
+                        }} block style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#fff', fontWeight: 600, height: 40, fontSize: '0.9rem' }}>{currentLineup ? 'Quick Substitution' : 'Start Lineup & Sub'}</Button>
                         {quickSubHistory.length > 0 && (
-                          <Button size="small" onClick={undoLastSubstitution} block style={{ marginTop: 4, height: 28, fontSize: '0.8rem' }}>Undo Last Sub</Button>
+                          <Button onClick={undoLastSubstitution} block style={{ marginTop: 4, height: 28, fontSize: '0.8rem' }}>Undo Last Sub</Button>
                         )}
                       </div>
                     </Col>
@@ -1604,7 +1602,6 @@ const Statistics = () => {
                                 style={{ width: 80 }}
                               />
                               <Button
-                                size="small"
                                 danger
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1778,7 +1775,7 @@ const Statistics = () => {
                     )
                   })()}
                 </Card>
-                <Card title="Play by Play" size="small" styles={{ body: { paddingTop: 8 } }} style={{ marginTop: 8 }}>
+                <Card title="Play by Play" styles={{ body: { paddingTop: 8 } }} style={{ marginTop: 8 }}>
                   <div className={style.eventsFeed}>
                     {events.slice(0, 10).map(event => (
                       <div key={event.id} className={style.eventItem}>
@@ -2031,7 +2028,6 @@ const Statistics = () => {
                             setSubstitutionPlayerOut(null)
                             setSubstitutionPlayerIn(null)
                           }}
-                          size="small"
                           block
                           style={{
                             backgroundColor: '#2563eb',
@@ -2046,7 +2042,6 @@ const Statistics = () => {
                         </Button>
                         {quickSubHistory.length > 0 && (
                           <Button
-                            size="small"
                             onClick={undoLastSubstitution}
                             block
                             style={{
@@ -2101,7 +2096,6 @@ const Statistics = () => {
                                 style={{ width: 90 }}
                               />
                               <Button
-                                size="small"
                                 danger
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -2124,7 +2118,7 @@ const Statistics = () => {
               </Col>
               <Col span={12} />
               <Col span={12}>
-                <Card title="Play by Play" size="small">
+                <Card title="Play by Play">
                   <div className={style.eventsFeed}>
                     {events.slice(0, 10).map(event => (
                       <div key={event.id} className={style.eventItem}>
@@ -2153,7 +2147,6 @@ const Statistics = () => {
               <Table 
                 dataSource={players} 
                 columns={playerColumns} 
-                size="small"
                 pagination={false}
                 scroll={{ y: 300 }}
               />
@@ -2238,10 +2231,10 @@ const Statistics = () => {
             </Card>
           </Col>
           <Col span={12}>
-            <Card title="Substitution History & Analytics" size="small">
+            <Card title="Substitution History & Analytics">
               <Row gutter={[16, 16]}>
                 <Col span={8}>
-                  <Card title="Substitution Stats" size="small">
+                  <Card title="Substitution Stats">
                     {(() => {
                       const stats = getSubstitutionStats()
                       return (
@@ -2263,7 +2256,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={16}>
-                  <Card title="Recent Substitutions" size="small">
+                  <Card title="Recent Substitutions">
                     {quickSubHistory.length > 0 ? (
                       <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                         {quickSubHistory.map((sub, index) => (
@@ -2318,14 +2311,13 @@ const Statistics = () => {
       children: (
         <Row gutter={[16, 16]}>
           <Col span={12}>
-            <Card title="Current Lineup" size="small">
+            <Card title="Current Lineup">
               {currentLineup ? (
                 <div>
                   <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text strong style={{ fontSize: '1.1rem', color: '#f5f7fa' }}>Active Lineup</Text>
                     <Button 
                       danger 
-                      size="small" 
                       onClick={endCurrentLineup}
                       style={{ fontWeight: 600 }}
                     >
@@ -2415,7 +2407,6 @@ const Statistics = () => {
                     </Text>
                     <Button 
                       type="primary" 
-                      size="middle"
                       onClick={() => setShowLineupBuilder(true)}
                       style={{ fontWeight: 600 }}
                     >
@@ -2427,7 +2418,7 @@ const Statistics = () => {
           </Col>
           
           <Col span={12}>
-            <Card title="Quick Substitutions" size="small">
+            <Card title="Quick Substitutions">
               {currentLineup ? (
                 <div>
                   <div style={{ marginBottom: 16 }}>
@@ -2507,7 +2498,6 @@ const Statistics = () => {
                             </Text>
                           </div>
                           <Button 
-                            size="small"
                             type="primary"
                             onClick={() => {
                               setSubstitutionPlayerIn(player)
@@ -2529,7 +2519,6 @@ const Statistics = () => {
                     </Text>
                     <Button 
                       type="primary" 
-                      size="middle"
                       onClick={() => setShowLineupBuilder(true)}
                       style={{ fontWeight: 600 }}
                     >
@@ -2541,7 +2530,7 @@ const Statistics = () => {
           </Col>
           
           <Col span={24}>
-            <Card title="Lineup History" size="small">
+            <Card title="Lineup History">
               <div className={style.lineupHistory}>
                 {lineups.length > 0 ? (
                   lineups.map(lineup => {
@@ -2963,7 +2952,7 @@ const Statistics = () => {
             >
               <Row gutter={[16, 16]}>
                 <Col span={12}>
-                  <Card title="📊 Team Performance" size="small" className={style.insightCard}>
+                  <Card title="📊 Team Performance" className={style.insightCard}>
                     <Row gutter={16}>
                       {halftimeInsights.map((insight, index) => (
                         <Col span={12} key={index}>
@@ -2978,7 +2967,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={12}>
-                  <Card title="🏆 Player Highlights" size="small" className={style.insightCard}>
+                  <Card title="🏆 Player Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
                         <Text strong>Top Scorer:</Text> #{halftimeData.topScorer.number} {halftimeData.topScorer.name} ({halftimeData.topScorer.points} pts)
@@ -2996,7 +2985,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={24}>
-                  <Card title="🎯 Game Pace & Projections" size="small" className={style.insightCard}>
+                  <Card title="🎯 Game Pace & Projections" className={style.insightCard}>
                     <Row gutter={16}>
                       <Col span={8}>
                         <Statistic title="Current Pace" value={`${halftimeData.pace} pts/game`} />
@@ -3012,7 +3001,7 @@ const Statistics = () => {
                 </Col>
                 {settings.showRecommendations && (
                   <Col span={24}>
-                    <Card title="💡 Strategic Recommendations" size="small" className={style.recommendations}>
+                    <Card title="💡 Strategic Recommendations" className={style.recommendations}>
                       <ul>
                         {halftimeData.recommendations.map((rec, index) => (
                           <li key={index}>{rec}</li>
@@ -3040,7 +3029,7 @@ const Statistics = () => {
             >
               <Row gutter={[16, 16]}>
                 <Col span={12}>
-                  <Card title="📈 Recent Momentum" size="small" className={style.insightCard}>
+                  <Card title="📈 Recent Momentum" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
                         <Text strong>Momentum:</Text> 
@@ -3075,7 +3064,7 @@ const Statistics = () => {
                   </Col>
                 )}
                 <Col span={24}>
-                  <Card title="📊 Score Update" size="small" className={style.insightCard}>
+                  <Card title="📊 Score Update" className={style.insightCard}>
                     <Row gutter={16}>
                       <Col span={8}>
                         <Statistic title="HOME" value={gameState.homeScore} />
@@ -3094,7 +3083,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={12}>
-                  <Card title="🏆 Player Highlights" size="small" className={style.insightCard}>
+                  <Card title="🏆 Player Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
                         <Text strong>Top Scorer:</Text> #{timeoutData.topScorer.number} {timeoutData.topScorer.name} ({timeoutData.topScorer.points} pts)
@@ -3112,7 +3101,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={12}>
-                  <Card title="📊 Team Performance" size="small" className={style.insightCard}>
+                  <Card title="📊 Team Performance" className={style.insightCard}>
                     <Row gutter={16}>
                       <Col span={12}>
                         <Statistic title="Shooting Efficiency" value={`${timeoutData.teamStats.fgPercentage}%`} />
@@ -3130,7 +3119,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={12}>
-                  <Card title="🔥 Opponent Run & Hot Hand" size="small" className={style.insightCard}>
+                  <Card title="🔥 Opponent Run & Hot Hand" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
                         <Text strong>Opponent Run:</Text> {timeoutData.recentOpponentRun}
@@ -3144,7 +3133,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={12}>
-                  <Card title="🎯 Game Pace & Projections" size="small" className={style.insightCard}>
+                  <Card title="🎯 Game Pace & Projections" className={style.insightCard}>
                     <Row gutter={16}>
                       <Col span={12}>
                         <Statistic title="Current Pace" value={`${timeoutData.pace} pts/game`} />
@@ -3159,7 +3148,7 @@ const Statistics = () => {
                   </Card>
                 </Col>
                 <Col span={24}>
-                  <Card title="💡 Strategic Recommendations" size="small" className={style.recommendations}>
+                  <Card title="💡 Strategic Recommendations" className={style.recommendations}>
                     <ul>
                       {timeoutData.recommendations.map((rec, index) => (
                         <li key={index}>{rec}</li>
@@ -3699,7 +3688,6 @@ const Statistics = () => {
                 <Col span={12}>
                   <Card 
                     title="Player Out" 
-                    size="small"
                     style={{ backgroundColor: '#1e3a5c', borderColor: '#334155' }}
                   >
                     <div style={{ textAlign: 'center' }}>
@@ -3719,7 +3707,6 @@ const Statistics = () => {
                 <Col span={12}>
                   <Card 
                     title="Player In" 
-                    size="small"
                     style={{ backgroundColor: '#1e3a5c', borderColor: '#334155' }}
                   >
                     <div style={{ textAlign: 'center' }}>

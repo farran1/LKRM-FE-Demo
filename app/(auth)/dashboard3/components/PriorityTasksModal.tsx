@@ -24,7 +24,7 @@ export default function PriorityTasksModal({
   priorityColor 
 }: PriorityTasksModalProps) {
   const [loading, setLoading] = useState(false);
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState<Array<{id: number, name: string, priority: string}>>([]);
 
   useEffect(() => {
     if (isOpen && priorityId) {

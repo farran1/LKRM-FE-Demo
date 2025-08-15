@@ -14,7 +14,7 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
   // const [event, setEvent] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [playerLoading, setPlayerLoading] = useState(false)
-  const [players, setPlayers] = useState([])
+  const [players, setPlayers] = useState<Array<{id: number, name: string, position: string}>>([]);
   const router = useRouter()
 
   useEffect(() => {

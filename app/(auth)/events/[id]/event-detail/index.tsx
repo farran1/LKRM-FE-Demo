@@ -30,7 +30,7 @@ function EventDetail({
   const router = useRouter()
 
   const [playerLoading, setPlayerLoading] = useState(false)
-  const [players, setPlayers] = useState([])
+  const [players, setPlayers] = useState<Array<{id: number, name: string, position: string}>>([]);
   const [isShowNewPlayer, showNewPlayer] = useState(false)
   const [sortHeaderPlayer, setSortHeaderPlayer] = useState<any>(null)
 

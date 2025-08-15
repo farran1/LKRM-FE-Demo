@@ -13,7 +13,7 @@ import dayjs from 'dayjs'
 
 function Filter({ isOpen, showOpen, onFilter } : any) {
   const [loading, setLoading] = useState(false)
-  const [positions, setPositions] = useState([])
+  const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
   const [form] = Form.useForm()
   const router = useRouter()
   const searchParams = useSearchParams()

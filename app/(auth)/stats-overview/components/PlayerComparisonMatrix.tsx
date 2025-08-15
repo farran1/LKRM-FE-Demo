@@ -37,7 +37,7 @@ const PlayerComparisonMatrix: React.FC<PlayerComparisonMatrixProps> = ({ filters
       <Table
         dataSource={filteredData}
         columns={columns}
-        size="small"
+
         pagination={false}
         style={{ background: 'transparent', color: '#fff' }}
         bordered={false}

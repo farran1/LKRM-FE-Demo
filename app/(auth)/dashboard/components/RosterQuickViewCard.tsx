@@ -1,7 +1,19 @@
 import React from "react";
 import { Card, List, Tag } from "antd";
 
-export default function RosterQuickViewCard({ players = [], overflowClass = '' }) {
+interface Player {
+  name: string;
+  position: string;
+  status?: 'injured' | 'active';
+  birthday?: string;
+}
+
+interface RosterQuickViewCardProps {
+  players?: Player[];
+  overflowClass?: string;
+}
+
+export default function RosterQuickViewCard({ players = [], overflowClass = '' }: RosterQuickViewCardProps) {
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}

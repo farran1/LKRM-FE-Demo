@@ -1,7 +1,18 @@
 import React from "react";
 import { Card, List, Tag } from "antd";
 
-export default function TasksCard({ tasks = [], overflowClass = '' }) {
+interface Task {
+  name: string;
+  dueDate: string;
+  status: 'overdue' | 'pending' | 'completed';
+}
+
+interface TasksCardProps {
+  tasks?: Task[];
+  overflowClass?: string;
+}
+
+export default function TasksCard({ tasks = [], overflowClass = '' }: TasksCardProps) {
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}

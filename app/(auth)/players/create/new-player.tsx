@@ -15,7 +15,7 @@ import NoteList from '@/components/note-list'
 function NewPlayer() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const [positions, setPositions] = useState([])
+  const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
   const { message } = App.useApp()
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)

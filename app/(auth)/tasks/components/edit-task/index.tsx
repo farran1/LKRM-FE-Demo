@@ -16,8 +16,8 @@ const STATUS = [
 
 function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
-  const [players, setPlayers] = useState([])
-  const [priorities, setPriorities] = useState([])
+  const [players, setPlayers] = useState<Array<{id: number, name: string}>>([])
+  const [priorities, setPriorities] = useState<Array<{id: number, name: string}>>([])
   const [form] = Form.useForm()
 
   useEffect(() => {

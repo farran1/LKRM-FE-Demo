@@ -169,7 +169,6 @@ const GameStatsPanel = () => {
         <Table
           columns={columns}
           dataSource={games.map(g => ({ ...g, key: g.id }))}
-          size="small"
           pagination={false}
           scroll={{ y: 120 }}
         />

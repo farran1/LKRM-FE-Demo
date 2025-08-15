@@ -30,9 +30,7 @@ const PlayIcon = () => (
 // Debug: Check if all routes are defined
 console.log('ROUTES:', ROUTES)
 console.log('ROUTES.statistic:', ROUTES.statistic)
-console.log('ROUTES.statsDash:', ROUTES.statsDash)
 console.log('ROUTES.planner.event:', ROUTES.planner.event)
-console.log('ROUTES.planner.volunteer:', ROUTES.planner.volunteer)
 console.log('ROUTES.team.player:', ROUTES.team.player)
 console.log('ROUTES.team.task:', ROUTES.team.task)
 console.log('ROUTES.finance.budget:', ROUTES.finance.budget)

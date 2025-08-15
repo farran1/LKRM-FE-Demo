@@ -999,7 +999,7 @@ const StatsDashboard = () => {
           </div>
           <div className={style.headerRight}>
             <Space>
-              <Button icon={<SettingOutlined />} size="small">
+              <Button icon={<SettingOutlined />}>
                 Settings
               </Button>
               <Button 

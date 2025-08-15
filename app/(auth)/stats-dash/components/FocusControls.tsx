@@ -57,14 +57,13 @@ const FocusControls: React.FC<FocusControlsProps> = ({
 
   return (
     <div className={style.focusControls}>
-      <Space size="small">
+              <Space>
         {/* Focus Mode Toggle Buttons */}
         <Tooltip title="Focus on Team Statistics">
           <Button
             type={getButtonType('team')}
             icon={getButtonIcon('team')}
             onClick={() => onToggleFocus('team')}
-            size="small"
           >
             {getButtonText('team')}
           </Button>
@@ -75,7 +74,6 @@ const FocusControls: React.FC<FocusControlsProps> = ({
             type={getButtonType('games')}
             icon={getButtonIcon('games')}
             onClick={() => onToggleFocus('games')}
-            size="small"
           >
             {getButtonText('games')}
           </Button>
@@ -86,7 +84,6 @@ const FocusControls: React.FC<FocusControlsProps> = ({
             type={getButtonType('players')}
             icon={getButtonIcon('players')}
             onClick={() => onToggleFocus('players')}
-            size="small"
           >
             {getButtonText('players')}
           </Button>
@@ -99,7 +96,6 @@ const FocusControls: React.FC<FocusControlsProps> = ({
               type="default"
               icon={<FullscreenExitOutlined />}
               onClick={onExitFocus}
-              size="small"
             >
               Exit Focus
             </Button>
@@ -113,7 +109,6 @@ const FocusControls: React.FC<FocusControlsProps> = ({
               type="default"
               icon={<AppstoreOutlined />}
               disabled
-              size="small"
             >
               Overview
             </Button>

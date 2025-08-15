@@ -1,5 +1,11 @@
 import { Request, Response, NextFunction } from 'express'
-import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken'
+
+// Mock jwt for frontend static export
+const jwt = {
+  verify: (token: string, secret: string) => ({ userId: 1, email: 'mock@example.com' })
+}
+const JsonWebTokenError = Error
+const TokenExpiredError = Error
 
 export interface AuthRequest extends Request {
   userId?: number

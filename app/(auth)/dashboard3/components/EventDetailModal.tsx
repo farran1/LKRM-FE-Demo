@@ -11,17 +11,38 @@ import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import { EditFilled, CloseOutlined } from '@ant-design/icons';
 
+interface Event {
+  id: number;
+  name: string;
+  eventType?: {
+    color?: string;
+    txtColor?: string;
+    name?: string;
+  };
+  isRepeat?: boolean;
+  startTime: string;
+  venue?: string;
+}
+
+interface Player {
+  id: number;
+  name: string;
+  position?: {
+    name: string;
+  };
+}
+
 interface EventDetailModalProps {
   isShowModal: boolean;
   onClose: () => void;
-  event: any;
+  event: Event | null;
   openEdit?: () => void;
 }
 
 function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetailModalProps) {
   const [loading, setLoading] = useState(false);
   const [playerLoading, setPlayerLoading] = useState(false);
-  const [players, setPlayers] = useState([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,6 +51,11 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
     }
     fetchPlayer();
   }, [event]);
+
+  // Don't render if no event is selected
+  if (!event) {
+    return null;
+  }
 
   const fetchPlayer = async () => {
     setPlayerLoading(true);
@@ -85,7 +111,7 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                 fontSize: '20px',
                 color: '#ffffff'
               }}>
-                {event?.name}
+                {event.name}
               </div>
               {openEdit && (
                 <Tooltip title="Edit Event">
@@ -112,8 +138,8 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                 }}>
                   <span 
                     style={{ 
-                      backgroundColor: event?.eventType?.color || '#1D75D0', 
-                      color: event?.eventType?.txtColor || '#ffffff',
+                      backgroundColor: event.eventType?.color || '#1D75D0', 
+                      color: event.eventType?.txtColor || '#ffffff',
                       padding: '1px 1px',
                       borderRadius: '3px',
                       fontSize: '12px',
@@ -121,62 +147,58 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                       fontWeight: 'normal'
                     }}
                   >
-                    {event?.eventType?.name || 'Event'}
+                    {event.eventType?.name || 'Event'}
                   </span>
                   <span>
-                    {event?.isRepeat ? 'Weekly' : 'Only'} on {dayjs(event?.startTime).format('dddd')}
+                    {event.isRepeat ? 'Weekly' : 'Only'} on {dayjs(event.startTime).format('dddd')}
                   </span>
                 </div>
                 <div style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   marginBottom: '5px',
-                  color: '#ffffff'
+                  color: '#b0c4d4',
+                  fontSize: '14px'
                 }}>
                   <CalendarIcon style={{ marginRight: '4px' }} />
-                  <span>{dayjs(event?.startTime).format('MMM D, h:mm A')}</span>
+                  <span>{dayjs(event.startTime).format('MMM D, h:mm A')}</span>
                 </div>
                 <div style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   marginBottom: '16px',
-                  color: '#ffffff'
+                  color: '#b0c4d4',
+                  fontSize: '14px'
                 }}>
                   <MapIcon style={{ marginRight: '4px' }} />
-                  <span>{event?.venue}</span>
+                  <span>{event.venue}</span>
                 </div>
                 <div style={{ marginBottom: '16px' }}>
-                  <Flex 
-                    justify="space-between" 
-                    align="center" 
-                    style={{ marginBottom: '12px' }}
-                  >
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      fontSize: '14px',
-                      color: '#1D75D0'
-                    }}>
-                      <UserIcon style={{ marginRight: '10px' }} />
-                      <span>{players.length} Players</span>
+                  <div style={{ 
+                    fontWeight: 600, 
+                    marginBottom: '8px',
+                    fontSize: '14px',
+                    color: '#1D75D0'
+                  }}>
+                    <UserIcon style={{ marginRight: '10px' }} />
+                    <span>{players.length} Players</span>
+                  </div>
+                  {players.length > 0 && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      0 yes, 0 no, {players.length} awaiting
                     </div>
-                    {players.length > 0 && (
-                      <div style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                        0 yes, 0 no, {players.length} awaiting
-                      </div>
-                    )}
-                  </Flex>
-                  {playerLoading && <Skeleton active />}
-                  {players.map((item: any) => (
-                    <Row key={item.id} style={{ color: '#ffffff', marginBottom: '4px' }}>
-                      <Col span={8}>👤 {item.name}</Col>
-                      <Col span={6}>Going</Col>
-                      <Col span={10} style={{ textAlign: 'right' }}>
-                        {item.position?.name}
-                      </Col>
-                    </Row>
-                  ))}
+                  )}
                 </div>
+                {playerLoading && <Skeleton active />}
+                {players.map((item: Player) => (
+                  <Row key={item.id} style={{ color: '#ffffff', marginBottom: '4px' }}>
+                    <Col span={8}>👤 {item.name}</Col>
+                    <Col span={6}>Going</Col>
+                    <Col span={10} style={{ textAlign: 'right' }}>
+                      {item.position?.name}
+                    </Col>
+                  </Row>
+                ))}
               </div>
             </Col>
             {/* Right Column */}
@@ -256,4 +278,4 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
   );
 }
 
-export default memo(EventDetailModal); 
+export default memo(EventDetailModal);

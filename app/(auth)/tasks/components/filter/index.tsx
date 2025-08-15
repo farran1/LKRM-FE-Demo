@@ -15,9 +15,9 @@ const locations = [{label: 'Home', value: 'HOME'}, {label: 'Away', value: 'AWAY'
 
 function Filter({ isOpen, showOpen } : any) {
   const [loading, setLoading] = useState(false)
-  const [players, setPlayers] = useState([])
-  const [priorities, setPriorities] = useState([])
-  const [events, setEvents] = useState([])
+  const [players, setPlayers] = useState<Array<{id: number, name: string}>>([])
+  const [priorities, setPriorities] = useState<Array<{id: number, name: string}>>([])
+  const [events, setEvents] = useState<Array<{id: number, name: string}>>([])
   const [form] = Form.useForm()
   const router = useRouter()
   const searchParams = useSearchParams()

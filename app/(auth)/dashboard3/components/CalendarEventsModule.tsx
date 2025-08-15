@@ -37,14 +37,14 @@ interface CalendarEventsModuleProps {
   // Add props if needed
 }
 
-export default function CalendarEventsModule({}: CalendarEventsModuleProps) {
+export default function CalendarEventsModule() {
   const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [isMonthViewVisible, setIsMonthViewVisible] = useState(false);
   const [monthViewDate, setMonthViewDate] = useState<Dayjs>(dayjs());
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
-  const [eventTypes, setEventTypes] = useState([]);
+  const [eventTypes, setEventTypes] = useState<Array<{label: string, value: number}>>([]);
   const [eventFormLoading, setEventFormLoading] = useState(false);
   const [eventForm] = Form.useForm();
   const [isEventDetailModalVisible, setIsEventDetailModalVisible] = useState(false);
@@ -270,7 +270,6 @@ export default function CalendarEventsModule({}: CalendarEventsModuleProps) {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              size="small"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsEventModalVisible(true);
@@ -409,7 +408,6 @@ export default function CalendarEventsModule({}: CalendarEventsModuleProps) {
         }}>
           <Button
             icon={<LeftOutlined />}
-            size="small"
             onClick={(e) => {
               e.stopPropagation();
               navigateMonthView('prev');
@@ -431,7 +429,6 @@ export default function CalendarEventsModule({}: CalendarEventsModuleProps) {
           </Text>
           <Button
             icon={<RightOutlined />}
-            size="small"
             onClick={(e) => {
               e.stopPropagation();
               navigateMonthView('next');
@@ -595,7 +592,6 @@ export default function CalendarEventsModule({}: CalendarEventsModuleProps) {
           <Flex gap="small">
             <Button
               icon={<LeftOutlined />}
-              size="small"
               onClick={(e) => {
                 e.stopPropagation();
                 navigateWeek('prev');
@@ -611,7 +607,6 @@ export default function CalendarEventsModule({}: CalendarEventsModuleProps) {
             />
             <Button
               icon={<RightOutlined />}
-              size="small"
               onClick={(e) => {
                 e.stopPropagation();
                 navigateWeek('next');

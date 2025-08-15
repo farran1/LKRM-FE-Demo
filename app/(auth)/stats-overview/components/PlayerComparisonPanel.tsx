@@ -21,7 +21,7 @@ const PlayerComparisonPanel: React.FC<{ players: Player[] }> = ({ players }) => 
       columns={columns}
       dataSource={players.map((p, i) => ({ ...p, key: i }))}
       pagination={false}
-      size="small"
+      
       style={{ width: '100%' }}
       scroll={{ y: 'calc(100% - 40px)' }}
     />

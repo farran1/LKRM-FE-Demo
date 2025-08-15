@@ -2,7 +2,20 @@ import React from "react";
 import BaseDashboardCard from "./BaseDashboardCard";
 import { List } from "antd";
 
-export default function UpcomingEventsCard({ events = [], overflow = "scroll" }) {
+interface Event {
+  title: string;
+  date: string;
+  time: string;
+  location?: string;
+  opponent?: string;
+}
+
+interface UpcomingEventsCardProps {
+  events?: Event[];
+  overflow?: "scroll" | "clipped";
+}
+
+export default function UpcomingEventsCard({ events = [], overflow = "scroll" }: UpcomingEventsCardProps) {
   return (
     <BaseDashboardCard title={<span style={{ color: '#fff', fontWeight: 700 }}>Upcoming Events</span>} overflow={overflow}>
       <List

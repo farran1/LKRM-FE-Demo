@@ -84,6 +84,10 @@ class LocalStorageService {
     return `lkmr_${type}`;
   }
 
+  private isLocalStorageAvailable(): boolean {
+    return typeof window !== 'undefined' && !!window.localStorage;
+  }
+
   // Initialize default data if not exists
   initializeDefaultData(): void {
     if (!this.getEvents().length) {
@@ -108,11 +112,15 @@ class LocalStorageService {
 
   // Events
   getEvents(): LocalEvent[] {
+    if (!this.isLocalStorageAvailable()) {
+      return this.getDefaultEvents();
+    }
     const data = localStorage.getItem(this.getStorageKey('events'));
     return data ? JSON.parse(data) : [];
   }
 
   setEvents(events: LocalEvent[]): void {
+    if (!this.isLocalStorageAvailable()) return;
     localStorage.setItem(this.getStorageKey('events'), JSON.stringify(events));
   }
 
@@ -129,11 +137,15 @@ class LocalStorageService {
 
   // Tasks
   getTasks(): LocalTask[] {
+    if (!this.isLocalStorageAvailable()) {
+      return this.getDefaultTasks();
+    }
     const data = localStorage.getItem(this.getStorageKey('tasks'));
     return data ? JSON.parse(data) : [];
   }
 
   setTasks(tasks: LocalTask[]): void {
+    if (!this.isLocalStorageAvailable()) return;
     localStorage.setItem(this.getStorageKey('tasks'), JSON.stringify(tasks));
   }
 
@@ -179,21 +191,29 @@ class LocalStorageService {
 
   // Players
   getPlayers(): LocalPlayer[] {
+    if (!this.isLocalStorageAvailable()) {
+      return this.getDefaultPlayers();
+    }
     const data = localStorage.getItem(this.getStorageKey('players'));
     return data ? JSON.parse(data) : [];
   }
 
   setPlayers(players: LocalPlayer[]): void {
+    if (!this.isLocalStorageAvailable()) return;
     localStorage.setItem(this.getStorageKey('players'), JSON.stringify(players));
   }
 
   // Priorities
   getPriorities(): LocalPriority[] {
+    if (!this.isLocalStorageAvailable()) {
+      return this.getDefaultPriorities();
+    }
     const data = localStorage.getItem(this.getStorageKey('priorities'));
     return data ? JSON.parse(data) : [];
   }
 
   setPriorities(priorities: LocalPriority[]): void {
+    if (!this.isLocalStorageAvailable()) return;
     localStorage.setItem(this.getStorageKey('priorities'), JSON.stringify(priorities));
   }
 

@@ -1,7 +1,19 @@
 import React from "react";
 import { Card, Statistic, Row, Col } from "antd";
 
-export default function TeamStatsCard({ stats = {}, overflowClass = '' }) {
+interface TeamStats {
+  ppg?: number;
+  papg?: number;
+  reb?: number;
+  ast?: number;
+}
+
+interface TeamStatsCardProps {
+  stats?: TeamStats;
+  overflowClass?: string;
+}
+
+export default function TeamStatsCard({ stats = {}, overflowClass = '' }: TeamStatsCardProps) {
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}

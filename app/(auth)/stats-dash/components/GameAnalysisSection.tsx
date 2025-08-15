@@ -323,7 +323,6 @@ const GameAnalysisSection = () => {
             <Table
               columns={playerColumns}
               dataSource={gameAnalysis.playerPerformance.map(p => ({ ...p, key: p.playerId }))}
-              size="small"
               pagination={false}
               scroll={{ x: 600 }}
             />

@@ -1,7 +1,7 @@
 'use client'
 import React from 'react';
 import { Card, Statistic, Row, Col, Divider, Spin, Alert } from 'antd';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { TrophyOutlined, FireOutlined, RiseOutlined, FallOutlined, FullscreenOutlined } from '@ant-design/icons';
 import style from '../style.module.scss';
 import { useTeamStats } from '../hooks/useStatsData';
@@ -203,9 +203,12 @@ const TeamStatsPanel: React.FC<TeamStatsPanelProps> = ({
             />
             <Bar 
               dataKey="result" 
-              fill={(entry: any) => entry.result === 1 ? '#52c41a' : '#f5222d'}
               radius={[2, 2, 0, 0]}
-            />
+            >
+              {lastFiveGamesData.map((entry: any, index: number) => (
+                <Cell key={`cell-${index}`} fill={entry.result === 1 ? '#52c41a' : '#f5222d'} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -235,9 +238,12 @@ const TeamStatsPanel: React.FC<TeamStatsPanelProps> = ({
             />
             <Bar 
               dataKey="value" 
-              fill={(entry: any) => entry.color}
               radius={[2, 2, 0, 0]}
-            />
+            >
+              {scoringData.map((entry: any, index: number) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

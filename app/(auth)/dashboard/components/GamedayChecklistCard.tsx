@@ -21,7 +21,11 @@ const checklistData = {
   ],
 };
 
-export default function GamedayChecklistCard({ overflowClass = '' }) {
+interface GamedayChecklistCardProps {
+  overflowClass?: string;
+}
+
+export default function GamedayChecklistCard({ overflowClass = '' }: GamedayChecklistCardProps) {
   const percent = Math.round((checklistData.completedTasks / checklistData.totalTasks) * 100);
 
   return (

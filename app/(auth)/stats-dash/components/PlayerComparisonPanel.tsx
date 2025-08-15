@@ -197,7 +197,6 @@ const PlayerComparisonPanel = () => {
         <Table
           columns={columns}
           dataSource={players.map(p => ({ ...p, key: p.id }))}
-          size="small"
           pagination={false}
           scroll={{ y: 120 }}
         />

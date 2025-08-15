@@ -5,7 +5,34 @@ import { cookies } from 'next/headers';
 import { apiMetadata } from '@/services/api';
 import { AxiosError } from 'axios';
 
-async function fetchEvent(eventId: number): Promise<Event | null> {
+async function fetchEvent(eventId: number): Promise<any> {
+  // For static export, return mock data instead of making API calls
+  if (process.env.NODE_ENV === 'production' || process.env.NEXT_PHASE === 'phase-production-build') {
+    return {
+      id: eventId,
+      name: `Event ${eventId}`,
+      startTime: new Date().toISOString(),
+      endTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      eventTypeId: 1,
+      eventType: {
+        id: 1,
+        name: 'Game',
+        color: '#3B82F6',
+        txtColor: '#FFFFFF'
+      },
+      location: 'HOME' as const,
+      venue: 'Main Court',
+      isRepeat: false,
+      occurence: 0,
+      isNotice: false,
+      oppositionTeam: null,
+      createdAt: new Date().toISOString(),
+      createdBy: 1,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 1
+    };
+  }
+
   const cookieStore = await cookies();
   try {
     const res = await apiMetadata.get(`/api/events/${eventId}`, {

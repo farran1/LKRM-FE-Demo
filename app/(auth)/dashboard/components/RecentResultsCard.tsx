@@ -1,7 +1,19 @@
 import React from "react";
 import { Card, List, Tag } from "antd";
 
-export default function RecentResultsCard({ results = [], overflowClass = '' }) {
+interface GameResult {
+  result: 'W' | 'L';
+  score: string;
+  opponent: string;
+  date: string;
+}
+
+interface RecentResultsCardProps {
+  results?: GameResult[];
+  overflowClass?: string;
+}
+
+export default function RecentResultsCard({ results = [], overflowClass = '' }: RecentResultsCardProps) {
   return (
     <Card
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
