@@ -7,8 +7,9 @@ RUN apk add --no-cache curl && \
 ENV PATH="/root/.yarn/bin:$PATH"
 
 COPY . .
-#COPY ./.env.prod ./.env
+COPY ./.env.example ./.env
 RUN yarn install
+RUN yarn db:generate
 RUN yarn build
 
 # --- Production Stage (Final Image) ---

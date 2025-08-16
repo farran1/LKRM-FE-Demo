@@ -1,9 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// Enhanced Prisma schema for LKRM Basketball Coaching Platform
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,13 +6,14 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  relationMode = "prisma" // disables FK enforcement in DB
 }
 
+// Enums
 enum Role {
   COACH
   ADMIN
   TRAINEE
+  PLAYER
 }
 
 enum Location {
@@ -25,270 +21,552 @@ enum Location {
   AWAY
 }
 
-enum Status {
+enum TaskStatus {
   TODO
   IN_PROGRESS
   DONE
 }
 
+enum GameResult {
+  WIN
+  LOSS
+  TIE
+}
+
+// Core User Management
 model User {
   id        Int      @id @default(autoincrement())
-  username  String
+  username  String   @unique
   email     String   @unique
   password  String
-  isActive  Boolean  @default(false)
-  role      Role
-  profileId Int     @unique
-  profile   Profile @relation(fields: [profileId], references: [id], map: "no_fk_profiles")
+  isActive  Boolean  @default(true)
+  role      Role     @default(COACH)
+  profileId Int?     @unique
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
   createdAt DateTime @default(now())
-  createdBy Int
+  createdBy Int      @default(0)
   updatedAt DateTime @updatedAt
-  updatedBy Int
-  notes     PlayerNote[]
-  goals     PlayerGoal[]
+  updatedBy Int      @default(0)
 
-  // @@index([profileId])
-
+  // Relations
+  createdEvents     Event[]      @relation("EventCreator")
+  createdPlayers    Player[]     @relation("PlayerCreator")
+  createdTasks      Task[]       @relation("TaskCreator")
+  createdNotes      PlayerNote[] @relation("NoteCreator")
+  createdGoals      PlayerGoal[] @relation("GoalCreator")
+  assignedTasks     UserTask[]
+  gameStats         GameStat[]
+  
   @@map("users")
 }
 
 model Profile {
   id          Int      @id @default(autoincrement())
-  user        User?
   firstName   String
   lastName    String
   email       String   @unique
-  phoneNumber String
-  institute   String
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+  phoneNumber String?
+  institute   String?
+  avatar      String?
+  bio         String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  // Relations
+  user User?
 
   @@map("profiles")
 }
 
-model EventType {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  color       String
-  txtColor    String   @default("#ffffff")
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
-  events      Event[]
-
-  @@map("eventTypes")
-}
-
-model Event {
-  id          Int      @id @default(autoincrement())
-  eventTypeId Int
-  eventType   EventType @relation(fields: [eventTypeId], references: [id], map: "no_fk_eventTypes")
-  name        String
-  startTime   DateTime
-  endTime     DateTime?
-  isRepeat    Boolean  @default(false)
-  occurence   Int @default(0)
-  location    Location
-  venue       String
-  isNotice    Boolean @default(false)
-  oppositionTeam String?
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
-
-  playerEvents      PlayerEvent[]
-  volunteerEvents   VolunteerEvent[]
-  tasks             Task[]
-
-  @@map("events")
-  @@index(name)
-  @@index(eventTypeId)
-}
-
+// Basketball Positions
 model Position {
   id          Int      @id @default(autoincrement())
   name        String   @unique
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
-  players     Player[]
+  abbreviation String  @unique
+  description String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  // Relations
+  players Player[]
 
   @@map("positions")
 }
 
+// Players
 model Player {
   id          Int      @id @default(autoincrement())
-  positionId  Int
-  position    Position @relation(fields: [positionId], references: [id], map: "no_fk")
-  avatar      String?
   name        String
+  positionId  Int
+  position    Position @relation(fields: [positionId], references: [id])
   jersey      String
-  phoneNumber String
-  weight      Float
-  height      Float
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
-
-  players        PlayerEvent[]
-  tasks          PlayerTask[]
-  notes          PlayerNote[]
-  goals          PlayerGoal[]
-
-  @@map("players")
-  @@index(name)
-  @@index(positionId)
-  @@index(createdBy)
-}
-
-model PlayerImport {
-  id          Int      @id @default(autoincrement())
-  importId    String
-  position    String?
-  name        String?
-  jersey      String?
   phoneNumber String?
-  weight      String?
-  height      String?
-  error       String?
-  createdAt   DateTime @default(now())
-  createdBy   Int
+  email       String?
+  height      Float?   // in inches
+  weight      Float?   // in pounds
+  avatar      String?
+  birthDate   DateTime?
+  isActive    Boolean  @default(true)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int
+  creator   User     @relation("PlayerCreator", fields: [createdBy], references: [id])
+  updatedAt DateTime @updatedAt
+  updatedBy Int
 
-  @@map("player_imports")
-  @@index(createdBy)
+  // Relations
+  playerEvents PlayerEvent[]
+  playerTasks  PlayerTask[]
+  userTasks    UserTask[]
+  notes        PlayerNote[]
+  goals        PlayerGoal[]
+  gameStats    GameStat[]
+
+  @@index([name])
+  @@index([positionId])
+  @@index([jersey])
+  @@index([createdBy])
+  @@map("players")
 }
 
-model PlayerNote {
-  id          Int      @id @default(autoincrement())
-  playerId    Int
-  player      Player @relation(fields: [playerId], references: [id], map: "no_fk")
-  note        String
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  createdUser User @relation(fields: [createdBy], references: [id], map: "no_fk_profiles")
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+// Event Types
+model EventType {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  color    String @default("#1890ff")
+  txtColor String @default("#ffffff")
+  icon     String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
 
-  @@map("player_notes")
-  @@index(playerId)
-  @@index(createdBy)
+  // Relations
+  events Event[]
+
+  @@map("event_types")
 }
 
-model PlayerGoal {
-  id          Int      @id @default(autoincrement())
-  playerId    Int
-  player      Player @relation(fields: [playerId], references: [id], map: "no_fk")
-  note        String
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  createdUser User @relation(fields: [createdBy], references: [id], map: "no_fk_profiles")
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+// Events (Games, Practices, Meetings, etc.)
+model Event {
+  id             Int       @id @default(autoincrement())
+  name           String
+  description    String?
+  eventTypeId    Int
+  eventType      EventType @relation(fields: [eventTypeId], references: [id])
+  startTime      DateTime
+  endTime        DateTime?
+  location       Location
+  venue          String
+  oppositionTeam String?
+  isRepeat       Boolean   @default(false)
+  occurence      Int       @default(0)
+  isNotice       Boolean   @default(false)
+  notes          String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int
+  creator   User     @relation("EventCreator", fields: [createdBy], references: [id])
+  updatedAt DateTime @updatedAt
+  updatedBy Int
 
-  @@map("player_goals")
-  @@index(playerId)
-  @@index(createdBy)
+  // Relations
+  playerEvents PlayerEvent[]
+  tasks        Task[]
+  games        Game[]
+
+  @@index([name])
+  @@index([eventTypeId])
+  @@index([startTime])
+  @@index([createdBy])
+  @@map("events")
 }
 
+// Player-Event Relationships
 model PlayerEvent {
-  playerId    Int
-  eventId     Int
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+  playerId  Int
+  eventId   Int
+  player    Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  status    String @default("pending") // pending, confirmed, declined
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
 
-  player   Player @relation(fields: [playerId], references: [id])
-  event    Event  @relation(fields: [eventId], references: [id])
-
-  @@id([playerId, eventId]) // Composite primary key
+  @@id([playerId, eventId])
   @@map("player_events")
 }
 
-model Volunteer {
-  id          Int      @id @default(autoincrement())
-  avatar      String?
-  name        String
-  phoneNumber String
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+// Task Priorities
+model TaskPriority {
+  id     Int    @id @default(autoincrement())
+  name   String @unique
+  weight Int    @unique
+  color  String @default("#1890ff")
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
 
-  volunteers   VolunteerEvent[]
+  // Relations
+  tasks Task[]
 
-  @@map("volunteers")
-  @@index(name)
+  @@index([weight])
+  @@map("task_priorities")
 }
 
-model VolunteerEvent {
-  volunteerId Int
-  eventId     Int
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
-
-  volunteer   Volunteer @relation(fields: [volunteerId], references: [id])
-  event       Event @relation(fields: [eventId], references: [id])
-
-  @@id([volunteerId, eventId]) // Composite primary key
-  @@map("volunteer_events")
-}
-
+// Tasks
 model Task {
-  id          Int      @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   name        String
   description String?
   dueDate     DateTime?
   priorityId  Int
-  priority    TaskPriority @relation(fields: [priorityId], references: [id], map: "no_fk")
-  status      Status @default(TODO)
+  priority    TaskPriority @relation(fields: [priorityId], references: [id])
+  status      TaskStatus   @default(TODO)
   eventId     Int?
-  event       Event? @relation(fields: [eventId], references: [id])
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+  event       Event?       @relation(fields: [eventId], references: [id])
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int
+  creator   User     @relation("TaskCreator", fields: [createdBy], references: [id])
+  updatedAt DateTime @updatedAt
+  updatedBy Int
 
-  playerTasks  PlayerTask[]
+  // Relations
+  playerTasks PlayerTask[]
+  userTasks   UserTask[]
 
+  @@index([name])
+  @@index([status])
+  @@index([dueDate])
+  @@index([priorityId])
+  @@index([eventId])
+  @@index([createdBy])
   @@map("tasks")
-  @@index(name)
 }
 
+// Player-Task Relationships
 model PlayerTask {
-  taskId      Int
-  playerId    Int
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+  taskId   Int
+  playerId Int
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  status   String @default("assigned") // assigned, in_progress, completed
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
 
-  task     Task  @relation(fields: [taskId], references: [id])
-  player   Player @relation(fields: [playerId], references: [id])
-
-  @@id([taskId, playerId]) // Composite primary key
+  @@id([taskId, playerId])
   @@map("player_tasks")
 }
 
-model TaskPriority {
+// User-Task Relationships (for coaches/staff)
+model UserTask {
+  taskId Int
+  userId Int
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status String @default("assigned")
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  @@id([taskId, userId])
+  @@map("user_tasks")
+}
+
+// Player Notes
+model PlayerNote {
+  id       Int    @id @default(autoincrement())
+  playerId Int
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  note     String
+  isPublic Boolean @default(false)
+  tags     String[] @default([])
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int
+  creator   User     @relation("NoteCreator", fields: [createdBy], references: [id])
+  updatedAt DateTime @updatedAt
+  updatedBy Int
+
+  @@index([playerId])
+  @@index([createdBy])
+  @@map("player_notes")
+}
+
+// Player Goals
+model PlayerGoal {
   id          Int      @id @default(autoincrement())
+  playerId    Int
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  goal        String
+  targetDate  DateTime?
+  isAchieved  Boolean  @default(false)
+  achievedAt  DateTime?
+  category    String?  // e.g., "shooting", "defense", "leadership"
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int
+  creator   User     @relation("GoalCreator", fields: [createdBy], references: [id])
+  updatedAt DateTime @updatedAt
+  updatedBy Int
+
+  @@index([playerId])
+  @@index([createdBy])
+  @@index([category])
+  @@map("player_goals")
+}
+
+// Games (specific instances of game events)
+model Game {
+  id             Int        @id @default(autoincrement())
+  eventId        Int        @unique
+  event          Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  opponent       String
+  homeScore      Int?
+  awayScore      Int?
+  result         GameResult?
+  gameDate       DateTime
+  season         String     @default("2024-25")
+  isPlayoffs     Boolean    @default(false)
+  notes          String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  // Relations
+  gameStats GameStat[]
+
+  @@index([gameDate])
+  @@index([season])
+  @@index([opponent])
+  @@map("games")
+}
+
+// Game Statistics
+model GameStat {
+  id       Int @id @default(autoincrement())
+  gameId   Int
+  game     Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  playerId Int?
+  player   Player? @relation(fields: [playerId], references: [id])
+  userId   Int?
+  user     User?   @relation(fields: [userId], references: [id])
+  
+  // Basketball Statistics
+  points              Int @default(0)
+  fieldGoalsMade      Int @default(0)
+  fieldGoalsAttempted Int @default(0)
+  threePointsMade     Int @default(0)
+  threePointsAttempted Int @default(0)
+  freeThrowsMade      Int @default(0)
+  freeThrowsAttempted Int @default(0)
+  rebounds            Int @default(0)
+  offensiveRebounds   Int @default(0)
+  defensiveRebounds   Int @default(0)
+  assists             Int @default(0)
+  steals              Int @default(0)
+  blocks              Int @default(0)
+  turnovers           Int @default(0)
+  fouls               Int @default(0)
+  minutesPlayed       Int @default(0)
+  plusMinus           Int @default(0)
+  
+  // Game context
+  quarter    Int?
+  period     String?
+  timestamp  DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  @@index([gameId])
+  @@index([playerId])
+  @@index([quarter])
+  @@map("game_stats")
+}
+
+// Seasons
+model Season {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g., "2024-25"
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(false)
+  description String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  @@index([isActive])
+  @@map("seasons")
+}
+
+// Budget Categories
+model BudgetCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  color       String   @default("#1890ff")
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  // Relations
+  budgets Budget[]
+
+  @@map("budget_categories")
+}
+
+// Budgets
+model Budget {
+  id          Int            @id @default(autoincrement())
   name        String
-  weight      Int
-  createdAt   DateTime @default(now())
-  createdBy   Int
-  updatedAt   DateTime @updatedAt
-  updatedBy   Int
+  amount      Decimal        @db.Decimal(10, 2)
+  period      String         // "Monthly", "Quarterly", "Yearly", "Custom"
+  autoRepeat  Boolean        @default(false)
+  description String?
+  categoryId  Int
+  category    BudgetCategory @relation(fields: [categoryId], references: [id])
+  season      String         @default("2024-25")
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
 
-  tasks       Task[]
+  // Relations
+  expenses Expense[]
 
-  @@index(weight)
-  @@map("task_priorities")
+  @@index([season])
+  @@index([categoryId])
+  @@map("budgets")
+}
+
+// Expenses
+model Expense {
+  id          Int      @id @default(autoincrement())
+  budgetId    Int?
+  budget      Budget?  @relation(fields: [budgetId], references: [id])
+  merchant    String
+  amount      Decimal  @db.Decimal(10, 2)
+  category    String
+  date        DateTime
+  eventId     Int?
+  event       Event?   @relation(fields: [eventId], references: [id])
+  description String?
+  receiptUrl  String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  createdBy Int      @default(0)
+  updatedAt DateTime @updatedAt
+  updatedBy Int      @default(0)
+
+  @@index([date])
+  @@index([category])
+  @@index([budgetId])
+  @@index([eventId])
+  @@map("expenses")
+}
+
+// Notifications
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String   // "mention", "assignment", "deadline", "game_reminder"
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  data      Json?    // Additional data as JSON
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// Settings
+model Setting {
+  id     Int    @id @default(autoincrement())
+  userId Int    @unique
+  key    String
+  value  String
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@map("settings")
+}
+
+// Audit Log
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String   // "CREATE", "UPDATE", "DELETE"
+  table     String   // table name
+  recordId  Int?     // ID of the affected record
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([table])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

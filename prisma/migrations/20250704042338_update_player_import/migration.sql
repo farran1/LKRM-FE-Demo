@@ -1,4 +1,0 @@
--- AlterTable
-ALTER TABLE "player_imports" ALTER COLUMN "weight" SET DATA TYPE TEXT,
-ALTER COLUMN "height" SET DATA TYPE TEXT,
-ALTER COLUMN "position" DROP NOT NULL;
