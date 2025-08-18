@@ -7,24 +7,14 @@ import DatabaseIcon from '@/components/icon/database.svg'
 import NotificationBell from '@/components/NotificationBell'
 import { createSampleNotifications } from '@/utils/mentions'
 import style from './style.module.scss'
-import { useAuthStore } from '@/store/auth'
-import api from '@/services/api'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 function RightHeader() {
-  const {logout, setUser} = useAuthStore()
+  const { user, signOut } = useAuth()
   const router = useRouter()
 
-  useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  const fetchProfile = async() => {
-    const res = await api.get('/api/me')
-    setUser(res.data.user)
-  }
-
   const handleLogout = () => {
-    logout()
+    signOut()
   }
 
   const handleDemoDataManager = () => {

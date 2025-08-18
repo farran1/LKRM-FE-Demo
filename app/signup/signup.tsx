@@ -3,23 +3,34 @@
 import { Form, Input, Button, ConfigProvider, App } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import style from './style.module.scss'
+import style from '../login/style.module.scss'
 import Link from 'next/link'
 import Logo from '@/components/icon/logo.svg'
 import { supabase } from '@/lib/supabase'
-import { ROUTES } from '@/utils/routes'
 
-const Login = () => {
+const Signup = () => {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const { message } = App.useApp()
 
   const onSubmit = async (payload: any) => {
+    if (payload.password !== payload.confirmPassword) {
+      message.error('Passwords do not match')
+      return
+    }
+
     setLoading(true)
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email: payload.email,
         password: payload.password,
+        options: {
+          data: {
+            first_name: payload.firstName,
+            last_name: payload.lastName,
+            institute: payload.institute
+          }
+        }
       })
 
       if (error) {
@@ -28,8 +39,8 @@ const Login = () => {
       }
 
       if (data.user) {
-        message.success('Login successful!')
-        router.push(ROUTES.planner.event)
+        message.success('Account created successfully! Please check your email to verify your account.')
+        router.push('/login')
       }
     } catch (error) {
       message.error('An unexpected error occurred')
@@ -42,10 +53,6 @@ const Login = () => {
     required: '${label} is required!'
   }
 
-  const goWaitlist = () => {
-    router.push('/waitlist')
-  }
-
   return (
     <div className={style.container}>
       <div className={style.background}>
@@ -55,31 +62,39 @@ const Login = () => {
         <div className={style.form}>
           <div className={style.logo}>
             <Logo />
-            <div className={style.des}>Login into your account</div>
+            <div className={style.des}>Create your LKRM account</div>
           </div>
           <ConfigProvider form={{ validateMessages }}>
             <Form onFinish={onSubmit} layout="vertical">
-              <Form.Item name="email" rules={[{ required: true }]} label="Email">
+              <Form.Item name="firstName" rules={[{ required: true }]} label="First Name">
+                <Input placeholder="Enter first name" />
+              </Form.Item>
+              <Form.Item name="lastName" rules={[{ required: true }]} label="Last Name">
+                <Input placeholder="Enter last name" />
+              </Form.Item>
+              <Form.Item name="institute" rules={[{ required: true }]} label="School/Institute">
+                <Input placeholder="Enter school or institute name" />
+              </Form.Item>
+              <Form.Item name="email" rules={[{ required: true, type: 'email' }]} label="Email">
                 <Input type="email" placeholder="Enter email" />
               </Form.Item>
-              <Form.Item name="password" rules={[{ required: true }]} label="Password">
-                <Input type="password" placeholder="Enter password" />
+              <Form.Item name="password" rules={[{ required: true, min: 6 }]} label="Password">
+                <Input.Password placeholder="Enter password (min 6 characters)" />
+              </Form.Item>
+              <Form.Item name="confirmPassword" rules={[{ required: true }]} label="Confirm Password">
+                <Input.Password placeholder="Confirm password" />
               </Form.Item>
 
               <div>
-                <Link href="/forgot-password" className={style.forgot_password}>Forgot password?</Link>
                 <Button block type="primary" htmlType="submit" style={{ marginBottom: 10 }} loading={loading}>
-                  Login
+                  Create Account
                 </Button>
                 <div className={style.divider}><span className={style.divider_text}>OR</span></div>
-                <Link href="/signup">
+                <Link href="/login">
                   <Button block>
-                    Create Account
+                    Back to Login
                   </Button>
                 </Link>
-                <Button block onClick={goWaitlist} style={{ marginTop: 10 }}>
-                  Join Waitlist
-                </Button>
               </div>
             </Form>
           </ConfigProvider>
@@ -89,4 +104,4 @@ const Login = () => {
   )
 }
 
-export default Login
+export default Signup

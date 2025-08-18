@@ -1,6 +1,6 @@
-# Next.js Admin Dashboard
+# LKRM Basketball Coaching Platform
 
-A comprehensive basketball coaching management platform built with Next.js 15, Prisma, PostgreSQL, and TypeScript.
+A comprehensive basketball coaching management platform built with Next.js 15, Supabase, and TypeScript.
 
 ## Features
 
@@ -11,14 +11,15 @@ A comprehensive basketball coaching management platform built with Next.js 15, P
 - 📊 **Statistics Dashboard**: Comprehensive analytics and performance tracking
 - 🔴 **Live Stat Tracker**: Real-time game statistics and monitoring
 - 🚀 **Next.js 15** with App Router and TypeScript
-- 🗄️ **PostgreSQL** with Prisma ORM
+- 🗄️ **Supabase** with PostgreSQL and real-time features
+- 🔐 **Authentication & Security**: Built-in auth with Row Level Security
 - 💅 **Ant Design** for professional UI components
 - 📱 **Mobile-responsive** design with dark theme
 
 ## Prerequisites
 
 - Node.js v18.0.0 or later
-- PostgreSQL database
+- Supabase account and project
 - npm or yarn package manager
 
 ## Getting Started
@@ -34,33 +35,28 @@ cd <project-directory>
 npm install
 ```
 
-3. **Set up environment variables:**
+3. **Set up Supabase:**
+- Create a new project at [supabase.com](https://supabase.com)
+- Copy your project URL and anon key
+
+4. **Set up environment variables:**
 ```bash
 cp .env.example .env.local
-# Edit .env.local with your database credentials and other settings
+# Edit .env.local with your Supabase credentials
 ```
 
-4. **Set up the database:**
+5. **Set up the database:**
 ```bash
-# Start PostgreSQL (using Docker)
-docker-compose up -d lkmr_db
-
-# Generate Prisma client
-npm run db:generate
-
-# Run database migrations
-npm run db:migrate
-
-# Seed the database with default data
-npm run db:seed
+# Run the SQL migrations in your Supabase dashboard
+# Or use the Supabase CLI if you have it installed
 ```
 
-5. **Run the development server:**
+6. **Run the development server:**
 ```bash
 npm run dev
 ```
 
-6. **Open your browser:**
+7. **Open your browser:**
 Navigate to [http://localhost:3000](http://localhost:3000) to access the application.
 
 ## Project Structure
@@ -74,18 +70,17 @@ Navigate to [http://localhost:3000](http://localhost:3000) to access the applica
 │   │   ├── tasks/         # Task management
 │   │   ├── budgets/       # Budget management
 │   │   └── stats-*/       # Statistics dashboards
-│   └── login/             # Authentication
+│   ├── login/             # Authentication
+│   └── signup/            # User registration
 ├── src/
 │   ├── components/        # Reusable React components
-│   ├── controllers/       # API route controllers
 │   ├── lib/              # Utility functions and configurations
 │   ├── services/         # Database and external services
-│   ├── store/            # Zustand state management
+│   ├── hooks/            # Custom React hooks
+│   ├── types/            # TypeScript type definitions
 │   ├── utils/            # Helper functions
 │   └── validations/      # Zod validation schemas
-├── prisma/
-│   ├── schema.prisma     # Database schema
-│   ├── seed.ts          # Database seeding
+├── supabase/
 │   └── migrations/      # Database migrations
 └── public/              # Static assets
 ```
@@ -98,24 +93,16 @@ Navigate to [http://localhost:3000](http://localhost:3000) to access the applica
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint
 
-### Database
-- `npm run db:generate` - Generate Prisma client
-- `npm run db:push` - Push schema changes to database
-- `npm run db:migrate` - Run database migrations
-- `npm run db:seed` - Seed database with default data
-- `npm run db:studio` - Open Prisma Studio
-- `npm run db:reset` - Reset database (⚠️ destructive)
-
 ### Deployment
 - `npm run export` - Export static site
 - `npm run deploy` - Build for deployment
 
 ## Database Schema
 
-The application uses PostgreSQL with Prisma ORM. Key entities include:
+The application uses Supabase (PostgreSQL) with Row Level Security. Key entities include:
 
 ### Core Entities
-- **Users & Profiles**: Authentication and user management
+- **Profiles**: User profile information (extends Supabase auth)
 - **Players**: Team roster with positions and statistics
 - **Events**: Games, practices, meetings with scheduling
 - **Tasks**: Team task management with priorities and assignments

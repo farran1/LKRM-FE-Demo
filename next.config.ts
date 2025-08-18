@@ -1,16 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable static export for GitHub Pages
-  output: 'export',
-  // Set base path for GitHub Pages (will be your repo name)
-  // basePath: process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_USE_GITHUB_PAGES === 'true' ? '/LKRM-FE-Demo' : '',
-  // Disable image optimization for static export
-  images: {
-    unoptimized: true,
-  },
-  // Disable trailing slash for static export
-  trailingSlash: false,
+  // Remove static export configuration for full-stack app
   webpack(config) {
     // Handle SVG imports
     config.module.rules.push({

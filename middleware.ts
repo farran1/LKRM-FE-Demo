@@ -1,25 +1,37 @@
-// Middleware disabled for static export
-// import { ROUTES } from '@/utils/routes';
-// import { NextRequest, NextResponse } from 'next/server';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-// export function middleware(req: NextRequest) {
-//   const token = req.cookies.get('access_token')?.value;
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
 
-//   const isAuthRoute = req.nextUrl.pathname.startsWith('/login') || req.nextUrl.pathname.startsWith('/waitlist');
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-//   if (!token) {
-//     if (!isAuthRoute) {
-//       return NextResponse.redirect(new URL('/login', req.url));
-//     }
-//   } else {
-//     if (req.nextUrl.pathname === '/' || isAuthRoute) {
-//       return NextResponse.redirect(new URL(ROUTES.planner.event, req.url));
-//     }
-//   }
+  // Auth routes that don't require authentication
+  const authRoutes = ['/login', '/signup', '/waitlist']
+  const isAuthRoute = authRoutes.some(route => req.nextUrl.pathname.startsWith(route))
 
-//   return NextResponse.next();
-// }
+  // If no session and trying to access protected route
+  if (!session && !isAuthRoute && req.nextUrl.pathname !== '/') {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
 
-// export const config = {
-//   matcher: ['/((?!api|_next|static|imgs|favicon.ico).*)'], // Apply to all routes except Next.js internal files
-// };
+  // If has session and trying to access auth routes
+  if (session && isAuthRoute) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
+  }
+
+  // Redirect root to dashboard if authenticated
+  if (session && req.nextUrl.pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
+  }
+
+  return res
+}
+
+export const config = {
+  matcher: ['/((?!api|_next|static|imgs|favicon.ico).*)'],
+}

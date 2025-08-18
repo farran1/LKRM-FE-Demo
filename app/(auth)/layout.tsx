@@ -9,9 +9,10 @@ import style from './style.module.scss'
 import RightHeader from '@/components/right-header'
 import { SWRConfig } from 'swr'
 import { fetcher } from '@/services/api'
-// DEV-ONLY: Changed from alias import to relative path to fix module not found error in dev mode. Revert to alias if project structure changes back.
 import { menus } from '@/utils/menu'
 import { MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons';
+import { useAuth } from '@/components/auth/AuthProvider'
+import { Spin } from 'antd'
 
 const { Header, Sider, Content, Footer } = Layout
 
@@ -19,11 +20,37 @@ interface MainLayoutProps {
   children: React.ReactNode
 }
 
-
-
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false);
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        background: '#202c3e'
+      }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
+
+  // Don't render if not authenticated
+  if (!user) {
+    return null
+  }
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebar-collapsed');
