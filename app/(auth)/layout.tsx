@@ -21,9 +21,42 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  // ALL HOOKS MUST BE AT THE TOP - before any conditional logic
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+  const {
+    token: { colorBgContainer, borderRadiusLG },
+  } = theme.useToken()
   const [collapsed, setCollapsed] = useState(false);
+
+  // Helper function for breadcrumbs (MUST be defined before useMemo)
+  const findBreadcrumb = (key: string, items: any[]): { label: string; icon?: React.ReactNode }[] => {
+    for (const item of items) {
+      if (key === item.key || key.startsWith(item.key)) return [{label: item.label, icon: item.icon}];
+      if (item.children) {
+        const found = findBreadcrumb(key, item.children);
+        if (found.length) return [{label: item.label, icon: item.icon}, ...found];
+      }
+    }
+    return [];
+  };
+
+  // Calculate breadcrumb items using useMemo (must be before any early returns)
+  const breadcrumbItems = useMemo(() => {
+    const pathWithoutQuery = pathname.split('?')[0];
+    const cleanPath = pathWithoutQuery
+    const breadcrumbs = findBreadcrumb(cleanPath, menus).map((item, index, array) => ({
+      path: index === array.length - 1 ? pathname : '#',
+      label: item.label,
+      icon: item.icon,
+    }));
+
+    return breadcrumbs;
+  }, [pathname]);
+
+  // Calculate selected key (must be before any early returns)
+  const selectedKey: string = pathname === '/' ? ROUTES.dashboard : pathname;
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -31,6 +64,30 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       router.push('/login')
     }
   }, [user, authLoading, router])
+
+  // Initialize collapsed state from localStorage (client-only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebar-collapsed');
+      if (stored === 'true') setCollapsed(true);
+    }
+  }, []);
+
+  // Listen for custom sidebar toggle events from other components
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleSidebarToggle = () => {
+        const stored = localStorage.getItem('sidebar-collapsed');
+        setCollapsed(stored === 'true');
+      };
+
+      window.addEventListener('sidebar-toggle', handleSidebarToggle);
+      
+      return () => {
+        window.removeEventListener('sidebar-toggle', handleSidebarToggle);
+      };
+    }
+  }, []);
 
   // Show loading while checking auth
   if (authLoading) {
@@ -51,43 +108,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   if (!user) {
     return null
   }
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('sidebar-collapsed');
-      if (stored === 'true') setCollapsed(true);
-    }
-  }, []);
-  const pathname = usePathname()
-  const router = useRouter()
-  const {
-    token: { colorBgContainer, borderRadiusLG },
-  } = theme.useToken()
-  const selectedKey: string = pathname === '/' ? ROUTES.planner.event : pathname;
-
-  const findBreadcrumb = (key: string, items: any[]): { label: string; icon?: React.ReactNode }[] => {
-    for (const item of items) {
-      if (key === item.key || key.startsWith(item.key)) return [{label: item.label, icon: item.icon}];
-      if (item.children) {
-        const found = findBreadcrumb(key, item.children);
-        if (found.length) return [{label: item.label, icon: item.icon}, ...found];
-      }
-    }
-    return [];
-  };
-
-  const breadcrumbItems = useMemo(() => {
-    const pathWithoutQuery = pathname.split('?')[0]; // Loại bỏ query string
-    // const cleanPath = pathWithoutQuery.replace(/\/(create)$/, '');
-    // console.log('cleanPath ', cleanPath)
-    const cleanPath = pathWithoutQuery
-    const breadcrumbs = findBreadcrumb(cleanPath, menus).map((item, index, array) => ({
-      path: index === array.length - 1 ? pathname : '#',
-      label: item.label,
-      icon: item.icon,
-    }));
-
-    return breadcrumbs;
-  }, [pathname]);
 
   const handleCollapse = (value: boolean) => {
     setCollapsed(value);
@@ -211,7 +231,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               zIndex: 1,
               display: 'flex',
               alignItems: 'center',
-              // ...other header styles as needed
             }}
           >
             {collapsed && (
@@ -219,7 +238,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <Logo />
               </div>
             )}
-            {/* ...rest of your header content... */}
             <Breadcrumb
               separator='/'
               items={breadcrumbItems.map((item) => ({
@@ -230,16 +248,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 ),
               }))}/>
             <RightHeader />
-            {/* <Button
-              type="text"
-              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setCollapsed(!collapsed)}
-              style={{
-                fontSize: '16px',
-                width: 64,
-                height: 64,
-              }}
-            /> */}
           </Header>
           <Content>
             {children}

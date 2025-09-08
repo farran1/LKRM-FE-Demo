@@ -1,0 +1,67 @@
+.drawer {
+  background-color: #073853 !important;
+  :global(.ant-drawer-header) {
+    display: none !important;
+  }
+  :global(.ant-input-outlined) {
+    background-color: transparent !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+  :global(.ant-input-outlined:hover) {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  :global(.ant-input-outlined:focus) {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  }
+  :global(.ant-input-number-outlined) {
+    background-color: transparent !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+  :global(.ant-input-number-outlined:hover) {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  :global(.ant-input-number-outlined:focus) {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  }
+  :global(.ant-select-outlined) {
+    background-color: transparent !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+  :global(.ant-select-outlined:hover) {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  :global(.ant-select-outlined:focus) {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  }
+  :global(.ant-form-item-label > label) {
+    color: white !important;
+  }
+  :global(.ant-form-item) {
+    margin-bottom: 28px;
+  }
+  :global(.ant-drawer-body) {
+    padding-bottom: 24px !important;
+  }
+}
+
+.title {
+  font-weight: 600;
+  font-size: 32px;
+}
+
+.header {
+  svg {
+    cursor: pointer;
+  }
+}
+
+.subtitle {
+  font-weight: 500;
+  margin-bottom: 16px;
+}

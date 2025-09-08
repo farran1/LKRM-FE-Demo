@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NewTask from '../../tasks/components/new-task';
 import PriorityTasksModal from './PriorityTasksModal';
-import TaskMentionInput from './TaskMentionInput';
 
 // SVG icon for the add button (from Figma assets)
 const AddIcon = () => (
@@ -20,20 +19,90 @@ interface Next7DaysTasksModuleProps {
 export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7DaysTasksModuleProps) {
   const router = useRouter();
   const [isShowNewTask, setIsShowNewTask] = useState(false);
-  const [isShowMentionTask, setIsShowMentionTask] = useState(false);
   const [isPriorityModalOpen, setIsPriorityModalOpen] = useState(false);
   const [selectedPriority, setSelectedPriority] = useState<{
     name: string;
     id: number;
     color: string;
   } | null>(null);
+  
+  // Task counts for next 7 days
+  const [taskCounts, setTaskCounts] = useState({
+    high: 0,
+    medium: 0,
+    low: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch task counts for next 7 days
+  useEffect(() => {
+    fetchTaskCounts();
+  }, []);
+
+  const fetchTaskCounts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Calculate date range for next 7 days
+      const today = new Date();
+      const next7Days = new Date();
+      next7Days.setDate(today.getDate() + 7);
+      
+      const startDate = today.toISOString().split('T')[0];
+      const endDate = next7Days.toISOString().split('T')[0];
+      
+      console.log('Fetching tasks from', startDate, 'to', endDate);
+      
+      // Fetch all tasks for the next 7 days
+      const response = await fetch(`/api/tasks?perPage=100&startDate=${startDate}&endDate=${endDate}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tasks');
+      }
+      
+      const tasks = await response.json();
+      const taskArray = Array.isArray(tasks) ? tasks : (tasks.data || []);
+      
+      // Filter tasks by due date and count by priority
+      const next7DaysTasks = taskArray.filter((task: any) => {
+        if (!task.dueDate) return false;
+        const dueDate = new Date(task.dueDate);
+        return dueDate >= today && dueDate <= next7Days;
+      });
+      
+      // Count tasks by priority
+      const counts = {
+        high: 0,
+        medium: 0,
+        low: 0
+      };
+      
+      next7DaysTasks.forEach((task: any) => {
+        // Map priority IDs to names (you may need to adjust these based on your actual priority IDs)
+        if (task.priorityId === 1) counts.high++;
+        else if (task.priorityId === 2) counts.medium++;
+        else if (task.priorityId === 3) counts.low++;
+      });
+      
+      console.log('Task counts for next 7 days:', counts);
+      setTaskCounts(counts);
+      
+    } catch (err) {
+      console.error('Error fetching task counts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load task counts');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle priority button clicks - open modal with filtered tasks
   const handlePriorityClick = (priorityName: string) => {
     // Map display names to priority IDs and colors
     const priorityMap: { [key: string]: { id: number; color: string } } = {
       'High Priority': { id: 1, color: '#ff464d' },
-      'Med Priority': { id: 2, color: '#d0d681' }, 
+      'Medium Priority': { id: 2, color: '#d0d681' }, 
       'Low Priority': { id: 3, color: '#4db8ff' }
     };
     
@@ -58,10 +127,10 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
     router.push('/tasks');
   };
 
-  // Handle add button click - open new task popup with mentions
+  // Handle add button click - open new task drawer
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsShowMentionTask(true);
+    setIsShowNewTask(true);
   };
 
   // Handle priority modal close
@@ -71,28 +140,8 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
   };
 
   const handleRefreshTask = () => {
-    // You can add refresh logic here if needed
     console.log('Task created, refreshing...');
-  };
-
-  // Handle task creation with mentions
-  const handleTaskCreate = (task: {
-    title: string;
-    description: string;
-    mentions: any[];
-    assignedTo?: string;
-    priority: 'high' | 'medium' | 'low';
-    dueDate?: string;
-  }) => {
-    console.log('New task created with mentions:', task);
-    setIsShowMentionTask(false);
-    // Here you would typically save the task to your backend
-    // For now, we'll just log it and close the modal
-  };
-
-  // Handle task creation cancel
-  const handleTaskCancel = () => {
-    setIsShowMentionTask(false);
+    fetchTaskCounts(); // Refetch task counts when a new task is created
   };
 
   return (
@@ -147,7 +196,7 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
                 whiteSpace: 'nowrap'
               }}
             >
-              Team Tasks - Next 7 Days
+              Tasks - Next 7 Days
             </div>
           </div>
 
@@ -186,6 +235,23 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
             Add Task
           </button>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div
+            style={{
+              color: '#ff6b6b',
+              fontSize: '12px',
+              textAlign: 'center',
+              padding: '8px',
+              backgroundColor: 'rgba(255, 107, 107, 0.1)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 107, 107, 0.3)'
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Priority Cards Container */}
         <div
@@ -268,12 +334,12 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
                   textAlign: 'center'
                 }}
               >
-                3
+                {loading ? '...' : taskCounts.high}
               </div>
             </div>
           </div>
 
-          {/* Med Priority Card */}
+          {/* Medium Priority Card */}
           <div
             data-priority-button="true"
             style={{
@@ -290,7 +356,7 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
             }}
             onClick={(e) => {
               e.stopPropagation();
-              handlePriorityClick('Med Priority');
+              handlePriorityClick('Medium Priority');
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'rgba(208, 214, 129, 0.1)';
@@ -343,7 +409,7 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
                   textAlign: 'center'
                 }}
               >
-                5
+                {loading ? '...' : taskCounts.medium}
               </div>
             </div>
           </div>
@@ -418,28 +484,20 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
                   textAlign: 'center'
                 }}
               >
-                15
+                {loading ? '...' : taskCounts.low}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* New Task Popup */}
+      {/* New Task Drawer */}
       <NewTask 
         isOpen={isShowNewTask} 
         showOpen={setIsShowNewTask} 
         onRefresh={handleRefreshTask}
         defaultValues={{}}
       />
-
-      {/* Task with Mentions Input */}
-      {isShowMentionTask && (
-        <TaskMentionInput
-          onTaskCreate={handleTaskCreate}
-          onCancel={handleTaskCancel}
-        />
-      )}
 
       {/* Priority Tasks Modal */}
       {selectedPriority && (

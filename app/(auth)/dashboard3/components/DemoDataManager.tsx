@@ -29,7 +29,7 @@ export default function DemoDataManager() {
   const handleClearData = async () => {
     setIsClearing(true);
     try {
-      localStorageService.clearAllData();
+      localStorageService.clearAll();
       message.success('All demo data has been cleared!');
       // Reload the page to reflect changes
       setTimeout(() => {

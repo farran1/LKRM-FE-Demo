@@ -20,9 +20,17 @@ const volunteerController = new VolunteerController()
 const taskController = new TaskController()
 
 // User routes
-// router.get('/users', async (req: Request, res: Response) => {
-//   await userController.getUserByEmail(req, res)
-// })
+router.get('/users/test', async (req: Request, res: Response) => {
+  await userController.test(req, res)
+})
+
+router.get('/users/test-data', async (req: Request, res: Response) => {
+  await userController.testUsers(req, res)
+})
+
+router.get('/users', async (req: Request, res: Response) => {
+  await userController.index(req, res)
+})
 
 // // Upload routes
 // router.post('/upload', upload.single('image'), async (req: Request, res: Response) => {

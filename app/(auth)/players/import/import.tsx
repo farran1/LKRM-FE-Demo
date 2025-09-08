@@ -49,9 +49,9 @@ function NewPlayer() {
 
     setLoading(true)
     api
-      .post('/api/players/upload-import', payload, configs)
+      .post('/api/players/upload-import', payload)
       .then((res) => {
-        setImportId(res.data.importId)
+        setImportId((res as any).data.importId)
       })
       .finally(() => {
         setLoading(false)

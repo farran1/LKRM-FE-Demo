@@ -10,10 +10,11 @@ import { stringify } from 'querystring'
 import { useRouter, useSearchParams } from 'next/navigation'
 import convertSearchParams, { formatPayload } from '@/utils/app'
 import dayjs from 'dayjs'
+import { safeMapData } from '@/utils/api-helpers'
 
 function Filter({ isOpen, showOpen, onFilter } : any) {
   const [loading, setLoading] = useState(false)
-  const [eventTypes, setEventTypes] = useState<Array<{id: number, name: string}>>([])
+  const [eventTypes, setEventTypes] = useState<Array<{ label: string; value: number }>>([])
   const [form] = Form.useForm()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -24,10 +25,17 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
 
   async function getEventTypes() {
     setLoading(true)
-    const res = await api.get('/api/eventTypes')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
-      setEventTypes(types)
+    try {
+      const res = await api.get('/api/eventTypes')
+      const eventTypeOptions = safeMapData(
+        res, 
+        (item: any) => ({label: item.name, value: item.id}), 
+        []
+      )
+      setEventTypes(eventTypeOptions)
+    } catch (error) {
+      console.error('Error fetching event types:', error)
+      setEventTypes([])
     }
     setLoading(false)
   }
@@ -94,29 +102,18 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
       </Flex>
       <Form layout="vertical" onFinish={onSubmit} form={form}>
         <div className={style.subtitle}>Date Range</div>
-        <Form.Item label="Start Date" name="startDate" style={{ marginBottom: 12 }}>
+        <Form.Item name="startDate" style={{ marginBottom: 12 }}>
           <DatePicker placeholder="Select Start Date" style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item label="End Date" name="endDate">
+        <Form.Item name="endDate">
           <DatePicker placeholder="Select End Date" style={{ width: '100%' }} />
         </Form.Item>
 
-        <div className={style.subtitle}>Budget</div>
-        <Form.Item label="Range" name="range" style={{ marginBottom: 12 }}>
-          <Select placeholder="Select Budget Range">
-            <Select.Option value="lt">Less than</Select.Option>
-            <Select.Option value="gt">Greater than</Select.Option>
-            <Select.Option value="eq">Equal to</Select.Option>
-            <Select.Option value="rg">Range</Select.Option>
-          </Select>
-        </Form.Item>
-        <Form.Item label="Value" name="value">
-          <Input type="number" placeholder="Add Budget Value" />
-        </Form.Item>
+
 
         <div className={style.subtitle}>Event Type</div>
-        <Form.Item label="Type" name="eventTypeIds">
-          <Select placeholder="Select Event Type" mode="multiple" allowClear>
+        <Form.Item name="eventTypeIds">
+          <Select placeholder="Select Event Type" mode="multiple" allowClear loading={loading}>
             {eventTypes.map((item: any) => (<Select.Option value={item.value}>{item.label}</Select.Option>))}
           </Select>
         </Form.Item>

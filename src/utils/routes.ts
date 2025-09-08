@@ -1,5 +1,6 @@
 export const ROUTES = {
   statistic: 'live-stat-tracker',
+  dashboard: '/dashboard',
   planner: {
     event: '/events',
   },

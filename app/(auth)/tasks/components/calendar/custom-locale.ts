@@ -6,5 +6,5 @@ dayjs.extend(updateLocale)
 
 dayjs.updateLocale('en', {
   weekStart: 1, // Mon
-  weekdaysMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  weekdaysMin: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
 })

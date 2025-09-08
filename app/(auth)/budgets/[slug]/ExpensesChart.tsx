@@ -1,87 +1,120 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-type SeriesPoint = { x: number; y: number };
-
-function generateMockSeries(): { expenses: SeriesPoint[]; remaining: SeriesPoint[]; maxY: number } {
-  // 31-day month mock in the spirit of the Figma
-  const days = 31;
-  const expenses: SeriesPoint[] = [];
-  const remaining: SeriesPoint[] = [];
-  let exp = 0;
-  const expTarget = 3000;
-  const remStart = 3000;
-  for (let d = 1; d <= days; d += 1) {
-    // incrementally add expenses with some acceleration mid‑month
-    const inc = 40 + Math.max(0, d - 10) * 6 + (d % 5 === 0 ? 60 : 0);
-    exp = Math.min(expTarget, exp + inc);
-    const rem = Math.max(0, remStart - (exp * 0.95));
-    expenses.push({ x: d, y: exp });
-    remaining.push({ x: d, y: rem });
-  }
-  const maxY = Math.max(expenses[expenses.length - 1].y, remStart);
-  return { expenses, remaining, maxY };
+interface SeriesPoint {
+  x: number;
+  y: number;
 }
 
-export default function ExpensesChart() {
-  const { expenses, remaining, maxY } = useMemo(generateMockSeries, []);
+interface Expense {
+  id: number;
+  date: string;
+  amount: number;
+}
 
-  const width = 720; // visual width similar to Figma right card
-  const height = 360;
-  const margin = { top: 24, right: 16, bottom: 28, left: 44 };
-  const innerW = width - margin.left - margin.right;
-  const innerH = height - margin.top - margin.bottom;
+interface ExpensesChartProps {
+  budgetId: number;
+}
 
-  const xScale = (x: number) => margin.left + ((x - 1) / 30) * innerW;
-  const yScale = (y: number) => margin.top + innerH - (y / (maxY || 1)) * innerH;
+export default function ExpensesChart({ budgetId }: ExpensesChartProps) {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toPath = (s: SeriesPoint[]) =>
-    s
-      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.x).toFixed(2)} ${yScale(p.y).toFixed(2)}`)
-      .join(' ');
+  useEffect(() => {
+    fetchExpenses();
+  }, [budgetId]);
 
-  const yTicks = [0, 500, 1000, 1500, 2000, 2500, 3000];
-  const xTicks = [1, 5, 10, 15, 20, 25, 31];
+  const fetchExpenses = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/expenses?budgetId=${budgetId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setExpenses(data.data || []);
+      } else {
+        console.error('Failed to fetch expenses:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate chart data from real expenses
+  const chartData = useMemo(() => {
+    if (!expenses.length) return [];
+
+    // Group expenses by day
+    const expensesByDay = expenses.reduce((acc, expense) => {
+      const date = new Date(expense.date);
+      const day = date.getDate();
+      if (!acc[day]) acc[day] = 0;
+      acc[day] += expense.amount;
+      return acc;
+    }, {} as Record<number, number>);
+
+    // Create data points for each day of the month
+    const days = 31;
+    const data = [];
+    let cumulativeExpenses = 0;
+
+    for (let day = 1; day <= days; day++) {
+      const dayExpenses = expensesByDay[day] || 0;
+      cumulativeExpenses += dayExpenses;
+      
+      data.push({
+        day,
+        expenses: cumulativeExpenses,
+        remaining: Math.max(0, 10000 - cumulativeExpenses), // TODO: Get actual budget amount
+      });
+    }
+
+    return data;
+  }, [expenses]);
+
+  if (loading) {
+    return <div>Loading chart data...</div>;
+  }
+
+  if (!expenses.length) {
+    return <div>No expense data available for this budget.</div>;
+  }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="360">
-      {/* Grid */}
-      {yTicks.map((t) => (
-        <g key={t}>
-          <line
-            x1={margin.left}
-            y1={yScale(t)}
-            x2={width - margin.right}
-            y2={yScale(t)}
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth={0.8}
-          />
-          <text x={margin.left - 8} y={yScale(t) + 3} fontSize={10} fill="#fff" textAnchor="end">
-            {t}
-          </text>
-        </g>
-      ))}
-      {xTicks.map((t) => (
-        <g key={`x-${t}`}>
-          <line
-            x1={xScale(t)}
-            y1={margin.top}
-            x2={xScale(t)}
-            y2={height - margin.bottom}
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={0.6}
-          />
-          <text x={xScale(t)} y={height - 8} fontSize={10} fill="#fff" textAnchor="middle">
-            {t}
-          </text>
-        </g>
-      ))}
-
-      {/* Lines */}
-      <path d={toPath(expenses)} fill="none" stroke="#f59e0c" strokeWidth={3} strokeLinejoin="round" />
-      <path d={toPath(remaining)} fill="none" stroke="#ffffff" strokeWidth={3} strokeLinejoin="round" />
-    </svg>
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={chartData}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis 
+          dataKey="day" 
+          label={{ value: 'Day of Month', position: 'insideBottom', offset: -10 }}
+        />
+        <YAxis 
+          label={{ value: 'Amount ($)', angle: -90, position: 'insideLeft' }}
+        />
+        <Tooltip 
+          formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+          labelFormatter={(label) => `Day ${label}`}
+        />
+        <Legend />
+        <Line 
+          type="monotone" 
+          dataKey="expenses" 
+          stroke="#fa8c16" 
+          strokeWidth={2}
+          name="Cumulative Expenses"
+        />
+        <Line 
+          type="monotone" 
+          dataKey="remaining" 
+          stroke="#52c41a" 
+          strokeWidth={2}
+          name="Budget Remaining"
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
 

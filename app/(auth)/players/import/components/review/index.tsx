@@ -21,7 +21,8 @@ const ReviewPage = (props: any) => {
     setLoading(true)
     const payload = { importId }
     const res = await api.post('/api/players/validate-import', payload)
-    setDataSource(res.data)
+    const rows = (res as any)?.data?.data ?? (res as any)?.data ?? []
+    setDataSource(Array.isArray(rows) ? rows : [])
     setLoading(false)
   }
 

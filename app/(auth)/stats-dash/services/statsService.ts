@@ -79,219 +79,125 @@ export interface SeasonData {
   };
 }
 
-// Mock data service - will be replaced with real API calls
+// Real data service backed by API
+import api from '@/services/api'
+
 class StatsService {
-  private mockData: {
-    teamStats: TeamStats;
-    games: GameStats[];
-    players: PlayerStats[];
-  };
 
-  constructor() {
-    this.mockData = this.generateMockData();
-  }
-
-  private generateMockData() {
-    const games: GameStats[] = [
-      {
-        id: '1',
-        date: '2024-01-15',
-        opponent: 'Central High',
-        homeAway: 'home',
-        finalScoreUs: 72,
-        finalScoreThem: 65,
-        result: 'W',
-        margin: 7,
-        quarterScores: {
-          q1: { us: 18, them: 16 },
-          q2: { us: 20, them: 18 },
-          q3: { us: 16, them: 14 },
-          q4: { us: 18, them: 17 }
-        },
-        keyStats: {
-          fieldGoalPercentage: 0.485,
-          threePointPercentage: 0.375,
-          freeThrowPercentage: 0.750,
-          rebounds: 32,
-          assists: 18,
-          turnovers: 12
-        }
-      },
-      {
-        id: '2',
-        date: '2024-01-18',
-        opponent: 'East Valley',
-        homeAway: 'away',
-        finalScoreUs: 68,
-        finalScoreThem: 71,
-        result: 'L',
-        margin: -3,
-        quarterScores: {
-          q1: { us: 16, them: 18 },
-          q2: { us: 18, them: 20 },
-          q3: { us: 17, them: 16 },
-          q4: { us: 17, them: 17 }
-        },
-        keyStats: {
-          fieldGoalPercentage: 0.420,
-          threePointPercentage: 0.300,
-          freeThrowPercentage: 0.800,
-          rebounds: 28,
-          assists: 15,
-          turnovers: 14
-        }
-      },
-      {
-        id: '3',
-        date: '2024-01-22',
-        opponent: 'Westside High',
-        homeAway: 'home',
-        finalScoreUs: 85,
-        finalScoreThem: 78,
-        result: 'W',
-        margin: 7,
-        quarterScores: {
-          q1: { us: 22, them: 20 },
-          q2: { us: 21, them: 19 },
-          q3: { us: 20, them: 18 },
-          q4: { us: 22, them: 21 }
-        },
-        keyStats: {
-          fieldGoalPercentage: 0.520,
-          threePointPercentage: 0.400,
-          freeThrowPercentage: 0.850,
-          rebounds: 35,
-          assists: 22,
-          turnovers: 10
-        }
-      }
-    ];
-
-    const players: PlayerStats[] = [
-      {
-        id: '1',
-        name: 'Mike Johnson',
-        position: 'PG',
-        jerseyNumber: 3,
-        gamesPlayed: 3,
-        points: 45,
-        avgPoints: 15.0,
-        rebounds: 8,
-        avgRebounds: 2.7,
-        assists: 12,
-        avgAssists: 4.0,
-        steals: 5,
-        avgSteals: 1.7,
-        blocks: 1,
-        avgBlocks: 0.3,
-        fieldGoalPercentage: 0.480,
-        threePointPercentage: 0.380,
-        freeThrowPercentage: 0.820,
-        minutesPlayed: 72,
-        avgMinutes: 24.0
-      },
-      {
-        id: '2',
-        name: 'David Smith',
-        position: 'SG',
-        jerseyNumber: 12,
-        gamesPlayed: 3,
-        points: 52,
-        avgPoints: 17.3,
-        rebounds: 15,
-        avgRebounds: 5.0,
-        assists: 8,
-        avgAssists: 2.7,
-        steals: 3,
-        avgSteals: 1.0,
-        blocks: 2,
-        avgBlocks: 0.7,
-        fieldGoalPercentage: 0.520,
-        threePointPercentage: 0.420,
-        freeThrowPercentage: 0.780,
-        minutesPlayed: 78,
-        avgMinutes: 26.0
-      },
-      {
-        id: '3',
-        name: 'Chris Wilson',
-        position: 'SF',
-        jerseyNumber: 24,
-        gamesPlayed: 3,
-        points: 38,
-        avgPoints: 12.7,
-        rebounds: 18,
-        avgRebounds: 6.0,
-        assists: 6,
-        avgAssists: 2.0,
-        steals: 4,
-        avgSteals: 1.3,
-        blocks: 3,
-        avgBlocks: 1.0,
-        fieldGoalPercentage: 0.450,
-        threePointPercentage: 0.350,
-        freeThrowPercentage: 0.750,
-        minutesPlayed: 75,
-        avgMinutes: 25.0
-      }
-    ];
-
-    const wins = games.filter(g => g.result === 'W').length;
-    const losses = games.filter(g => g.result === 'L').length;
-    const totalPointsFor = games.reduce((sum, g) => sum + g.finalScoreUs, 0);
-    const totalPointsAgainst = games.reduce((sum, g) => sum + g.finalScoreThem, 0);
-
+  // API Methods
+  async fetchTeamStats(seasonId: string = '2024-25'): Promise<TeamStats> {
+    const gamesRes = await api.get('/api/games', { params: { season: seasonId } })
+    const games = ((gamesRes?.data as any)?.data ?? []) as any[]
+    const wins = games.filter(g => (g.result ?? '').toUpperCase() === 'WIN').length
+    const losses = games.filter(g => (g.result ?? '').toUpperCase() === 'LOSS').length
+    const pointsFor = games.reduce((s,g)=>s+(g.homeScore||0),0)
+    const pointsAgainst = games.reduce((s,g)=>s+(g.awayScore||0),0)
     const teamStats: TeamStats = {
       id: 'team-1',
-      name: 'Lincoln High School',
-      season: '2023-24',
+      name: 'Team',
+      season: seasonId,
       gamesPlayed: games.length,
       wins,
       losses,
-      winPercentage: (wins / games.length) * 100,
-      pointsFor: totalPointsFor,
-      pointsAgainst: totalPointsAgainst,
-      avgPointsFor: Math.round(totalPointsFor / games.length),
-      avgPointsAgainst: Math.round(totalPointsAgainst / games.length),
-      pointDifferential: totalPointsFor - totalPointsAgainst,
-      lastFiveGames: ['W', 'L', 'W', 'W', 'L']
-    };
-
-    return { teamStats, games, players };
+      winPercentage: games.length ? (wins/games.length)*100 : 0,
+      pointsFor,
+      pointsAgainst,
+      avgPointsFor: games.length ? Math.round(pointsFor/games.length) : 0,
+      avgPointsAgainst: games.length ? Math.round(pointsAgainst/games.length) : 0,
+      pointDifferential: pointsFor - pointsAgainst,
+      lastFiveGames: games.slice(-5).map(g => ((g.result ?? '').toUpperCase()==='WIN'?'W':'L'))
+    }
+    return teamStats
   }
 
-  // API Methods
-  async fetchTeamStats(seasonId: string = '2023-24'): Promise<TeamStats> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return this.mockData.teamStats;
+  async fetchGameStats(seasonId: string = '2024-25'): Promise<GameStats[]> {
+    const res = await api.get('/api/games', { params: { season: seasonId } })
+    const games = ((res?.data as any)?.data ?? []) as any[]
+    return games.map(g => ({
+      id: String(g.id),
+      date: g.gameDate || g.createdAt,
+      opponent: g.opponent,
+      homeAway: (g.location ?? 'HOME').toLowerCase() === 'home' ? 'home' : 'away',
+      finalScoreUs: g.homeScore ?? 0,
+      finalScoreThem: g.awayScore ?? 0,
+      result: (g.result ?? ( (g.homeScore||0) >= (g.awayScore||0) ? 'W':'L')).toUpperCase()==='WIN'?'W':'L',
+      margin: (g.homeScore||0)-(g.awayScore||0),
+      quarterScores: { q1:{us:0,them:0}, q2:{us:0,them:0}, q3:{us:0,them:0}, q4:{us:0,them:0} },
+      keyStats: { fieldGoalPercentage:0, threePointPercentage:0, freeThrowPercentage:0, rebounds:0, assists:0, turnovers:0 }
+    }))
   }
 
-  async fetchGameStats(seasonId: string = '2023-24'): Promise<GameStats[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return this.mockData.games;
+  async fetchPlayerStats(seasonId: string = '2024-25'): Promise<PlayerStats[]> {
+    const playersRes = await api.get('/api/players')
+    const players = ((playersRes?.data as any)?.data ?? []) as any[]
+    const statsRes = await api.get('/api/game-stats', { params: { season: seasonId } })
+    const rows = ((statsRes?.data as any)?.data ?? []) as any[]
+    const agg = new Map<string, any>()
+    rows.forEach(r => {
+      const key = String(r.playerId)
+      const x = agg.get(key) || { g:0, pts:0, reb:0, ast:0, stl:0, blk:0, min:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0 }
+      x.g += 1
+      x.pts += r.points||0
+      x.reb += r.rebounds||0
+      x.ast += r.assists||0
+      x.stl += r.steals||0
+      x.blk += r.blocks||0
+      x.min += r.minutesPlayed||0
+      x.fgm += r.fieldGoalsMade||0
+      x.fga += r.fieldGoalsAttempted||0
+      x.tpm += r.threePointsMade||0
+      x.tpa += r.threePointsAttempted||0
+      x.ftm += r.freeThrowsMade||0
+      x.fta += r.freeThrowsAttempted||0
+      agg.set(key, x)
+    })
+    return players.map(p => {
+      const a = agg.get(String(p.id)) || { g:0, pts:0, reb:0, ast:0, stl:0, blk:0, min:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0 }
+      const gp = Math.max(1, a.g)
+      return {
+        id: String(p.id),
+        name: p.name || `${p.first_name??''} ${p.last_name??''}`.trim(),
+        position: p.position?.name || '',
+        jerseyNumber: Number(p.jersey_number || p.jersey || 0),
+        gamesPlayed: a.g,
+        points: a.pts,
+        avgPoints: a.pts/gp,
+        rebounds: a.reb,
+        avgRebounds: a.reb/gp,
+        assists: a.ast,
+        avgAssists: a.ast/gp,
+        steals: a.stl,
+        avgSteals: a.stl/gp,
+        blocks: a.blk,
+        avgBlocks: a.blk/gp,
+        fieldGoalPercentage: a.fga? a.fgm/a.fga:0,
+        threePointPercentage: a.tpa? a.tpm/a.tpa:0,
+        freeThrowPercentage: a.fta? a.ftm/a.fta:0,
+        minutesPlayed: a.min,
+        avgMinutes: a.min/gp
+      }
+    })
   }
 
-  async fetchPlayerStats(seasonId: string = '2023-24'): Promise<PlayerStats[]> {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return this.mockData.players;
-  }
-
-  async fetchSeasonData(seasonId: string = '2023-24'): Promise<SeasonData> {
-    await new Promise(resolve => setTimeout(resolve, 600));
+  async fetchSeasonData(seasonId: string = '2024-25'): Promise<SeasonData> {
+    const [teamStats, games, players] = await Promise.all([
+      this.fetchTeamStats(seasonId),
+      this.fetchGameStats(seasonId),
+      this.fetchPlayerStats(seasonId)
+    ])
     return {
       id: seasonId,
       year: seasonId,
-      teamStats: this.mockData.teamStats,
-      games: this.mockData.games,
-      players: this.mockData.players,
+      teamStats,
+      games,
+      players,
       trends: {
-        offensiveEfficiency: 108.5,
-        defensiveEfficiency: 102.3,
-        pace: 68.2,
-        strengthOfSchedule: 0.485
+        offensiveEfficiency: teamStats.avgPointsFor,
+        defensiveEfficiency: teamStats.avgPointsAgainst,
+        pace: 0,
+        strengthOfSchedule: 0
       }
-    };
+    }
   }
 
   // Real-time data methods (for future implementation)

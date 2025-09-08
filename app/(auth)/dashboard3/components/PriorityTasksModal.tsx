@@ -36,8 +36,8 @@ export default function PriorityTasksModal({
     setLoading(true);
     try {
       const res = await api.get(`/api/tasks?priorityId=${priorityId}&perPage=50`);
-      if (res?.data?.data) {
-        setTasks(res.data.data);
+      if ((res as any)?.data?.data) {
+        setTasks((res as any).data.data);
       }
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -211,7 +211,7 @@ export default function PriorityTasksModal({
       <Flex justify="space-between" align="center" style={{ marginBottom: 24 }}>
         <div>
           <Title level={3} style={{ margin: 0, color: '#ffffff', fontSize: '22px', fontWeight: 600 }}>
-            {priorityName === 'Med Priority' ? 'Medium Priority Tasks' : `${priorityName} Tasks`}
+            {priorityName === 'Medium Priority' ? 'Medium Priority Tasks' : `${priorityName} Tasks`}
           </Title>
           <Text style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '14px' }}>
             {tasks.length} task{tasks.length !== 1 ? 's' : ''} found
@@ -250,7 +250,7 @@ export default function PriorityTasksModal({
             No {priorityName.toLowerCase()} tasks found
           </Title>
           <Text style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
-            There are currently no tasks with {priorityName.toLowerCase()} priority.
+            There are currently no tasks with {priorityName.toLowerCase()}.
           </Text>
         </div>
       ) : (

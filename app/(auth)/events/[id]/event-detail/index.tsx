@@ -10,6 +10,7 @@ import CalendarIcon from '@/components/icon/calendar.svg'
 import PlusIcon from '@/components/icon/plus.svg'
 import MapIcon from '@/components/icon/map-pin.svg'
 import CreditIcon from '@/components/icon/credit-card.svg'
+import TaskIcon from '@/components/icon/credit-card.svg'
 import api from '@/services/api'
 import dayjs from 'dayjs'
 import BaseTable from '@/components/base-table'
@@ -23,7 +24,7 @@ import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons'
 function EventDetail({
   eventId,
 }: {
-  eventId: number
+  eventId: number | string
 }) {
   const [event, setEvent] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -31,6 +32,7 @@ function EventDetail({
 
   const [playerLoading, setPlayerLoading] = useState(false)
   const [players, setPlayers] = useState<Array<{id: number, name: string, position: string}>>([]);
+  const [tasks, setTasks] = useState<Array<any>>([])
   const [isShowNewPlayer, showNewPlayer] = useState(false)
   const [sortHeaderPlayer, setSortHeaderPlayer] = useState<any>(null)
 
@@ -41,25 +43,43 @@ function EventDetail({
 
     fetchDetail()
     fetchPlayer()
+    fetchTasks()
   }, [eventId])
 
   const fetchDetail = async () => {
     setLoading(true)
-    const res = await api.get('/api/events/' + eventId)
-    setEvent(res.data.event)
+    // Extract original event ID from composite IDs like "17-0"
+    const originalEventId = String(eventId).split('-')[0]
+    const res = await api.get('/api/events/' + originalEventId)
+    setEvent((res as any).data.event)
     setLoading(false)
   }
 
   const fetchPlayer = async (sortParams: any = null) => {
     setPlayerLoading(true)
+    // Extract original event ID from composite IDs like "17-0"
+    const originalEventId = String(eventId).split('-')[0]
     let res
     if (sortParams?.sortBy && sortParams?.sortDirection) {
-      res = await api.get(`/api/events/${eventId}/players?sortBy=${sortParams.sortBy}&sortDirection=${sortParams.sortDirection}`)
+      res = await api.get(`/api/events/${originalEventId}/players?sortBy=${sortParams.sortBy}&sortDirection=${sortParams.sortDirection}`)
     } else {
-      res = await api.get(`/api/events/${eventId}/players`)
+      res = await api.get(`/api/events/${originalEventId}/players`)
     }
-    setPlayers(res.data)
+    const players = (res as any)?.data?.data ?? (res as any)?.data ?? []
+    setPlayers(Array.isArray(players) ? players : [])
     setPlayerLoading(false)
+  }
+
+  const fetchTasks = async () => {
+    try {
+      // Extract original event ID from composite IDs like "17-0"
+      const originalEventId = String(eventId).split('-')[0]
+      const res = await api.get('/api/tasks', { params: { eventId: originalEventId } })
+      const list = Array.isArray((res as any)?.data) ? (res as any).data : (Array.isArray((res as any)?.data?.data) ? (res as any).data.data : [])
+      setTasks(list)
+    } catch {
+      setTasks([])
+    }
   }
 
   const addPlayer = () => {
@@ -184,7 +204,7 @@ function EventDetail({
             </Card>
             <Card>
               <Flex align='center' justify='space-between' style={{ marginBottom: 24 }}>
-                <div className={style.title2}>Players</div>
+                <div className={style.title2}>Coaches</div>
                 <Button icon={<PlusIcon />} onClick={addPlayer}>Add Player</Button>
               </Flex>
               <BaseTable
@@ -242,38 +262,23 @@ function EventDetail({
             </Card>
             <Card>
               <div className={style.title2} style={{ marginBottom: 32 }}>Tasks</div>
-              <div className={style.task}>
-                <Flex align='center'>
-                  <CreditIcon />
-                  <div>
-                    <div className={style.title}>Strength Training</div>
-                    <div className={style.value}>👤 Jake Reynolds</div>
-                  </div>
-                </Flex>
-              </div>
-              <div className={style.task}>
-                <Flex align='center'>
-                  <CreditIcon />
-                  <div>
-                    <div className={style.title}>Strength Training</div>
-                    <div className={style.value}>👤 Jake Reynolds</div>
-                  </div>
-                </Flex>
-              </div>
-              <div className={style.task}>
-                <Flex align='center'>
-                  <CreditIcon />
-                  <div>
-                    <div className={style.title}>Strength Training</div>
-                    <div className={style.value}>👤 Jake Reynolds</div>
-                  </div>
-                </Flex>
-              </div>
+              {tasks.length === 0 && <div className={style.task}>No Tasks Linked</div>}
+              {tasks.map(t => (
+                <div key={t.userId || t.id} className={style.task}>
+                  <Flex align='center'>
+                    <TaskIcon />
+                    <div>
+                      <div className={style.title}>{t.name}</div>
+                      <div className={style.value}>{t.users?.username ? `👤 ${t.users.username}` : ''}</div>
+                    </div>
+                  </Flex>
+                </div>
+              ))}
             </Card>
           </div>
         </Flex>
       </div>
-      <NewPlayer isOpen={isShowNewPlayer} showOpen={showNewPlayer} onRefresh={refreshPlayer} eventId={eventId} />
+      <NewPlayer isOpen={isShowNewPlayer} showOpen={showNewPlayer} onRefresh={refreshPlayer} eventId={String(eventId).split('-')[0]} />
     </>
   )
 }

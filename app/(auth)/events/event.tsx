@@ -10,7 +10,6 @@ import PlusIcon from '@/components/icon/plus.svg'
 import SearchIcon from '@/components/icon/search.svg'
 import FunnelIcon from '@/components/icon/funnel.svg'
 import SortIcon from '@/components/icon/sort.svg'
-import GearIcon from '@/components/icon/columns-grear.svg'
 import { useRouter, useSearchParams } from 'next/navigation'
 import convertSearchParams from '@/utils/app'
 import { stringify } from 'querystring'
@@ -34,7 +33,23 @@ function Event() {
   const searchParams = useSearchParams()
   const queryParams = convertSearchParams(searchParams)
   const API_KEY = `/api/events?${stringify(queryParams)}`
-  const {data: dataSource, isLoading, isValidating, mutate} = useSWR(API_KEY)
+  const {data: response, isLoading, isValidating, mutate} = useSWR(API_KEY)
+  const dataSource = response?.data || []
+  
+  // Debug: Log the data being returned
+  useEffect(() => {
+    console.log('Events dataSource:', dataSource)
+    console.log('Events API_KEY:', API_KEY)
+    console.log('Events isLoading:', isLoading)
+    console.log('Events isValidating:', isValidating)
+    console.log('Events dataSource type:', typeof dataSource)
+    console.log('Events dataSource isArray:', Array.isArray(dataSource))
+    console.log('Events dataSource length:', dataSource?.length)
+    if (dataSource && Array.isArray(dataSource)) {
+      console.log('Events first item:', dataSource[0])
+    }
+  }, [dataSource, API_KEY, isLoading, isValidating])
+  
   const [isOpenNewEvent, showNewEvent] = useState(false)
   const [isOpenEditEvent, showEditEvent] = useState(false)
   const [isOpenFilter, showFilter] = useState(false)
@@ -46,6 +61,7 @@ function Event() {
   const { notification } = App.useApp()
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [searchkey, setSearchKey] = useState('')
+  const [eventDefaultVals, setEventDefaultVals] = useState({})
 
   useEffect(() => {
     setSearchKey(queryParams?.name)
@@ -101,41 +117,57 @@ function Event() {
     {
       title: renderHeader('Title', 'name'),
       dataIndex: 'name',
+      key: 'name',
     },
     {
       title: renderHeader('Date & Time', 'startTime'),
+      key: 'startTime',
       render: (data: any) => {
         return moment(data.startTime).format('MMM D, h:mm A')
       }
     },
     {
+      title: renderHeader('Type', 'eventType'),
+      key: 'type',
+      render: (data: any) => {
+        return <span className={style.eventType} style={{ backgroundColor: data.event_types?.color || '#1890ff', color: '#ffffff' }}>{data.event_types?.name || 'Unknown'}</span>
+      }
+    },
+    {
       title: 'Location',
+      key: 'location',
       render: (data: any) => {
         return data.location + ' - ' + data.venue
       }
     },
     {
-      title: 'Type',
+      title: 'Details',
+      key: 'details',
       render: (data: any) => {
-        return <span className={style.eventType} style={{ backgroundColor: data.eventType.color, color: data.eventType.txtColor }}>{data.eventType.name}</span>
-      }
-    },
-    {
-      title: 'Opposition Team',
-      render: (data: any) => {
-        return data.oppositionTeam || 'N/A'
-      }
-    },
-    {
-      title: 'Notifications',
-      render: (data: any) => {
-        return 'N/A'
-      }
-    },
-    {
-      title: 'Spend',
-      render: (data: any) => {
-        return 'N/A'
+        const eventType = data.event_types?.name?.toLowerCase()
+        const info = data.oppositionTeam || 'TBD'
+        const coaches = ''
+        const extra = data.notes || ''
+
+        if (eventType === 'meeting' || eventType === 'practice' || eventType === 'workout') {
+          return (
+            <div>
+              <strong>Attendees:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
+            </div>
+          )
+        } else if (eventType === 'game' || eventType === 'scrimmage') {
+          return (
+            <div>
+              <strong>Opponent:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
+            </div>
+          )
+        } else {
+          return (
+            <div>
+              <strong>Details:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
+            </div>
+          )
+        }
       }
     }
   ], [queryParams.sortBy, queryParams.sortDirection, isSort])
@@ -278,7 +310,7 @@ function Event() {
           <Flex align='center' gap={10}>
             <Button type="primary" className={classNames({[style.filter]: !hasFilter})} icon={<FunnelIcon />} onClick={openFilter}>Filters</Button>
             <Button type="primary" className={classNames({[style.sort]: !isSort})} icon={<SortIcon />} onClick={toggleSort}>Sort</Button>
-            <Button type="primary" icon={<GearIcon />}></Button>
+            
           </Flex>
         </Flex>
         {viewMode === 'list' &&
@@ -291,10 +323,18 @@ function Event() {
           />
         }
         {viewMode === 'calendar' &&
-          <CalendarView dataSource={dataSource} currentDate={currentDate} showEventDetail={openEventDetail} />
+          <CalendarView 
+            dataSource={dataSource} 
+            currentDate={currentDate} 
+            showEventDetail={openEventDetail}
+            addEvent={(defaultValues: any) => {
+              setEventDefaultVals(defaultValues)
+              openNewEvent()
+            }}
+          />
         }
       </div>
-      <NewEvent isOpen={isOpenNewEvent} showOpen={showNewEvent} onRefresh={refreshEvent} />
+      <NewEvent isOpen={isOpenNewEvent} showOpen={showNewEvent} onRefresh={refreshEvent} defaultValues={eventDefaultVals} />
       <EditEvent event={selectedEvent} isOpen={isOpenEditEvent} showOpen={showEditEvent} onRefresh={refreshEvent} />
       <Filter isOpen={isOpenFilter} showOpen={showFilter} />
       <EventDetailModal isShowModal={isShowEventDetail} onClose={onCloseEventDetail} event={selectedEvent} openEdit={openEditEvent} />

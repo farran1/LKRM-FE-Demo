@@ -10,14 +10,15 @@ import TagSelector from '@/components/tag-selector'
 import convertSearchParams, { formatPayload } from '@/utils/app'
 import { stringify } from 'querystring'
 import dayjs from 'dayjs'
+import { safeMapData } from '@/utils/api-helpers'
 
 const locations = [{label: 'Home', value: 'HOME'}, {label: 'Away', value: 'AWAY'}]
 
 function Filter({ isOpen, showOpen } : any) {
   const [loading, setLoading] = useState(false)
-  const [players, setPlayers] = useState<Array<{id: number, name: string}>>([])
-  const [priorities, setPriorities] = useState<Array<{id: number, name: string}>>([])
-  const [events, setEvents] = useState<Array<{id: number, name: string}>>([])
+  const [players, setPlayers] = useState<Array<{ label: string; value: number }>>([])
+  const [priorities, setPriorities] = useState<Array<{ label: string; value: number }>>([])
+  const [events, setEvents] = useState<Array<{ label: string; value: number }>>([])
   const [form] = Form.useForm()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -30,20 +31,34 @@ function Filter({ isOpen, showOpen } : any) {
 
   async function getPlayers() {
     setLoading(true)
-    const res = await api.get('/api/players')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
-      setPlayers(types)
+    try {
+      const res = await api.get('/api/players')
+      const playerOptions = safeMapData(
+        res, 
+        (item: any) => ({label: item.name, value: item.id}), 
+        []
+      )
+      setPlayers(playerOptions)
+    } catch (error) {
+      console.error('Error fetching players:', error)
+      setPlayers([])
     }
     setLoading(false)
   }
 
   async function getPriorities() {
     setLoading(true)
-    const res = await api.get('/api/priorities')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
-      setPriorities(types)
+    try {
+      const res = await api.get('/api/priorities')
+      const priorityOptions = safeMapData(
+        res, 
+        (item: any) => ({label: item.name, value: item.id}), 
+        []
+      )
+      setPriorities(priorityOptions)
+    } catch (error) {
+      console.error('Error fetching priorities:', error)
+      setPriorities([])
     }
     setLoading(false)
   }
@@ -52,15 +67,18 @@ function Filter({ isOpen, showOpen } : any) {
     setLoading(true)
     try {
       const res = await api.get('/api/events')
-      if (res?.data?.data.length > 0) {
-        const eventOptions = res?.data?.data.map((item: any) => ({
+      const eventOptions = safeMapData(
+        res, 
+        (item: any) => ({
           label: `${item.name} - ${dayjs(item.date).format('MMM D, YYYY')}`, 
           value: item.id
-        }))
-        setEvents(eventOptions)
-      }
+        }), 
+        []
+      )
+      setEvents(eventOptions)
     } catch (error) {
       console.error('Error fetching events:', error)
+      setEvents([])
     }
     setLoading(false)
   }
@@ -122,10 +140,10 @@ function Filter({ isOpen, showOpen } : any) {
       </Flex>
       <Form layout="vertical" onFinish={onSubmit} form={form}>
         <Form.Item label="Assignee" name="playerIds">
-          <Select mode="multiple" allowClear showSearch options={players} optionFilterProp="label"/>
+          <Select mode="multiple" allowClear showSearch options={players} optionFilterProp="label" loading={loading}/>
         </Form.Item>
         <Form.Item label="Event" name="eventId">
-          <Select placeholder="Select Event" allowClear showSearch options={events} optionFilterProp="label"/>
+          <Select placeholder="Select Event" allowClear showSearch options={events} optionFilterProp="label" loading={loading}/>
         </Form.Item>
         <Form.Item label="Due Date" name="dueDate">
           <DatePicker placeholder="Select Due Date" style={{ width: '100%' }} />

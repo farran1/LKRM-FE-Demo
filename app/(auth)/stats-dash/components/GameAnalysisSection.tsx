@@ -1,335 +1,288 @@
 'use client'
-import React, { useState } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Button, Select, Timeline, Progress, Space, Typography } from 'antd';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { Card, Timeline, Spin, Alert, Statistic, Row, Col, Divider } from 'antd';
 import { 
   TrophyOutlined, 
   FireOutlined, 
-  ClockCircleOutlined, 
-  TeamOutlined,
-  UserOutlined,
-  BarChartOutlined,
-  DownloadOutlined
+  RiseOutlined, 
+  FallOutlined,
+  FullscreenOutlined
 } from '@ant-design/icons';
-import { useGameAnalysis } from '../hooks/useAdvancedStats';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import style from '../style.module.scss';
+import { statsService } from '../services/statsService';
 
-const { Title, Text } = Typography;
-const { Option } = Select;
+interface GameAnalysisSectionProps {
+  isFocused?: boolean;
+  onToggleFocus?: () => void;
+}
 
-const GameAnalysisSection = () => {
-  const [selectedGameId, setSelectedGameId] = useState<string>('game-1');
-  const { gameAnalysis, isLoading, error } = useGameAnalysis(selectedGameId);
+const GameAnalysisSection: React.FC<GameAnalysisSectionProps> = ({ isFocused = false, onToggleFocus }) => {
+  const [gameStats, setGameStats] = useState<any[]>([]);
+  const [selectedGame, setSelectedGame] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const games = await statsService.fetchGameStats();
+        setGameStats(games);
+        if (games.length > 0) {
+          setSelectedGame(games[games.length - 1]); // Select most recent game
+        }
+      } catch (err) {
+        setError('Failed to load game analysis data');
+        console.error('Game analysis error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handlePanelClick = () => {
+    if (onToggleFocus) {
+      onToggleFocus();
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className={style.sectionPlaceholder}>
+      <Card title="Game Analysis" className={style.panel} variant="outlined">
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <div style={{ color: '#b8c5d3' }}>Loading game analysis...</div>
+          <Spin size="large" />
+          <div style={{ marginTop: 16, color: '#b8c5d3' }}>Loading game analysis...</div>
         </div>
-      </div>
+      </Card>
     );
   }
 
-  if (error || !gameAnalysis) {
+  if (error) {
     return (
-      <div className={style.sectionPlaceholder}>
-        <Title level={3} style={{ color: '#ffffff' }}>Game Analysis</Title>
-        <Text style={{ color: '#b8c5d3' }}>
-          Select a game to view detailed analysis
-        </Text>
-      </div>
+      <Card title="Game Analysis" className={style.panel} variant="outlined">
+        <Alert
+          message="Error Loading Data"
+          description={error}
+          type="error"
+          showIcon
+        />
+      </Card>
+    );
+  }
+
+  if (!selectedGame) {
+    return (
+      <Card title="Game Analysis" className={style.panel} variant="outlined">
+        <div style={{ textAlign: 'center', color: '#b8c5d3', padding: '40px 0' }}>
+          No game data available for analysis
+        </div>
+      </Card>
     );
   }
 
   // Prepare data for charts
-  const gameFlowData = gameAnalysis.gameFlow.map((flow, index) => ({
-    period: `Q${flow.period}`,
-    homeScore: flow.homeScore,
-    awayScore: flow.awayScore,
-    leadChanges: flow.leadChanges,
-    largestLead: flow.largestLead,
+  const gameFlowData = gameStats.slice(-8).map((game, index) => ({
+    key: `flow-${index}`,
+    game: index + 1,
+    points: game.finalScoreUs || 0,
+    pointsAllowed: game.finalScoreThem || 0,
+    margin: (game.finalScoreUs || 0) - (game.finalScoreThem || 0)
   }));
 
   const quarterData = [
-    { name: 'Q1', home: gameAnalysis.quarterAnalysis.q1.home, away: gameAnalysis.quarterAnalysis.q1.away },
-    { name: 'Q2', home: gameAnalysis.quarterAnalysis.q2.home, away: gameAnalysis.quarterAnalysis.q2.away },
-    { name: 'Q3', home: gameAnalysis.quarterAnalysis.q3.home, away: gameAnalysis.quarterAnalysis.q3.away },
-    { name: 'Q4', home: gameAnalysis.quarterAnalysis.q4.home, away: gameAnalysis.quarterAnalysis.q4.away },
+    { key: 'q1', quarter: 'Q1', points: selectedGame.q1ScoreUs || 0, pointsAllowed: selectedGame.q1ScoreThem || 0 },
+    { key: 'q2', quarter: 'Q2', points: selectedGame.q2ScoreUs || 0, pointsAllowed: selectedGame.q2ScoreThem || 0 },
+    { key: 'q3', quarter: 'Q3', points: selectedGame.q3ScoreUs || 0, pointsAllowed: selectedGame.q3ScoreThem || 0 },
+    { key: 'q4', quarter: 'Q4', points: selectedGame.q4ScoreUs || 0, pointsAllowed: selectedGame.q4ScoreThem || 0 }
   ];
 
-  const playerColumns = [
-    {
-      title: 'Player',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string) => <Text style={{ color: '#ffffff', fontWeight: 500 }}>{name}</Text>,
-    },
-    {
-      title: 'Points',
-      dataIndex: 'points',
-      key: 'points',
-      render: (points: number) => <Text style={{ color: '#52c41a', fontWeight: 600 }}>{points}</Text>,
-    },
-    {
-      title: 'Rebounds',
-      dataIndex: 'rebounds',
-      key: 'rebounds',
-      render: (rebounds: number) => <Text style={{ color: '#1890ff' }}>{rebounds}</Text>,
-    },
-    {
-      title: 'Assists',
-      dataIndex: 'assists',
-      key: 'assists',
-      render: (assists: number) => <Text style={{ color: '#722ed1' }}>{assists}</Text>,
-    },
-    {
-      title: 'Minutes',
-      dataIndex: 'minutes',
-      key: 'minutes',
-      render: (minutes: number) => <Text style={{ color: '#b8c5d3' }}>{minutes}</Text>,
-    },
-    {
-      title: '+/-',
-      dataIndex: 'plusMinus',
-      key: 'plusMinus',
-      render: (plusMinus: number) => (
-        <Tag color={plusMinus >= 0 ? 'green' : 'red'}>
-          {plusMinus >= 0 ? '+' : ''}{plusMinus}
-        </Tag>
-      ),
-    },
-  ];
+  // Calculate game analysis metrics
+  const totalPoints = selectedGame.finalScoreUs || 0;
+  const totalPointsAllowed = selectedGame.finalScoreThem || 0;
+  const margin = totalPoints - totalPointsAllowed;
+  const result = selectedGame.result === 'W' ? 'Win' : 'Loss';
+  const resultColor = result === 'Win' ? '#52c41a' : '#f5222d';
 
-  const COLORS = ['#52c41a', '#1890ff', '#722ed1', '#fa8c16'];
+  // Generate key moments based on game data
+  const keyMoments = [
+    {
+      key: 'moment-1',
+      time: 'Q1 Start',
+      event: 'Game begins',
+      impact: 'neutral'
+    },
+    {
+      key: 'moment-2',
+      time: 'Q2',
+      event: `${selectedGame.q2ScoreUs || 0}-${selectedGame.q2ScoreThem || 0}`,
+      impact: 'positive'
+    },
+    {
+      key: 'moment-3',
+      time: 'Q3',
+      event: `${selectedGame.q3ScoreUs || 0}-${selectedGame.q3ScoreThem || 0}`,
+      impact: 'positive'
+    },
+    {
+      key: 'moment-4',
+      time: 'Q4 End',
+      event: `Final: ${totalPoints}-${totalPointsAllowed}`,
+      impact: result === 'Win' ? 'positive' : 'negative'
+    }
+  ];
 
   return (
-    <div className={style.gameAnalysisSection}>
-      {/* Game Selection and Header */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={16}>
-          <Title level={3} style={{ color: '#ffffff', margin: 0 }}>
-            Game Analysis: {gameAnalysis.opponent}
-          </Title>
-          <Text style={{ color: '#b8c5d3' }}>
-            {gameAnalysis.date} • {gameAnalysis.finalScore} • {gameAnalysis.result === 'W' ? 'Win' : 'Loss'}
-          </Text>
-        </Col>
-        <Col span={8} style={{ textAlign: 'right' }}>
-          <Space>
-            <Select
-              defaultValue="game-1"
-              style={{ width: 200 }}
-              onChange={setSelectedGameId}
-            >
-              <Option value="game-1">vs Central High (W 72-68)</Option>
-              <Option value="game-2">vs East Valley (L 68-71)</Option>
-              <Option value="game-3">vs Westside (W 85-78)</Option>
-            </Select>
-            <Button icon={<DownloadOutlined />} type="primary">
-              Export
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-
-      {/* Key Statistics */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} lg={6}>
-          <Card className={style.analysisCard} variant="outlined">
+    <Card 
+      title="Game Analysis" 
+      className={`${style.panel} ${isFocused ? style.focusedPanel : ''}`} 
+      variant="outlined"
+      extra={
+        onToggleFocus && (
+          <FullscreenOutlined 
+            onClick={handlePanelClick}
+            style={{ cursor: 'pointer', color: '#1890ff' }}
+          />
+        )
+      }
+    >
+      {/* Game Summary */}
+      <div style={{ marginBottom: 16 }}>
+        <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Game Summary</h4>
+        <Row gutter={16}>
+          <Col span={8}>
             <Statistic
               title="Result"
-              value={gameAnalysis.result === 'W' ? 'WIN' : 'LOSS'}
-              prefix={<TrophyOutlined />}
-              valueStyle={{ color: gameAnalysis.result === 'W' ? '#52c41a' : '#f5222d' }}
+              value={result}
+              valueStyle={{ color: resultColor, fontSize: '18px' }}
             />
-          </Card>
-        </Col>
-        <Col xs={24} lg={6}>
-          <Card className={style.analysisCard} variant="outlined">
+          </Col>
+          <Col span={8}>
             <Statistic
-              title="Field Goal %"
-              value={(gameAnalysis.teamStats.fieldGoalPercentage * 100).toFixed(1)}
-              suffix="%"
-              valueStyle={{ color: '#1890ff' }}
+              title="Final Score"
+              value={`${totalPoints}-${totalPointsAllowed}`}
+              valueStyle={{ color: '#ffffff' }}
             />
-          </Card>
-        </Col>
-        <Col xs={24} lg={6}>
-          <Card className={style.analysisCard} variant="outlined">
+          </Col>
+          <Col span={8}>
             <Statistic
-              title="Three Point %"
-              value={(gameAnalysis.teamStats.threePointPercentage * 100).toFixed(1)}
-              suffix="%"
-              valueStyle={{ color: '#722ed1' }}
+              title="Margin"
+              value={margin > 0 ? `+${margin}` : margin.toString()}
+              valueStyle={{ color: margin > 0 ? '#52c41a' : '#f5222d' }}
             />
-          </Card>
-        </Col>
-        <Col xs={24} lg={6}>
-          <Card className={style.analysisCard} variant="outlined">
-            <Statistic
-              title="Free Throw %"
-              value={(gameAnalysis.teamStats.freeThrowPercentage * 100).toFixed(1)}
-              suffix="%"
-              valueStyle={{ color: '#fa8c16' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+          </Col>
+        </Row>
+      </div>
 
-      {/* Game Flow Chart */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} lg={16}>
-          <Card title="Game Flow" className={style.chartCard} variant="outlined">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={gameFlowData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a4a6b" />
-                <XAxis 
-                  dataKey="period" 
-                  stroke="#b8c5d3"
-                  tick={{ fill: '#b8c5d3', fontSize: 12 }}
-                />
-                <YAxis 
-                  stroke="#b8c5d3"
-                  tick={{ fill: '#b8c5d3', fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#17375c',
-                    border: '1px solid #2a4a6b',
-                    color: '#ffffff'
-                  }}
-                  labelStyle={{ color: '#b8c5d3' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="homeScore" 
-                  stroke="#52c41a" 
-                  strokeWidth={3}
-                  dot={{ fill: '#52c41a', strokeWidth: 2, r: 6 }}
-                  activeDot={{ r: 8, stroke: '#52c41a', strokeWidth: 2 }}
-                  name="Lincoln High"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="awayScore" 
-                  stroke="#f5222d" 
-                  strokeWidth={3}
-                  dot={{ fill: '#f5222d', strokeWidth: 2, r: 6 }}
-                  activeDot={{ r: 8, stroke: '#f5222d', strokeWidth: 2 }}
-                  name="Opponent"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
+      <Divider style={{ margin: '16px 0' }} />
 
-        <Col xs={24} lg={8}>
-          <Card title="Quarter Breakdown" className={style.chartCard} variant="outlined">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={quarterData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a4a6b" />
-                <XAxis 
-                  type="number"
-                  stroke="#b8c5d3"
-                  tick={{ fill: '#b8c5d3', fontSize: 12 }}
-                />
-                <YAxis 
-                  dataKey="name"
-                  type="category"
-                  stroke="#b8c5d3"
-                  tick={{ fill: '#b8c5d3', fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#17375c',
-                    border: '1px solid #2a4a6b',
-                    color: '#ffffff'
-                  }}
-                  labelStyle={{ color: '#b8c5d3' }}
-                />
-                <Bar dataKey="home" fill="#52c41a" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="away" fill="#f5222d" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-      </Row>
+      {/* Quarter Breakdown */}
+      <div style={{ marginBottom: 16 }}>
+        <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Quarter Breakdown</h4>
+        {quarterData.some(q => q.points > 0 || q.pointsAllowed > 0) ? (
+          <ResponsiveContainer width="100%" height={isFocused ? 150 : 100}>
+            <BarChart data={quarterData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a4a6b" />
+              <XAxis 
+                dataKey="quarter" 
+                stroke="#b8c5d3"
+                tick={{ fill: '#b8c5d3', fontSize: 12 }}
+              />
+              <YAxis 
+                stroke="#b8c5d3"
+                tick={{ fill: '#b8c5d3', fontSize: 12 }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#17375c',
+                  border: '1px solid #2a4a6b',
+                  color: '#ffffff'
+                }}
+                labelStyle={{ color: '#b8c5d3' }}
+              />
+              <Bar dataKey="points" fill="#52c41a" name="Points For" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="pointsAllowed" fill="#f5222d" name="Points Against" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#b8c5d3', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            No quarter data available
+          </div>
+        )}
+      </div>
 
-      {/* Key Moments and Player Performance */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} lg={12}>
-          <Card title="Key Moments" className={style.analysisCard} variant="outlined">
-            <Timeline
-              items={gameAnalysis.keyMoments.map((moment, index) => ({
-                color: moment.impact === 'positive' ? 'green' : moment.impact === 'negative' ? 'red' : 'blue',
-                children: (
-                  <div>
-                    <Text style={{ color: '#ffffff', fontWeight: 500 }}>
-                      {moment.time}
-                    </Text>
-                    <br />
-                    <Text style={{ color: '#b8c5d3' }}>
-                      {moment.description}
-                    </Text>
-                  </div>
-                ),
-              }))}
-            />
-          </Card>
-        </Col>
+      <Divider style={{ margin: '16px 0' }} />
 
-        <Col xs={24} lg={12}>
-          <Card title="Team Stats" className={style.analysisCard} variant="outlined">
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Statistic
-                  title="Rebounds"
-                  value={`${gameAnalysis.teamStats.rebounds.offensive}/${gameAnalysis.teamStats.rebounds.defensive}`}
-                  suffix="O/D"
-                  valueStyle={{ color: '#1890ff' }}
-                />
-              </Col>
-              <Col span={12}>
-                <Statistic
-                  title="Assists"
-                  value={gameAnalysis.teamStats.assists}
-                  valueStyle={{ color: '#722ed1' }}
-                />
-              </Col>
-              <Col span={12}>
-                <Statistic
-                  title="Turnovers"
-                  value={gameAnalysis.teamStats.turnovers}
-                  valueStyle={{ color: '#f5222d' }}
-                />
-              </Col>
-              <Col span={12}>
-                <Statistic
-                  title="Steals"
-                  value={gameAnalysis.teamStats.steals}
-                  valueStyle={{ color: '#52c41a' }}
-                />
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-      </Row>
+      {/* Game Flow Analysis */}
+      <div style={{ marginBottom: 16 }}>
+        <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Game Flow Analysis</h4>
+        {gameFlowData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={isFocused ? 150 : 100}>
+            <LineChart data={gameFlowData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a4a6b" />
+              <XAxis 
+                dataKey="game" 
+                stroke="#b8c5d3"
+                tick={{ fill: '#b8c5d3', fontSize: 12 }}
+              />
+              <YAxis 
+                stroke="#b8c5d3"
+                tick={{ fill: '#b8c5d3', fontSize: 12 }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#17375c',
+                  border: '1px solid #2a4a6b',
+                  color: '#ffffff'
+                }}
+                labelStyle={{ color: '#b8c5d3' }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="points" 
+                stroke="#52c41a" 
+                strokeWidth={2}
+                dot={{ fill: '#52c41a', strokeWidth: 2, r: 4 }}
+                name="Points For"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="pointsAllowed" 
+                stroke="#f5222d" 
+                strokeWidth={2}
+                dot={{ fill: '#f5222d', strokeWidth: 2, r: 4 }}
+                name="Points Against"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#b8c5d3', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            No game flow data available
+          </div>
+        )}
+      </div>
 
-      {/* Player Performance Table */}
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <Card title="Player Performance" className={style.analysisCard} variant="outlined">
-            <Table
-              columns={playerColumns}
-              dataSource={gameAnalysis.playerPerformance.map(p => ({ ...p, key: p.playerId }))}
-              pagination={false}
-              scroll={{ x: 600 }}
-            />
-          </Card>
-        </Col>
-      </Row>
-    </div>
+      <Divider style={{ margin: '16px 0' }} />
+
+      {/* Key Moments Timeline */}
+      <div>
+        <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Key Moments</h4>
+        <Timeline
+          items={keyMoments.map(moment => ({
+            key: moment.key,
+            children: (
+              <div>
+                <div style={{ color: '#ffffff', fontWeight: 600 }}>{moment.time}</div>
+                <div style={{ color: '#b8c5d3' }}>{moment.event}</div>
+              </div>
+            ),
+            color: moment.impact === 'positive' ? 'green' : moment.impact === 'negative' ? 'red' : 'blue'
+          }))}
+        />
+      </div>
+    </Card>
   );
 };
 

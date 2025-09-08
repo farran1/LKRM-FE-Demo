@@ -12,6 +12,8 @@ import TagSelector from '@/components/tag-selector';
 import { convertDateTime } from '@/utils/app';
 import { locations } from '@/utils/constants';
 import EventDetailModal from './EventDetailModal';
+import { safeMapData } from '@/utils/api-helpers';
+import NewEvent from '../../events/components/new-event';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -49,6 +51,9 @@ export default function CalendarEventsModule() {
   const [eventForm] = Form.useForm();
   const [isEventDetailModalVisible, setIsEventDetailModalVisible] = useState(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
+  
+  // New Event Drawer state
+  const [isNewEventDrawerVisible, setIsNewEventDrawerVisible] = useState(false);
   const router = useRouter();
 
   // Fetch events using SWR like the existing events page
@@ -67,10 +72,17 @@ export default function CalendarEventsModule() {
 
   async function getEventTypes() {
     setEventFormLoading(true);
-    const res = await api.get('/api/eventTypes');
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}));
-      setEventTypes(types);
+    try {
+      const res = await api.get('/api/eventTypes');
+      const eventTypeOptions = safeMapData(
+        res, 
+        (item: any) => ({label: item.name, value: item.id}), 
+        []
+      );
+      setEventTypes(eventTypeOptions);
+    } catch (error) {
+      console.error('Error fetching event types:', error);
+      setEventTypes([]);
     }
     setEventFormLoading(false);
   }
@@ -83,6 +95,19 @@ export default function CalendarEventsModule() {
   const handleEventDetailModalClose = () => {
     setIsEventDetailModalVisible(false);
     setSelectedEventForDetail(null);
+  };
+
+  // New Event Drawer handlers
+  const handleNewEventDrawerOpen = () => {
+    setIsNewEventDrawerVisible(true);
+  };
+
+  const handleNewEventDrawerClose = () => {
+    setIsNewEventDrawerVisible(false);
+  };
+
+  const handleNewEventRefresh = () => {
+    mutate(); // Refresh events data
   };
 
   const handleEventClick = (event: Event) => {
@@ -272,7 +297,7 @@ export default function CalendarEventsModule() {
               icon={<PlusOutlined />}
               onClick={(e) => {
                 e.stopPropagation();
-                setIsEventModalVisible(true);
+                handleNewEventDrawerOpen();
               }}
               style={{
                 borderRadius: '16px',
@@ -783,284 +808,14 @@ export default function CalendarEventsModule() {
          </div>
        </div>
 
-      {/* Event Creation Modal */}
-      <Modal
-        title="Create New Event"
-        open={isEventModalVisible}
-        onCancel={handleEventModalClose}
-        footer={null}
-        width={1000}
-        destroyOnHidden
-        styles={{
-          content: {
-            backgroundColor: '#17375c',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            marginTop: '-10vh',
-            transform: 'translateY(-20px)'
-          },
-          body: {
-            padding: '24px',
-            backgroundColor: '#17375c'
-          },
-          header: {
-            backgroundColor: '#17375c',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
-            color: '#ffffff',
-            padding: '2px 24px 4px 24px'
-          }
-        }}
-      >
-        <Form
-          layout="vertical"
-          onFinish={handleEventSubmit}
-          form={eventForm}
-          initialValues={{ isRepeat: false }}
-        >
-          <Row gutter={24}>
-            {/* Left Column */}
-            <Col xs={24} lg={12}>
-              {/* Basic Information Section */}
-              <div style={{ marginBottom: '4px' }}>
-                <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: 600, 
-                  marginBottom: '4px', 
-                  color: '#ffffff',
-                  borderBottom: '2px solid rgba(255,255,255,0.2)',
-                  paddingBottom: '4px'
-                }}>
-                  Basic Information
-                </div>
-                
-                <Form.Item name="name" rules={[{ required: true, max: 255 }]} label="Event Name" style={{ marginBottom: '4px' }}>
-                  <Input 
-                    placeholder="Enter Event Name" 
-                    size="middle" 
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#ffffff'
-                    }}
-                  />
-                </Form.Item>
-                
-                <Form.Item name="eventTypeId" rules={[{ required: true, message: 'Please select Event type' }]} label="Event Type" style={{ marginBottom: 0 }}>
-                  <TagSelector options={eventTypes} />
-                </Form.Item>
-              </div>
-
-              {/* Date & Time Section */}
-              <div style={{ marginBottom: '4px' }}>
-                <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: 600, 
-                  marginBottom: '4px', 
-                  color: '#ffffff',
-                  borderBottom: '2px solid rgba(255,255,255,0.2)',
-                  paddingBottom: '4px'
-                }}>
-                  Date & Time
-                </div>
-                
-                <Row gutter={12}>
-                  <Col span={12}>
-                    <Form.Item label="Start Date" name="startDate" rules={[{ required: true, message: 'Please select the start date' }]} style={{ marginBottom: '4px' }}>
-                      <DatePicker 
-                        placeholder="Start date" 
-                        style={{ 
-                          width: '100%',
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff'
-                        }} 
-                        size="middle"
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item label="Start Time" name="startTime" rules={[{ required: true, message: 'Please select the start time' }]} style={{ marginBottom: '4px' }}>
-                      <TimePicker 
-                        placeholder="Start time" 
-                        style={{ 
-                          width: '100%',
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff'
-                        }} 
-                        showSecond={false} 
-                        use12Hours 
-                        size="middle"
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-                
-                <Row gutter={12}>
-                  <Col span={12}>
-                    <Form.Item label="End Date" name="endDate" style={{ marginBottom: '4px' }}>
-                      <DatePicker 
-                        placeholder="End date" 
-                        style={{ 
-                          width: '100%',
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff'
-                        }} 
-                        size="middle"
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item label="End Time" name="endTime" style={{ marginBottom: '4px' }}>
-                      <TimePicker 
-                        placeholder="End time" 
-                        style={{ 
-                          width: '100%',
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff'
-                        }} 
-                        showSecond={false} 
-                        use12Hours 
-                        size="middle"
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-                
-                <Row gutter={12}>
-                  <Col span={12}>
-                    <Form.Item label="Repeats?" name="isRepeat" style={{ marginBottom: 0 }}>
-                      <Select 
-                        size="middle"
-                        style={{
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff'
-                        }}
-                      >
-                        <Select.Option value={false}>Does not Repeat</Select.Option>
-                        <Select.Option value={true}>Repeat</Select.Option>
-                      </Select>
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item label="Occurrences" name="occurence" style={{ marginBottom: 0 }}>
-                      <Input 
-                        type="number" 
-                        placeholder="0" 
-                        size="middle"
-                        style={{
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff'
-                        }}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              </div>
-            </Col>
-
-            {/* Right Column */}
-            <Col xs={24} lg={12}>
-              {/* Location Section */}
-              <div style={{ marginBottom: '4px' }}>
-                <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: 600, 
-                  marginBottom: '4px', 
-                  color: '#ffffff',
-                  borderBottom: '2px solid rgba(255,255,255,0.2)',
-                  paddingBottom: '6px'
-                }}>
-                  Location Details
-                </div>
-                
-                <Form.Item name="location" rules={[{ required: true, message: 'Please select location' }]} label="Location" style={{ marginBottom: '4px' }}>
-                  <TagSelector options={locations} />
-                </Form.Item>
-                
-                <Form.Item name="venue" rules={[{ required: true, max: 255, message: 'Please enter venue name' }]} label="Venue Name" style={{ marginBottom: 0 }}>
-                  <Input 
-                    placeholder="Enter venue name" 
-                    size="middle"
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#ffffff'
-                    }}
-                  />
-                </Form.Item>
-              </div>
-
-              {/* Team & Notifications Section */}
-              <div style={{ marginBottom: '4px' }}>
-                <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: 600, 
-                  marginBottom: '4px', 
-                  color: '#ffffff',
-                  borderBottom: '2px solid rgba(255,255,255,0.2)',
-                  paddingBottom: '6px'
-                }}>
-                  Team & Notifications
-                </div>
-                
-                <Form.Item name="members" label="Team Members" style={{ marginBottom: '4px' }}>
-                  <Input 
-                    placeholder="Add team member" 
-                    size="middle"
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#ffffff'
-                    }}
-                  />
-                </Form.Item>
-                
-                <Flex align="center" justify="space-between" style={{ marginBottom: '4px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff' }}>Notify Team?</div>
-                  <Form.Item name="isNotice" style={{ margin: 0 }}>
-                    <Switch />
-                  </Form.Item>
-                </Flex>
-
-                <Form.Item name="oppositionTeam" label="Opposition Team" style={{ marginBottom: 0 }}>
-                  <Input 
-                    placeholder="Add Opposition Team" 
-                    size="middle"
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#ffffff'
-                    }}
-                  />
-                </Form.Item>
-              </div>
-            </Col>
-          </Row>
-
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            block 
-            size="middle"
-            loading={eventFormLoading}
-            style={{ 
-              marginTop: '8px',
-              height: '40px',
-              fontSize: '14px',
-              fontWeight: 600,
-              backgroundColor: '#B58842',
-              borderColor: '#B58842'
-            }}
-          >
-            Create Event
-          </Button>
-        </Form>
-      </Modal>
+      {/* Event Creation Modal - COMMENTED OUT: We're using the NewEvent drawer instead of this popup modal for now */}
+        
+      {/* New Event Drawer - Using the existing NewEvent component instead of the popup modal */}
+      <NewEvent
+        isOpen={isNewEventDrawerVisible}
+        showOpen={setIsNewEventDrawerVisible}
+        onRefresh={handleNewEventRefresh}
+      />
 
       {/* Event Detail Modal */}
       <EventDetailModal

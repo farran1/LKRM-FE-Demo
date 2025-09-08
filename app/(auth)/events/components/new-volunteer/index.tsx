@@ -18,8 +18,8 @@ function NewVolunteer({ eventId, isOpen, showOpen, onRefresh } : any) {
 
   async function getPositions() {
     const res = await api.get('/api/positions')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
+    if ((res as any)?.data?.data?.length > 0) {
+      const types = (res as any)?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
       setPositions(types)
     }
   }

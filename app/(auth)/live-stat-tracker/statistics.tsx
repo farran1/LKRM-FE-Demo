@@ -1,13 +1,273 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Card, Row, Col, Button, Typography, Space, Divider, Badge, Progress, Statistic, Modal, Table, Tabs, Select, Input, Tooltip, Alert, Switch } from 'antd'
-import { PlayCircleOutlined, PauseCircleOutlined, StopOutlined, ClockCircleOutlined, BarChartOutlined, ExportOutlined, DownloadOutlined, SettingOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons'
+import { Card, Row, Col, Button, Typography, Space, Divider, Badge, Progress, Statistic, Modal, Table, Tabs, Select, Input, Tooltip, Alert, Switch, App } from 'antd'
+import { PlayCircleOutlined, PauseCircleOutlined, StopOutlined, ClockCircleOutlined, BarChartOutlined, ExportOutlined, DownloadOutlined, TeamOutlined, TrophyOutlined, CloseOutlined, EditOutlined, SaveOutlined, ReloadOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons'
 import style from './style.module.scss'
+import api from '@/services/api'
+import { useRouter } from 'next/navigation'
+import { refinedLiveStatTrackerService } from '../../../src/services/refinedLiveStatTrackerService'
+import type { OfflineGameData as RefinedOfflineGameData } from '../../../src/services/refinedLiveStatTrackerService'
+import '@/utils/liveStatTrackerDebug' // Load debug utilities
+import '@/utils/databaseDiagnostic' // Load database diagnostic utilities
+
 
 const { Title, Text } = Typography
 const { TabPane } = Tabs
 const { Option } = Select
+
+// Custom Locker Icon Component
+const LockerIcon = ({ color = "currentColor" }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="6" y="3" width="12" height="18" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    <rect x="7" y="4" width="10" height="16" stroke={color} strokeWidth="1.5" fill="none"/>
+    <circle cx="15" cy="12" r="1" fill={color}/>
+    <line x1="9" y1="7" x2="15" y2="7" stroke={color} strokeWidth="1" strokeLinecap="round"/>
+    <line x1="9" y1="9" x2="15" y2="9" stroke={color} strokeWidth="1" strokeLinecap="round"/>
+    <line x1="9" y1="11" x2="13" y2="11" stroke={color} strokeWidth="1" strokeLinecap="round"/>
+    <rect x="11" y="14" width="2" height="3" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
+    <line x1="3" y1="21" x2="21" y2="21" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+)
+
+// Team Comparison Table Component
+type ComparisonStats = {
+  fgMade?: number; fgAttempted?: number; fgPercentage?: number;
+  twoPointMade?: number; twoPointAttempted?: number; twoPointPercentage?: number;
+  threePointMade?: number; threePointAttempted?: number; threePointPercentage?: number;
+  ftMade?: number; ftAttempted?: number; ftPercentage?: number;
+  totalRebounds?: number; totalAssists?: number; totalSteals?: number; totalBlocks?: number;
+  totalTurnovers?: number; totalFouls?: number; pointsInPaint?: number; secondChancePoints?: number;
+  pointsOffTurnovers?: number; benchPoints?: number;
+}
+
+const TeamComparisonTable = ({ teamStats, opponentStats, teamName = "HOME", opponentName = "OPPONENT" }: { teamStats: ComparisonStats; opponentStats: ComparisonStats; teamName?: string; opponentName?: string }) => {
+  const getComparisonBar = (teamValue: number, opponentValue: number, statKey: string) => {
+    if (teamValue === opponentValue) return null;
+    
+    // Determine which direction is "better" for each stat type
+    const isTeamBetter = (() => {
+      switch (statKey) {
+        // Higher is better
+        case 'fg':
+        case '2p':
+        case '3p':
+        case 'ft':
+        case 'reb':
+        case 'as':
+        case 'st':
+        case 'blk':
+        case 'pip':
+        case 'scp':
+        case 'pto':
+        case 'bp':
+          return teamValue > opponentValue;
+        // Lower is better
+        case 'to':
+        case 'tf':
+        case 'f':
+          return teamValue < opponentValue;
+        default:
+          return teamValue > opponentValue;
+      }
+    })();
+    
+    // Color based on which team is better (blue for home, red for opponent)
+    const color = isTeamBetter ? '#1890ff' : '#ff4d4f';
+    
+    return (
+      <div style={{
+        position: 'absolute',
+        right: isTeamBetter ? 'auto' : '8px',
+        left: isTeamBetter ? '8px' : 'auto',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '14px',
+        color: color, // Uses team colors (blue/red)
+        fontWeight: 'bold'
+      }}>
+        {isTeamBetter ? '◀' : '▶'}
+      </div>
+    );
+  };
+
+  const formatStatValue = (value: any, type: 'number' | 'percentage' | 'ratio' | 'fraction' = 'number') => {
+    if (type === 'percentage') {
+      return `${value}%`;
+    } else if (type === 'ratio') {
+      return value.toFixed(2);
+    } else if (type === 'fraction') {
+      return value;
+    }
+    return value;
+  };
+
+  const stats = [
+    { key: 'fg', label: 'Field Goals', type: 'fraction', teamValue: `${teamStats.fgMade || 0}/${teamStats.fgAttempted || 0}`, opponentValue: `${opponentStats.fgMade || 0}/${opponentStats.fgAttempted || 0}`, teamPercent: teamStats.fgPercentage || 0, opponentPercent: opponentStats.fgPercentage || 0 },
+    { key: '2p', label: 'Two-Point', type: 'fraction', teamValue: `${teamStats.twoPointMade || 0}/${teamStats.twoPointAttempted || 0}`, opponentValue: `${opponentStats.twoPointMade || 0}/${opponentStats.twoPointAttempted || 0}`, teamPercent: teamStats.twoPointPercentage || 0, opponentPercent: opponentStats.twoPointPercentage || 0 },
+    { key: '3p', label: 'Three-Point', type: 'fraction', teamValue: `${teamStats.threePointMade || 0}/${teamStats.threePointAttempted || 0}`, opponentValue: `${opponentStats.threePointMade || 0}/${opponentStats.threePointAttempted || 0}`, teamPercent: teamStats.threePointPercentage || 0, opponentPercent: opponentStats.threePointPercentage || 0 },
+    { key: 'ft', label: 'Free Throws', type: 'fraction', teamValue: `${teamStats.ftMade || 0}/${teamStats.ftAttempted || 0}`, opponentValue: `${opponentStats.ftMade || 0}/${opponentStats.ftAttempted || 0}`, teamPercent: teamStats.ftPercentage || 0, opponentPercent: opponentStats.ftPercentage || 0 },
+    { key: 'reb', label: 'Rebounds', type: 'number', teamValue: teamStats.totalRebounds || 0, opponentValue: opponentStats.totalRebounds || 0 },
+    { key: 'as', label: 'Assists', type: 'number', teamValue: teamStats.totalAssists || 0, opponentValue: opponentStats.totalAssists || 0 },
+    { key: 'st', label: 'Steals', type: 'number', teamValue: teamStats.totalSteals || 0, opponentValue: opponentStats.totalSteals || 0 },
+    { key: 'blk', label: 'Blocks', type: 'number', teamValue: teamStats.totalBlocks || 0, opponentValue: opponentStats.totalBlocks || 0 },
+    { key: 'to', label: 'Turnovers', type: 'number', teamValue: teamStats.totalTurnovers || 0, opponentValue: opponentStats.totalTurnovers || 0 },
+    { key: 'tf', label: 'Total Fouls', type: 'number', teamValue: teamStats.totalFouls || 0, opponentValue: opponentStats.totalFouls || 0 },
+    { key: 'pip', label: 'Points in Paint', type: 'number', teamValue: teamStats.pointsInPaint || 0, opponentValue: opponentStats.pointsInPaint || 0 },
+    { key: 'scp', label: 'Second Chance', type: 'number', teamValue: teamStats.secondChancePoints || 0, opponentValue: opponentStats.secondChancePoints || 0 },
+    { key: 'pto', label: 'Points off TO', type: 'number', teamValue: teamStats.pointsOffTurnovers || 0, opponentValue: opponentStats.pointsOffTurnovers || 0 },
+    { key: 'bp', label: 'Bench Points', type: 'number', teamValue: teamStats.benchPoints || 0, opponentValue: opponentStats.benchPoints || 0 },
+  ];
+
+  // Split stats into two columns (6 stats left, 8 stats right)
+  const leftColumnStats = stats.slice(0, 6);
+  const rightColumnStats = stats.slice(6, 14);
+
+  const renderStatRow = (stat: any) => (
+              <tr key={stat.key} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <td style={{ 
+        padding: '8px 6px', 
+                  textAlign: 'center', 
+                  position: 'relative',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '4px'
+                }}>
+        <div style={{ fontWeight: 600, color: '#1890ff', fontSize: '14px' }}>
+                    {stat.type === 'fraction' ? stat.teamValue : stat.teamValue}
+                  </div>
+                  {stat.teamPercent !== undefined && (
+          <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
+                      ({stat.teamPercent}%)
+                    </div>
+                  )}
+                </td>
+                <td style={{ 
+        padding: '8px 6px', 
+                  textAlign: 'center', 
+                  fontWeight: 600,
+                  color: '#ffffff',
+        background: 'rgba(255,255,255,0.1)',
+        fontSize: '14px',
+        position: 'relative'
+                }}>
+        {getComparisonBar(stat.teamValue, stat.opponentValue, stat.key)}
+                  <Tooltip
+                    title={
+                      stat.key === 'fg' ? 'Field Goals made/attempted and percentage' :
+                      stat.key === '2p' ? 'Two-point shots made/attempted and percentage' :
+                      stat.key === '3p' ? 'Three-point shots made/attempted and percentage' :
+                      stat.key === 'ft' ? 'Free throws made/attempted and percentage' :
+                      stat.key === 'reb' ? 'Total rebounds' :
+                      stat.key === 'as' ? 'Assists' :
+                      stat.key === 'st' ? 'Steals' :
+                      stat.key === 'blk' ? 'Blocks' :
+                      stat.key === 'to' ? 'Turnovers' :
+            stat.key === 'tf' ? 'Total fouls' :
+                      stat.key === 'pip' ? 'Points in the paint' :
+                      stat.key === 'scp' ? 'Second chance points' :
+                      stat.key === 'pto' ? 'Points off turnovers' :
+                      stat.key === 'bp' ? 'Bench points' :
+                      ''
+                    }
+                  >
+                    <span>{stat.label}</span>
+                  </Tooltip>
+                </td>
+                <td style={{ 
+        padding: '8px 6px', 
+                  textAlign: 'center', 
+                  position: 'relative',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '4px'
+                }}>
+        <div style={{ fontWeight: 600, color: '#ff4d4f', fontSize: '14px' }}>
+                    {stat.type === 'fraction' ? stat.opponentValue : stat.opponentValue}
+                  </div>
+                  {stat.opponentPercent !== undefined && (
+          <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
+                      ({stat.opponentPercent}%)
+                    </div>
+                  )}
+                </td>
+              </tr>
+  );
+
+  return (
+    <Card title="Team Comparison" className={style.teamComparisonCard}>
+      <div style={{ display: 'flex', gap: '16px', overflowX: 'auto' }}>
+        {/* Left Column */}
+        <div style={{ flex: 1 }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '14px',
+            color: '#ffffff'
+          }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
+                <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#1890ff', fontSize: '14px' }}>
+                  {teamName}
+                </th>
+                <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#ffffff', fontSize: '14px' }}>
+                  <Tooltip
+                    title={
+                      <div>
+                        FG = Field Goals; 2P/3P = Two/Three-point shots; FT = Free Throws; REB = Rebounds; AS = Assists; ST = Steals; BLK = Blocks; TO = Turnovers; TF = Total Fouls; PIP = Points in Paint; SCP = Second Chance Points; PTO = Points off Turnovers; BP = Bench Points
+                      </div>
+                    }
+                  >
+                    <span>Stat</span>
+                  </Tooltip>
+                </th>
+                <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#ff4d4f', fontSize: '14px' }}>
+                  {opponentName}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {leftColumnStats.map(renderStatRow)}
+          </tbody>
+        </table>
+        </div>
+
+        {/* Right Column */}
+        <div style={{ flex: 1 }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '14px',
+            color: '#ffffff'
+          }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
+                <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#1890ff', fontSize: '14px' }}>
+                  {teamName}
+                </th>
+                <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#ffffff', fontSize: '14px' }}>
+                  <Tooltip
+                    title={
+                      <div>
+                        FG = Field Goals; 2P/3P = Two/Three-point shots; FT = Free Throws; REB = Rebounds; AS = Assists; ST = Steals; BLK = Blocks; TO = Turnovers; TF = Total Fouls; PIP = Points in Paint; SCP = Second Chance Points; PTO = Points off Turnovers; BP = Bench Points
+                      </div>
+                    }
+                  >
+                    <span>Stat</span>
+                  </Tooltip>
+                </th>
+                <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#ff4d4f', fontSize: '14px' }}>
+                  {opponentName}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rightColumnStats.map(renderStatRow)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Card>
+  );
+};
 
 interface GameState {
   isPlaying: boolean
@@ -18,6 +278,12 @@ interface GameState {
   opponentScore: number
   timeoutHome: number
   timeoutAway: number
+  gameStartTime: number
+  teamFoulsHome: number
+  teamFoulsAway: number
+  isOvertime?: boolean
+  overtimeNumber?: number
+  regulationQuarters?: number
 }
 
 interface Player {
@@ -42,9 +308,12 @@ interface Player {
   ftAttempted: number
   ftMade: number
   plusMinus: number
+  pointsInPaint?: number
   chargesTaken: number
   deflections: number
   isOnCourt: boolean
+  isStarter: boolean // NEW: Designate if player is a starter
+  isMainRoster: boolean // NEW: Designate if player is in main roster
 }
 
 interface StatEvent {
@@ -57,6 +326,7 @@ interface StatEvent {
   quarter: number
   gameTime: number
   opponentEvent?: boolean
+  metadata?: any
 }
 
 interface Lineup {
@@ -65,6 +335,8 @@ interface Lineup {
   startTime: number
   endTime?: number
   plusMinus: number
+  stats?: any
+  name?: string
 }
 
 // DEV-ONLY: Settings interface for comprehensive configuration
@@ -76,7 +348,6 @@ interface GameSettings {
   shotClock: number // seconds
   
   // Workflow Settings
-  workflowMode: 'player-first' | 'action-first'
   autoPauseOnTimeout: boolean
   autoPauseOnQuarterEnd: boolean
   showConfirmations: boolean
@@ -85,7 +356,7 @@ interface GameSettings {
   showPlayerNumbers: boolean
   showPositions: boolean
   showEfficiencyRatings: boolean
-  compactMode: boolean
+  askForPointsInPaint: boolean
   darkMode: boolean
   
   // Export Settings
@@ -145,21 +416,151 @@ const SettingRow: React.FC<SettingRowProps> = ({ label, controlType, value, onCh
   );
 };
 
-const Statistics = () => {
+// (removed duplicate StatisticsProps with optional eventId)
+
+// Alias for compatibility during transition
+type OfflineGameData = RefinedOfflineGameData
+
+// Note: OfflineStorageService completely replaced by refinedLiveStatTrackerService
+
+// OfflineStorageService class definition has been completely removed
+// All functionality is now handled by refinedLiveStatTrackerService
+
+interface StatisticsProps {
+  eventId: number
+  onExit?: () => void
+}
+const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit }) => {
+  const router = useRouter()
+  const { modal, message } = App.useApp()
+  
+  // Use refined live stat tracker service (replaces both enhanced + offline services)
+  const liveStatService = refinedLiveStatTrackerService
+  
+  // Initialize enhanced live stat tracker service
+  const [liveSessionKey, setLiveSessionKey] = useState<string | null>(null)
+  const [serviceStatus, setServiceStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
+  
+  // Prevent double start in React StrictMode (dev) / re-mounts
+  const hasStartedRef = useRef(false)
+  
+  // Start enhanced live session when component mounts
+  useEffect(() => {
+    if (hasStartedRef.current) return
+    hasStartedRef.current = true
+    const startRefinedLiveSession = async () => {
+      try {
+        // Set a default user ID for the enhanced service
+        liveStatService.setUserId(1)
+        
+        // Set the Supabase client from your existing app to prevent duplicate clients
+        // Try to get it from your existing supabase lib
+        try {
+          const { supabase } = await import('../../../src/lib/supabase')
+          if (supabase) {
+            liveStatService.setSupabaseClient(supabase)
+          }
+        } catch (error) {
+          console.log('Could not import existing Supabase client, enhanced service will work offline only')
+        }
+        
+        if (eventId) {
+          const gameData = await liveStatService.startLiveGame(
+            eventId,
+            undefined, // No game ID yet
+            {
+              currentTime: 600,
+              quarter: 1,
+              homeScore: 0,
+              awayScore: 0,
+              opponentScore: 0,
+              timeoutHome: 4,
+              timeoutAway: 4,
+              isPlaying: false
+            }
+          )
+          setLiveSessionKey(gameData.sessionKey)
+          setServiceStatus('connected')
+          console.log('Refined live session started:', gameData.sessionKey)
+        }
+      } catch (error) {
+        console.error('Failed to start refined live session:', error)
+        setServiceStatus('error')
+      }
+    }
+    
+    startRefinedLiveSession()
+  }, [eventId])
+
+  // Automatically collapse sidebar when live stat tracker opens
+  useEffect(() => {
+    collapseSidebar()
+  }, [])
+  
+  // State for saved games
+  const [savedGames, setSavedGames] = useState<Array<{ 
+    id: string; 
+    eventId: number; 
+    sessionKey: string; 
+    startedAt: string; 
+    timestamp: string; 
+    events: any[] 
+  }>>([])
+
+  // Ensure accurate online status on component mount
+  useEffect(() => {
+    // Force update of online status when component mounts
+    if (typeof window !== 'undefined') {
+      const currentOnlineStatus = navigator.onLine
+      if (currentOnlineStatus !== liveStatService.getOfflineStatus().isOnline) {
+        // Update the stored status to match current browser status
+        localStorage.setItem('basketball-offline-status', JSON.stringify({
+          isOnline: currentOnlineStatus,
+          lastUpdated: Date.now()
+        }))
+      }
+    }
+  }, [])
+
+  // Load saved games when component mounts
+  useEffect(() => {
+    const loadSavedGames = async () => {
+      try {
+        const games = await liveStatService.getAllSavedGamesFromDatabase()
+        setSavedGames(games)
+      } catch (error) {
+        console.error('Failed to load saved games:', error)
+      }
+    }
+    
+    if (liveStatService.hasSupabaseClient()) {
+      loadSavedGames()
+    }
+  }, [liveStatService])
+
+  // Function to refresh saved games
+  const refreshSavedGames = async () => {
+    try {
+      const games = await liveStatService.getAllSavedGamesFromDatabase()
+      setSavedGames(games)
+    } catch (error) {
+      console.error('Failed to refresh saved games:', error)
+    }
+  }
+  
   // DEV-ONLY: Default settings with comprehensive options
   const defaultSettings: GameSettings = {
     quarterDuration: 10,
     totalQuarters: 4,
     timeoutCount: 4,
     shotClock: 30,
-    workflowMode: 'player-first',
     autoPauseOnTimeout: true,
     autoPauseOnQuarterEnd: true,
     showConfirmations: true,
     showPlayerNumbers: true,
     showPositions: true,
     showEfficiencyRatings: true,
-    compactMode: false,
+    askForPointsInPaint: false,
     darkMode: false,
     autoExport: false,
     exportFormat: 'json',
@@ -179,20 +580,107 @@ const Statistics = () => {
     showQuickActions: true
   }
 
-  // Hydration-safe: always use defaultSettings for SSR, update from localStorage on client
+  // Hydration-safe: always use defaultSettings for SSR, then load from service/localStorage on client
   const [settings, setSettings] = useState<GameSettings>(defaultSettings)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('basketballStatsSettings')
-      if (savedSettings) {
-        try {
-          setSettings({ ...defaultSettings, ...JSON.parse(savedSettings) })
-        } catch (error) {
-          console.warn('Failed to load settings from localStorage:', error)
+    let isMounted = true
+    const load = async () => {
+      try {
+        // Prefer service-backed settings (Supabase by session), with localStorage fallback
+        const loaded = await refinedLiveStatTrackerService.loadSettings()
+        if (isMounted && loaded) {
+          setSettings({ ...defaultSettings, ...loaded })
+        }
+      } catch (error) {
+        // Fallback to previous localStorage path if service not ready
+        if (typeof window !== 'undefined') {
+          const savedSettings = localStorage.getItem('basketballStatsSettings')
+          if (savedSettings) {
+            try {
+              if (isMounted) setSettings({ ...defaultSettings, ...JSON.parse(savedSettings) })
+            } catch (e) {
+              console.warn('Failed to load settings from localStorage:', e)
+            }
+          }
         }
       }
     }
+    load()
+    return () => { isMounted = false }
+  }, [])
+
+  // Helper function to convert position names to abbreviations
+  const getPositionAbbreviation = (positionName: string): string => {
+    const position = positionName?.toLowerCase() || ''
+    if (position.includes('guard')) return 'G'
+    if (position.includes('center')) return 'C'
+    if (position.includes('forward')) return 'F'
+    return positionName?.substring(0, 2)?.toUpperCase() || 'N/A'
+  }
+
+  // Fetch real player data from API
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      try {
+        console.log('Live Stat Tracker: Fetching players from API...')
+        const response: any = await api.get('/api/players')
+        const playersData = (response as any).data?.data || (response as any).data || []
+        
+        console.log('Live Stat Tracker: Received players:', response.data)
+        console.log('Live Stat Tracker: Players array:', playersData)
+        
+        // Transform API data to match the Player interface
+        const transformedPlayers: Player[] = playersData.map((dbPlayer: any) => {
+          // Get position name, abbreviation, or fallback
+          const positionName = dbPlayer.position?.name || 'N/A'
+          const positionAbbr = getPositionAbbreviation(positionName)
+          
+          // Construct player name
+          const playerName = dbPlayer.first_name && dbPlayer.last_name 
+            ? `${dbPlayer.first_name} ${dbPlayer.last_name}`
+            : dbPlayer.name || 'Unknown Player'
+          
+          return {
+            id: dbPlayer.id,
+            name: playerName,
+            number: dbPlayer.jersey_number || dbPlayer.jersey || '0',
+            position: positionAbbr,
+            minutesPlayed: 0,
+            points: 0,
+            rebounds: 0,
+            offensiveRebounds: 0,
+            defensiveRebounds: 0,
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            fouls: 0,
+            turnovers: 0,
+            fgAttempted: 0,
+            fgMade: 0,
+            threeAttempted: 0,
+            threeMade: 0,
+            ftAttempted: 0,
+            ftMade: 0,
+            plusMinus: 0,
+            chargesTaken: 0,
+            deflections: 0,
+            isOnCourt: false,
+            isStarter: false, // NEW: Designate if player is a starter
+            isMainRoster: false // NEW: Designate if player is in main roster
+          }
+        })
+        
+        console.log('Live Stat Tracker: Transformed players:', transformedPlayers)
+        setPlayers(transformedPlayers)
+      } catch (error) {
+        console.error('Live Stat Tracker: Error fetching players:', error)
+        // Keep empty array on error
+        setPlayers([])
+      }
+    }
+
+    fetchPlayers()
   }, [])
 
   const [gameState, setGameState] = useState<GameState>(() => ({
@@ -203,32 +691,24 @@ const Statistics = () => {
     awayScore: 0,
     opponentScore: 0,
     timeoutHome: defaultSettings.timeoutCount,
-    timeoutAway: defaultSettings.timeoutCount
+    timeoutAway: defaultSettings.timeoutCount,
+    gameStartTime: Date.now(),
+    teamFoulsHome: 0,
+    teamFoulsAway: 0,
+    isOvertime: false,
+    overtimeNumber: 0,
+    regulationQuarters: defaultSettings.totalQuarters
   }))
 
-  const [players, setPlayers] = useState<Player[]>([
-    { id: 1, name: 'John Smith', number: '10', position: 'PG', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 2, name: 'Mike Johnson', number: '15', position: 'SG', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 3, name: 'David Wilson', number: '23', position: 'SF', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 4, name: 'Chris Brown', number: '32', position: 'PF', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 5, name: 'Alex Davis', number: '44', position: 'C', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 6, name: 'Ryan Martinez', number: '3', position: 'PG', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 7, name: 'Kevin Thompson', number: '7', position: 'SG', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 8, name: 'Marcus Williams', number: '12', position: 'SF', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 9, name: 'Jordan Lee', number: '21', position: 'PF', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 10, name: 'Tyler Anderson', number: '33', position: 'C', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 11, name: 'Brandon Garcia', number: '5', position: 'PG', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 12, name: 'Isaiah Rodriguez', number: '8', position: 'SG', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 13, name: 'Cameron White', number: '14', position: 'SF', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 14, name: 'Devin Taylor', number: '25', position: 'PF', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-    { id: 15, name: 'Nathan Clark', number: '55', position: 'C', minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, chargesTaken: 0, deflections: 0, isOnCourt: false },
-  ])
+  const [players, setPlayers] = useState<Player[]>([])
 
   // Opponent on-court jersey slots (5) and selection
   const [opponentOnCourt, setOpponentOnCourt] = useState<string[]>(['', '', '', '', ''])
   const [selectedOpponentSlot, setSelectedOpponentSlot] = useState<number | null>(null)
+  const [opponentFouls, setOpponentFouls] = useState<number[]>([0, 0, 0, 0, 0])
 
   const [events, setEvents] = useState<StatEvent[]>([])
+  const [deletedEvents, setDeletedEvents] = useState<StatEvent[]>([])
   const [lineups, setLineups] = useState<Lineup[]>([])
   const [showHalftimeReport, setShowHalftimeReport] = useState(false)
   const [showTimeoutReport, setShowTimeoutReport] = useState(false)
@@ -236,14 +716,38 @@ const Statistics = () => {
   const [selectedAction, setSelectedAction] = useState<string | null>(null)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showPipModal, setShowPipModal] = useState(false)
+  const [pendingPipEvent, setPendingPipEvent] = useState<any>(null)
+  const [showAssistModal, setShowAssistModal] = useState(false)
+  const [pendingAssistEvent, setPendingAssistEvent] = useState<any>(null)
+  const [showReboundModal, setShowReboundModal] = useState(false)
+  const [pendingReboundEvent, setPendingReboundEvent] = useState<any>(null)
+  const [showStealModal, setShowStealModal] = useState(false)
+  const [pendingStealEvent, setPendingStealEvent] = useState<any>(null)
+  const [showTurnoverModal, setShowTurnoverModal] = useState(false)
+  const [pendingTurnoverEvent, setPendingTurnoverEvent] = useState<any>(null)
+  const [showFoulModal, setShowFoulModal] = useState(false)
+  const [pendingFoulEvent, setPendingFoulEvent] = useState<any>(null)
+  const [showBlockModal, setShowBlockModal] = useState(false)
+  const [pendingBlockEvent, setPendingBlockEvent] = useState<any>(null)
+  // Allow in-app dialogs (like Settings) to bypass the leave/stay confirmation
+  const [suppressNavigationGuard, setSuppressNavigationGuard] = useState(false)
+  
+  // Track sidebar collapsed state for responsive layout
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
   const [activeTab, setActiveTab] = useState('tracking')
-  const [workflowMode, setWorkflowMode] = useState<'player-first' | 'action-first'>(defaultSettings.workflowMode)
-  const [lastTimeoutTime, setLastTimeoutTime] = useState<number>(0)
+  // Track last timeout moment using wall-clock time (ms since epoch)
+  const [lastTimeoutTs, setLastTimeoutTs] = useState<number>(0)
   const [currentLineup, setCurrentLineup] = useState<Lineup | null>(null)
   const [showLineupBuilder, setShowLineupBuilder] = useState(false)
   const [selectedLineupPlayers, setSelectedLineupPlayers] = useState<number[]>([])
   const [lineupName, setLineupName] = useState('')
+  const [showBulkSubModal, setShowBulkSubModal] = useState(false)
+  const [selectedBulkSubPlayers, setSelectedBulkSubPlayers] = useState<number[]>([])
   const [isEditingClock, setIsEditingClock] = useState(false);
+  const [editingLineupId, setEditingLineupId] = useState<string | null>(null)
+  const [editingLineupName, setEditingLineupName] = useState('')
   
   // DEV-ONLY: Action history for undo functionality
   const [actionHistory, setActionHistory] = useState<Array<{
@@ -263,8 +767,49 @@ const Statistics = () => {
   // 1. Add a ref for the Player In select
   const playerInSelectRef = useRef<any>(null);
 
+  // Bench/SCP/PTO tracking
+  const starterIdsRef = useRef<number[]>([])
+  const scpWindowHomeRef = useRef<boolean>(false)
+  const scpWindowAwayRef = useRef<boolean>(false)
+  const ptoWindowHomeRef = useRef<boolean>(false)
+  const ptoWindowAwayRef = useRef<boolean>(false)
+  const lastPossessionRef = useRef<'home' | 'away' | null>(null)
+
+  const [analyticsTotals, setAnalyticsTotals] = useState<Record<number, { home: { scp: number; pto: number; benchPoints: number }; away: { scp: number; pto: number; benchPoints: number } }>>({})
+
+  const addAnalytics = (quarter: number, team: 'home'|'away', points: number, flags: { scp?: boolean; pto?: boolean; bench?: boolean }) => {
+    setAnalyticsTotals(prev => {
+      const q = prev[quarter] || { home: { scp: 0, pto: 0, benchPoints: 0 }, away: { scp: 0, pto: 0, benchPoints: 0 } }
+      const t = { ...q[team] }
+      if (flags.scp) t.scp += points
+      if (flags.pto) t.pto += points
+      if (flags.bench) t.benchPoints += points
+      return { ...prev, [quarter]: { ...q, [team]: t } }
+    })
+  }
+
+  // Debounced sync of analytics to Supabase when online
+  const syncAnalytics = useCallback(() => {
+    if (!liveSessionKey) return
+    try {
+      refinedLiveStatTrackerService.updateAnalytics({ byQuarter: analyticsTotals })
+    } catch (e) {
+      // noop offline
+    }
+  }, [liveSessionKey, analyticsTotals])
+
+  useEffect(() => {
+    const id = setTimeout(syncAnalytics, 800)
+    return () => clearTimeout(id)
+  }, [syncAnalytics])
+
   // DEV-ONLY: Enhanced substitution state
   const [showSubstitutionModal, setShowSubstitutionModal] = useState(false)
+  const [showReportButton, setShowReportButton] = useState(false)
+  const [isReportEnabled, setIsReportEnabled] = useState(false)
+  // Real-time start for current quarter (ms since epoch)
+  const [quarterStartTime, setQuarterStartTime] = useState<number | null>(null)
+  const halftimeTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [substitutionStep, setSubstitutionStep] = useState<'select-out' | 'select-in' | 'confirm'>('select-out')
   const [substitutionHistory, setSubstitutionHistory] = useState<Array<{
     playerIn: Player
@@ -274,17 +819,20 @@ const Statistics = () => {
     gameTime: number
     lineupId?: string
   }>>([])
+  const [hasGameStarted, setHasGameStarted] = useState(false)
 
   // DEV-ONLY: Save settings to localStorage
   const saveSettings = useCallback((newSettings: Partial<GameSettings>) => {
     const updatedSettings = { ...settings, ...newSettings }
     setSettings(updatedSettings)
     
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('basketballStatsSettings', JSON.stringify(updatedSettings))
-      } catch (error) {
-        console.warn('Failed to save settings to localStorage:', error)
+    // Save through service (mirrors to Supabase and localStorage when available)
+    try {
+      refinedLiveStatTrackerService.saveSettings(updatedSettings)
+    } catch (error) {
+      // Also mirror to localStorage as a hard fallback
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('basketballStatsSettings', JSON.stringify(updatedSettings)) } catch {}
       }
     }
   }, [settings])
@@ -330,41 +878,44 @@ const Statistics = () => {
     reader.readAsText(file)
   }
 
-  // DEV-ONLY: Game clock timer with enhanced functionality
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (gameState.isPlaying && gameState.currentTime > 0) {
-      interval = setInterval(() => {
-        setGameState(prev => ({
-          ...prev,
-          currentTime: prev.currentTime - 1
-        }))
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [gameState.isPlaying, gameState.currentTime])
 
   // DEV-ONLY: Apply game configuration settings
   useEffect(() => {
     setGameState(prev => ({
       ...prev,
-      currentTime: settings.quarterDuration * 60,
       timeoutHome: settings.timeoutCount,
-      timeoutAway: settings.timeoutCount
+      timeoutAway: settings.timeoutCount,
     }))
-  }, [settings.quarterDuration, settings.timeoutCount])
+  }, [settings.timeoutCount])
 
   // DEV-ONLY: Apply workflow mode changes
   useEffect(() => {
-    setWorkflowMode(settings.workflowMode)
-  }, [settings.workflowMode])
+    // Workflow mode removed - using consistent player-first layout
+  }, [])
 
   // DEV-ONLY: Check for halftime with settings integration
+  // Auto-activate LKRM Halftime Report 9:30 after Q2 starts (real time)
   useEffect(() => {
-    if (gameState.quarter === 2 && gameState.currentTime === 300 && settings.halftimeReminder) {
-      setShowHalftimeReport(true)
+    if (!settings.halftimeReminder) return
+    // Clear any existing timer
+    if (halftimeTimerRef.current) {
+      clearTimeout(halftimeTimerRef.current)
+      halftimeTimerRef.current = null
     }
-  }, [gameState.quarter, gameState.currentTime, settings.halftimeReminder])
+    // When quarter 2 starts and we have a real start time, schedule after 9m30s
+    if (gameState.quarter === 2 && quarterStartTime) {
+      const delayMs = 9 * 60 * 1000 + 30 * 1000 // 9:30
+      halftimeTimerRef.current = setTimeout(() => {
+        setShowHalftimeReport(true)
+      }, delayMs)
+    }
+    return () => {
+      if (halftimeTimerRef.current) {
+        clearTimeout(halftimeTimerRef.current)
+        halftimeTimerRef.current = null
+      }
+    }
+  }, [gameState.quarter, quarterStartTime, settings.halftimeReminder])
 
   // DEV-ONLY: Enhanced timeout tracking with settings integration
   const handleTimeout = (team: 'home' | 'away') => {
@@ -372,11 +923,16 @@ const Statistics = () => {
     const previousState = {
       players: players,
       gameState: gameState,
-      events: events
+      events: events,
+      lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime
     }
 
-    const currentGameTime = (settings.quarterDuration * 60) - gameState.currentTime
-    setLastTimeoutTime(currentGameTime)
+    const nowTs = Date.now()
+    setLastTimeoutTs(nowTs)
     
     setGameState(prev => ({
       ...prev,
@@ -397,10 +953,29 @@ const Statistics = () => {
       data: { team },
       previousState
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
+
+    // Auto-save after timeout
+    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
   }
 
   // DEV-ONLY: Generate comprehensive halftime insights
   const generateHalftimeInsights = () => {
+    // Return empty insights if no players loaded yet
+    if (!players || players.length === 0) {
+      return {
+        topScorer: null,
+        topRebounder: null,
+        topAssister: null,
+        mostEfficient: null,
+        teamStats: calculateTeamStats(),
+        pace: 0,
+        recommendations: [],
+        recentOpponentRun: null,
+        hotOpponent: null,
+        insights: []
+      };
+    }
+
     const topScorer = players.reduce((max, p) => p.points > max.points ? p : max, players[0]);
     const topRebounder = players.reduce((max, p) => p.rebounds > max.rebounds ? p : max, players[0]);
     const topAssister = players.reduce((max, p) => p.assists > max.assists ? p : max, players[0]);
@@ -410,15 +985,16 @@ const Statistics = () => {
     }, { player: players[0], efficiency: players[0].points + players[0].rebounds + players[0].assists + players[0].steals + players[0].blocks - players[0].turnovers - players[0].fouls });
 
     const teamStats = calculateTeamStats();
-    // Calculate opponent stats for first half
+    // Opponent metrics using all events so far (independent of game clock)
     const opponentStats = {
-      totalRebounds: events.filter(e => e.opponentEvent && (e.eventType === 'defensive_rebound' || e.eventType === 'offensive_rebound') && e.gameTime <= (settings.quarterDuration * 60 * 2)).length,
-      totalTurnovers: events.filter(e => e.opponentEvent && e.eventType === 'turnover' && e.gameTime <= (settings.quarterDuration * 60 * 2)).length,
+      totalRebounds: events.filter(e => e.opponentEvent && (e.eventType === 'defensive_rebound' || e.eventType === 'offensive_rebound')).length,
+      totalTurnovers: events.filter(e => e.opponentEvent && e.eventType === 'turnover').length,
     };
-    // Opponent run at end of half
-    const recentOpponentRun = calculateOpponentRun(events.filter(e => e.gameTime >= (settings.quarterDuration * 60 * 2) - 120));
-    // Opponent hot hand in first half
-    const hotOpponent = findHotOpponent(events.filter(e => e.opponentEvent && e.gameTime <= (settings.quarterDuration * 60 * 2)));
+    // Opponent run in last 2 minutes of real time
+    const twoMinAgo = Date.now() - 120000;
+    const recentOpponentRun = calculateOpponentRun(events.filter(e => e.timestamp >= twoMinAgo));
+    // Opponent hot hand over all events so far
+    const hotOpponent = findHotOpponent(events.filter(e => e.opponentEvent));
 
     const halftimeData = {
       topScorer,
@@ -426,7 +1002,6 @@ const Statistics = () => {
       topAssister,
       mostEfficient,
       teamStats,
-      pace: teamStats.pace,
       recommendations: [] as string[],
       recentOpponentRun,
       hotOpponent,
@@ -542,8 +1117,33 @@ const Statistics = () => {
 
   // DEV-ONLY: Generate timeout insights
   const generateTimeoutInsights = () => {
+    // Return empty insights if no players loaded yet
+    if (!players || players.length === 0) {
+      return {
+        topScorer: null,
+        topRebounder: null,
+        topAssister: null,
+        mostEfficient: null,
+        teamStats: {
+          totalPoints: 0,
+          totalRebounds: 0,
+          totalAssists: 0,
+          totalTurnovers: 0,
+          fgAttempted: 0,
+          fgMade: 0,
+          assistToTurnoverRatio: 0,
+          pace: 0,
+          projectedFinal: 0,
+          fgPercentage: 0
+        },
+        momentum: 'neutral',
+        recommendations: []
+      };
+    }
+
     // Last 2 minutes of events
-    const recentEvents = events.filter(e => e.gameTime >= lastTimeoutTime - 120);
+    // Use the last 2 minutes of wall-clock time from last timeout
+    const recentEvents = events.filter(e => e.timestamp >= (lastTimeoutTs - 120000));
     const recentScoring = recentEvents.filter(e => e.eventType.includes('made') || e.eventType === 'points');
     const recentTurnovers = recentEvents.filter(e => e.eventType === 'turnover');
     const momentum = recentScoring.length > recentTurnovers.length ? 'positive' : 'negative';
@@ -647,7 +1247,6 @@ const Statistics = () => {
     
     return recommendations
   }
-
   // DEV-ONLY: Generate advanced halftime recommendations
   const generateHalftimeRecommendations = (
     teamStats: any,
@@ -725,23 +1324,77 @@ const Statistics = () => {
     return recommendations
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+  const formatWallClock = (ts: number) => {
+    const d = new Date(ts)
+    const hh = d.getHours().toString().padStart(2, '0')
+    const mm = d.getMinutes().toString().padStart(2, '0')
+    const ss = d.getSeconds().toString().padStart(2, '0')
+    return `${hh}:${mm}:${ss}`
   }
 
-  // DEV-ONLY: Undo last action function
+  // DEV-ONLY: Enhanced undo last action function
   const undoLastAction = () => {
-    if (actionHistory.length === 0) return
+    if (actionHistory.length === 0) {
+      message.warning('No actions to undo')
+      return
+    }
 
     const lastAction = actionHistory[0]
     const previousState = lastAction.previousState
 
-    // Restore previous state
-    setPlayers(previousState.players)
-    setGameState(previousState.gameState)
-    setEvents(previousState.events)
+    // Restore all previous state
+    setPlayers(previousState.players || players)
+    setGameState(previousState.gameState || gameState)
+    setEvents(previousState.events || events)
+    setLineups(previousState.lineups || lineups)
+    setOpponentOnCourt(previousState.opponentOnCourt || opponentOnCourt)
+    setSubstitutionHistory(previousState.substitutionHistory || substitutionHistory)
+    setQuickSubHistory(previousState.quickSubHistory || quickSubHistory)
+    if (previousState.showReportButton !== undefined) setShowReportButton(previousState.showReportButton)
+    if (previousState.isReportEnabled !== undefined) setIsReportEnabled(previousState.isReportEnabled)
+    
+    // Restore quarter start time if it was saved
+    if (previousState.quarterStartTime !== undefined) {
+      setQuarterStartTime(previousState.quarterStartTime)
+    }
+
+    // Handle specific action types for additional cleanup and user feedback
+    if (lastAction.type === 'quarter') {
+      const { action, quarter } = lastAction.data
+      
+      if (action === 'start') {
+        // Undoing a quarter start - game is no longer playing
+        setGameState(prev => ({ ...prev, isPlaying: false }))
+        setHasGameStarted(false)
+        message.success(`Undid Q${quarter} start - Game paused`)
+      } else if (action === 'stop') {
+        // Undoing a quarter stop - game is playing again
+        setGameState(prev => ({ ...prev, isPlaying: true }))
+        message.success(`Undid Q${quarter} stop - Game resumed`)
+      } else if (action === 'end_game') {
+        // Undoing end game - restore to previous quarter
+        setGameState(prev => ({ ...prev, isPlaying: true }))
+        message.success('Undid end game - Game resumed')
+      } else if (action === 'next_quarter') {
+        // Undoing next quarter - go back to previous quarter
+        message.success(`Undid advance to Q${quarter} - Back to Q${quarter - 1}`)
+      }
+    } else if (lastAction.type === 'stat') {
+      const { eventType, playerId, isOpponent } = lastAction.data
+      const playerName = isOpponent ? `Opponent #${playerId}` : players.find(p => p.id === playerId)?.name || 'Player'
+      message.success(`Undid ${eventType} for ${playerName}`)
+    } else if (lastAction.type === 'substitution') {
+      const { playerIn, playerOut } = lastAction.data
+      message.success(`Undid substitution: ${playerOut?.name || 'Player'} ↔ ${playerIn?.name || 'Player'}`)
+    } else if (lastAction.type === 'timeout') {
+      const { team } = lastAction.data
+      message.success(`Undid ${team} timeout`)
+    } else if (lastAction.type === 'score') {
+      const { points, team } = lastAction.data
+      message.success(`Undid ${points} point(s) for ${team}`)
+    } else {
+      message.success('Undid last action')
+    }
 
     // Remove the last action from history
     setActionHistory(prev => prev.slice(1))
@@ -753,7 +1406,12 @@ const Statistics = () => {
     const previousState = {
       players: players,
       gameState: gameState,
-      events: events
+      events: events,
+      lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime
     }
 
     setGameState(prev => ({ ...prev, opponentScore: prev.opponentScore + points }))
@@ -768,7 +1426,7 @@ const Statistics = () => {
   }
 
   // DEV-ONLY: Enhanced stat event handler with workflow mode support and undo tracking
-  const handleStatEvent = useCallback((playerId: number, eventType: string, value?: number, isOpponent: boolean = false) => {
+  const handleStatEvent = useCallback((playerId: number, eventType: string, value?: number, isOpponent: boolean = false, metadata?: any) => {
     const player = players.find(p => p.id === playerId)
     if (!player) return
 
@@ -776,7 +1434,12 @@ const Statistics = () => {
     const previousState = {
       players: players,
       gameState: gameState,
-      events: events
+      events: events,
+      lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime
     }
 
     // DEV-ONLY: Apply foul trouble alert
@@ -784,6 +1447,13 @@ const Statistics = () => {
       // Could show notification here
       console.log(`⚠️ Foul trouble alert: ${player.name} has ${player.fouls + 1} fouls`)
     }
+
+    const pointsForThis = (eventType === 'three_made' ? 3 : eventType === 'ft_made' ? 1 : value || 0)
+    const willScore = (eventType.includes('made') || eventType === 'points') && pointsForThis > 0
+    // Determine bench/scp/pto flags (before state changes)
+    const isBench = starterIdsRef.current.length > 0 ? !starterIdsRef.current.includes(playerId) : false
+    const scp = willScore && (lastPossessionRef.current === 'home') && scpWindowHomeRef.current
+    const pto = willScore && (lastPossessionRef.current === 'away') && ptoWindowHomeRef.current
 
     const newEvent: StatEvent = {
       id: Date.now().toString(),
@@ -793,8 +1463,10 @@ const Statistics = () => {
       eventType,
       value,
       quarter: gameState.quarter,
-      gameTime: (settings.quarterDuration * 60) - gameState.currentTime,
-      opponentEvent: isOpponent
+      // gameTime kept for backward-compat, but downstream views should use timestamp
+      gameTime: Date.now(),
+      opponentEvent: isOpponent,
+      metadata: { ...(metadata || {}), bench: isBench, scp, pto }
     }
 
     setEvents(prev => [newEvent, ...prev])
@@ -850,6 +1522,11 @@ const Statistics = () => {
           updated.fgMade += 1;
           updated.points += 2;
           updated.plusMinus += 2;
+          // Add PIP if metadata indicates it
+          if (metadata?.pip) {
+            updated.pointsInPaint = (updated.pointsInPaint || 0) + 2;
+          }
+          // Note: Assist is now handled by creating a separate assist event
           break;
         case 'three_attempt':
           updated.threeAttempted += 1;
@@ -872,9 +1549,320 @@ const Statistics = () => {
     }));
 
     // Update team score for points
-    if (eventType.includes('made') || eventType === 'points') {
-      const points = eventType === 'three_made' ? 3 : eventType === 'ft_made' ? 1 : value || 2
+    if (willScore) {
+      const points = pointsForThis || 2
       if (isOpponent) {
+        setGameState(prev => ({
+          ...prev,
+          opponentScore: prev.opponentScore + points
+        }))
+      } else {
+        setGameState(prev => ({
+          ...prev,
+          homeScore: prev.homeScore + points
+        }))
+        // Update analytics for home scoring
+        addAnalytics(gameState.quarter, 'home', points, { scp, pto, bench: isBench })
+      }
+    }
+
+    // Add to action history
+    setActionHistory(prev => [{
+      type: 'stat',
+      timestamp: Date.now(),
+      data: { playerId, eventType, value, isOpponent },
+      previousState
+    }, ...prev.slice(0, 49)]) // Keep last 50 actions
+
+    // Auto-save after each stat event
+    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
+    
+    // Enhanced service: Record live stat event
+    if (liveSessionKey) {
+      // Guard: wait until session is active before sending events
+      if (!liveStatService.hasActiveSession || !liveStatService.hasActiveSession()) {
+        message.info('Connecting to live session… please try again in a moment')
+        return
+      }
+      try {
+        liveStatService.recordLiveEvent(
+          eventType,
+          value,
+          playerId,
+          gameState.quarter,
+          Math.max(0, Math.min(3599, Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime))),
+          isOpponent,
+          undefined, // No opponent jersey for team players
+          { playerName: player.name, timestamp: new Date().toISOString(), isOpponent, bench: isBench, scp, pto, ...(metadata || {}) }
+        )
+      } catch (error) {
+        console.error('Failed to record enhanced live event:', error)
+      }
+    }
+  }, [players, gameState.quarter, gameState.currentTime, settings.foulTroubleAlert, actionHistory, liveSessionKey, settings.quarterDuration])
+
+  // Delete event function with stat reversal
+  const handleDeleteEvent = (eventId: string) => {
+    const eventToDelete = events.find(event => event.id === eventId)
+    if (!eventToDelete) return
+
+    // Confirm deletion
+    modal.confirm({
+      title: 'Delete Event',
+      content: `Are you sure you want to delete this ${eventToDelete.eventType} event for ${eventToDelete.playerName}?`,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+              onOk: () => {
+          // Move event to deleted events array instead of permanently removing
+          const eventToDelete = events.find(event => event.id === eventId)
+          if (!eventToDelete) return
+          
+          setDeletedEvents(prev => [...prev, eventToDelete])
+          setEvents(prev => prev.filter(event => event.id !== eventId))
+
+        // Persist deletion as an audit event in Supabase (no reinstatement)
+        if (liveSessionKey) {
+          // Guard: wait until session is active before sending events
+          if (!liveStatService.hasActiveSession || !liveStatService.hasActiveSession()) {
+            console.info('Skipping deletion audit event until session connects')
+            return
+          }
+          try {
+            liveStatService.recordLiveEvent(
+              'deleted_event',
+              undefined,
+              (!!eventToDelete.opponentEvent || (eventToDelete.playerId || 0) <= 0) ? undefined : eventToDelete.playerId,
+              gameState.quarter,
+              Math.max(0, Math.min(3599, Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime))),
+              !!eventToDelete.opponentEvent,
+              undefined,
+              {
+                deletedLocalId: eventToDelete.id,
+                originalEventType: eventToDelete.eventType,
+                originalValue: eventToDelete.value,
+                originalTimestamp: new Date(eventToDelete.timestamp).toISOString(),
+                playerName: eventToDelete.playerName,
+                isOpponent: !!eventToDelete.opponentEvent
+              }
+            )
+          } catch (err) {
+            console.error('Failed to persist deletion event:', err)
+          }
+        }
+
+        // Reverse the stat changes
+        const player = players.find(p => p.id === eventToDelete.playerId)
+        if (player) {
+          setPlayers(prev => prev.map(p => {
+            if (p.id !== eventToDelete.playerId) return p
+            const updated = { ...p }
+            
+            // Reverse the stat changes based on event type
+            switch (eventToDelete.eventType) {
+              case 'points':
+                updated.points -= eventToDelete.value || 2
+                updated.plusMinus -= eventToDelete.value || 2
+                break
+              case 'rebound':
+                updated.rebounds -= 1
+                break
+              case 'offensive_rebound':
+                updated.offensiveRebounds -= 1
+                updated.rebounds -= 1
+                break
+              case 'defensive_rebound':
+                updated.defensiveRebounds -= 1
+                updated.rebounds -= 1
+                break
+              case 'assist':
+                updated.assists -= 1
+                break
+              case 'steal':
+                updated.steals -= 1
+                updated.plusMinus -= 2
+                break
+              case 'block':
+                updated.blocks -= 1
+                break
+              case 'foul':
+                updated.fouls -= 1
+                break
+              case 'turnover':
+                updated.turnovers -= 1
+                updated.plusMinus += 2
+                break
+              case 'charge_taken':
+                updated.chargesTaken -= 1
+                updated.plusMinus -= 2
+                break
+              case 'deflection':
+                updated.deflections -= 1
+                break
+              case 'fg_attempt':
+                updated.fgAttempted -= 1
+                break
+              case 'fg_made':
+                updated.fgMade -= 1
+                updated.points -= 2
+                updated.plusMinus -= 2
+                if (eventToDelete.metadata?.pip) {
+                  updated.pointsInPaint = (updated.pointsInPaint || 0) - 2
+                }
+                break
+              case 'three_attempt':
+                updated.threeAttempted -= 1
+                break
+              case 'three_made':
+                updated.threeMade -= 1
+                updated.points -= 3
+                updated.plusMinus -= 3
+                break
+              case 'ft_attempt':
+                updated.ftAttempted -= 1
+                break
+              case 'ft_made':
+                updated.ftMade -= 1
+                updated.points -= 1
+                updated.plusMinus -= 1
+                break
+            }
+            return updated
+          }))
+        }
+
+        // Reverse team score changes
+        if (eventToDelete.eventType.includes('made') || eventToDelete.eventType === 'points') {
+          const points = eventToDelete.eventType === 'three_made' ? 3 : 
+                        eventToDelete.eventType === 'ft_made' ? 1 : 
+                        eventToDelete.value || 2
+          
+          if (eventToDelete.opponentEvent) {
+            setGameState(prev => ({
+              ...prev,
+              opponentScore: prev.opponentScore - points
+            }))
+          } else {
+            setGameState(prev => ({
+              ...prev,
+              homeScore: prev.homeScore - points
+            }))
+          }
+        }
+
+        message.success('Event deleted and stats reversed')
+      }
+    })
+  }
+
+  // Undo last deleted event
+  const undoLastDeletedEvent = useCallback(() => {
+    if (deletedEvents.length === 0) {
+      message.warning('No deleted events to undo')
+      return
+    }
+
+    const eventToRestore = deletedEvents[deletedEvents.length - 1]
+    
+    // Create a new event with a unique ID to avoid key conflicts
+    const restoredEvent: StatEvent = {
+      ...eventToRestore,
+      id: Date.now().toString() // Generate unique ID consistent with other events
+    }
+    
+    // Restore the event to the events array
+    setEvents(prev => [...prev, restoredEvent])
+    
+    // Remove from deleted events
+    setDeletedEvents(prev => prev.slice(0, -1))
+
+    // Re-apply the stat changes
+    const player = players.find(p => p.id === eventToRestore.playerId)
+    if (player) {
+      setPlayers(prev => prev.map(p => {
+        if (p.id !== eventToRestore.playerId) return p
+        const updated = { ...p }
+        
+        // Re-apply the stat changes based on event type
+        switch (eventToRestore.eventType) {
+          case 'points':
+            updated.points += eventToRestore.value || 2
+            updated.plusMinus += eventToRestore.value || 2
+            break
+          case 'rebound':
+            updated.rebounds += 1
+            break
+          case 'offensive_rebound':
+            updated.offensiveRebounds += 1
+            updated.rebounds += 1
+            break
+          case 'defensive_rebound':
+            updated.defensiveRebounds += 1
+            updated.rebounds += 1
+            break
+          case 'assist':
+            updated.assists += 1
+            break
+          case 'steal':
+            updated.steals += 1
+            updated.plusMinus += 2
+            break
+          case 'block':
+            updated.blocks += 1
+            break
+          case 'foul':
+            updated.fouls += 1
+            break
+          case 'turnover':
+            updated.turnovers += 1
+            updated.plusMinus -= 2
+            break
+          case 'charge_taken':
+            updated.chargesTaken += 1
+            updated.plusMinus += 2
+            break
+          case 'deflection':
+            updated.deflections += 1
+            break
+          case 'fg_attempt':
+            updated.fgAttempted += 1
+            break
+          case 'fg_made':
+            updated.fgMade += 1
+            updated.points += 2
+            updated.plusMinus += 2
+            if (eventToRestore.metadata?.pip) {
+              updated.pointsInPaint = (updated.pointsInPaint || 0) + 2
+            }
+            break
+          case 'three_attempt':
+            updated.threeAttempted += 1
+            break
+          case 'three_made':
+            updated.threeMade += 1
+            updated.points += 3
+            updated.plusMinus += 3
+            break
+          case 'ft_attempt':
+            updated.ftAttempted += 1
+            break
+          case 'ft_made':
+            updated.ftMade += 1
+            updated.points += 1
+            updated.plusMinus += 1
+            break
+        }
+        return updated
+      }))
+    }
+
+    // Re-apply team score changes
+    if (eventToRestore.eventType.includes('made') || eventToRestore.eventType === 'points') {
+      const points = eventToRestore.eventType === 'three_made' ? 3 : 
+                    eventToRestore.eventType === 'ft_made' ? 1 : 
+                    eventToRestore.value || 2
+      
+      if (eventToRestore.opponentEvent) {
         setGameState(prev => ({
           ...prev,
           opponentScore: prev.opponentScore + points
@@ -887,24 +1875,35 @@ const Statistics = () => {
       }
     }
 
-    // Add to action history
-    setActionHistory(prev => [{
-      type: 'stat',
-      timestamp: Date.now(),
-      data: { playerId, eventType, value, isOpponent },
-      previousState
-    }, ...prev.slice(0, 49)]) // Keep last 50 actions
-  }, [players, gameState.quarter, gameState.currentTime, settings.foulTroubleAlert, actionHistory])
+    message.success(`Event restored: ${restoredEvent.eventType} for ${restoredEvent.playerName}`)
+  }, [deletedEvents, players])
 
   // Record opponent stat by jersey number only (no player object updates)
-  const handleOpponentStatEvent = useCallback((jerseyNumber: string, eventType: string, value?: number) => {
+  const handleOpponentStatEvent = useCallback((jerseyNumber: string, eventType: string, value?: number, metadata?: any) => {
     if (!jerseyNumber) return
+
+    // Update opponent fouls if this is a foul event
+    if (eventType === 'foul') {
+      const slotIndex = opponentOnCourt.findIndex(jersey => jersey === jerseyNumber)
+      if (slotIndex !== -1) {
+        setOpponentFouls(prev => {
+          const next = [...prev]
+          next[slotIndex] = (next[slotIndex] || 0) + 1
+          return next
+        })
+      }
+    }
 
     // Save current state for undo
     const previousState = {
       players: players,
       gameState: gameState,
-      events: events
+      events: events,
+      lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime
     }
 
     const newEvent: StatEvent = {
@@ -915,8 +1914,9 @@ const Statistics = () => {
       eventType,
       value,
       quarter: gameState.quarter,
-      gameTime: (settings.quarterDuration * 60) - gameState.currentTime,
-      opponentEvent: true
+      gameTime: Date.now(),
+      opponentEvent: true,
+      metadata: metadata || {}
     }
 
     setEvents(prev => [newEvent, ...prev])
@@ -925,7 +1925,13 @@ const Statistics = () => {
     if (eventType.includes('made') || eventType === 'points') {
       const points = eventType === 'three_made' ? 3 : eventType === 'ft_made' ? 1 : value || 2
       setGameState(prev => ({ ...prev, opponentScore: prev.opponentScore + points }))
+      // Update analytics for away scoring
+      const scp = (lastPossessionRef.current === 'away') && scpWindowAwayRef.current
+      const pto = (lastPossessionRef.current === 'home') && ptoWindowAwayRef.current
+      addAnalytics(gameState.quarter, 'away', points, { scp, pto })
     }
+
+
 
     // Add to action history for undo
     setActionHistory(prev => [{
@@ -934,7 +1940,33 @@ const Statistics = () => {
       data: { jerseyNumber, eventType, value, isOpponent: true },
       previousState
     }, ...prev.slice(0, 49)])
-  }, [players, gameState.quarter, gameState.currentTime, events, settings.quarterDuration])
+
+    // Auto-save after each opponent stat event
+    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
+    
+    // Enhanced service: Record opponent live stat event
+    if (liveSessionKey) {
+      // Guard: wait until session is active before sending events
+      if (!liveStatService.hasActiveSession || !liveStatService.hasActiveSession()) {
+        message.info('Connecting to live session… please try again in a moment')
+        return
+      }
+      try {
+        liveStatService.recordLiveEvent(
+          eventType,
+          value,
+          undefined, // No player ID for opponent
+          gameState.quarter,
+          Math.max(0, Math.min(3599, Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime))),
+          true, // Is opponent event
+          jerseyNumber, // Opponent jersey number
+          { playerName: `#${jerseyNumber}`, timestamp: new Date().toISOString(), isOpponent: true, ...(metadata || {}) }
+        )
+      } catch (error) {
+        console.error('Failed to record enhanced opponent live event:', error)
+      }
+    }
+  }, [players, gameState.quarter, gameState.currentTime, events, settings.quarterDuration, liveSessionKey])
 
   // DEV-ONLY: Auto-export functionality
   useEffect(() => {
@@ -982,11 +2014,21 @@ const Statistics = () => {
       document.body.classList.remove('dark-mode')
     }
   }, [settings.darkMode])
-
   // DEV-ONLY: Enhanced export functionality for game data
-  const exportGameData = (format: 'csv' | 'json' | 'pdf') => {
+  const exportGameData = (format: 'csv' | 'json' | 'pdf' | 'maxpreps') => {
     const gameData: any = {
       exportTime: new Date().toISOString()
+    }
+    if (format === 'maxpreps') {
+      const txtContent = generateMaxPrepsTxt({ players })
+      const dataBlob = new Blob([txtContent], { type: 'text/plain' })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `maxpreps-export-${Date.now()}.txt` // avoid quotes/parentheses
+      link.click()
+      setShowExportModal(false)
+      return
     }
 
     if (settings.includePlayerStats) {
@@ -1009,6 +2051,7 @@ const Statistics = () => {
       link.href = url
       link.download = `game-stats-${Date.now()}.json`
       link.click()
+      setShowExportModal(false)
     } else if (format === 'csv') {
       // DEV-ONLY: Enhanced CSV export with settings
       const csvContent = generateCSV(gameData)
@@ -1017,6 +2060,18 @@ const Statistics = () => {
       const link = document.createElement('a')
       link.href = url
       link.download = `game-stats-${Date.now()}.csv`
+      link.click()
+      setShowExportModal(false)
+    }
+
+    // Also export complete offline data
+    if (format === 'json') {
+      const offlineData = liveStatService.exportOfflineData()
+      const dataBlob = new Blob([offlineData], { type: 'application/json' })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `complete-offline-data-${Date.now()}.json`
       link.click()
     }
   }
@@ -1045,6 +2100,75 @@ const Statistics = () => {
     return [headers, ...rows].map(row => row.join(',')).join('\n')
   }
 
+  // Generate MaxPreps pipe-delimited .txt (basketball)
+  const generateMaxPrepsTxt = ({ players }: { players: Player[] }) => {
+    // Placeholder 32-char Supplier ID line (replace when provided)
+    const supplierId = '00000000000000000000000000000000'
+
+    // Second line: declare fields (Jersey first)
+    const fields = [
+      'Jersey',
+      'MinutesPlayed',
+      'Points',
+      'TwoPointsMade',
+      'TwoPointAttempts',
+      'ThreePointsMade',
+      'ThreePointAttempts',
+      'FreeThrowsMade',
+      'FreeThrowAttempts',
+      'OffensiveRebounds',
+      'DefensiveRebounds',
+      'Rebounds',
+      'Assists',
+      'BlockedShots',
+      'Steals',
+      'Deflections',
+      'Turnovers',
+      'Charges',
+      'PersonalFouls'
+    ]
+
+    const escapeVal = (v: any) => (v === undefined || v === null ? '' : String(v))
+
+    const lines: string[] = []
+    lines.push(supplierId)
+    lines.push(fields.join('|'))
+
+    players.forEach((p) => {
+      // Compute two-point stats from FG - 3PT
+      const twoMade = Math.max(0, (p.fgMade || 0) - (p.threeMade || 0))
+      const twoAtt = Math.max(0, (p.fgAttempted || 0) - (p.threeAttempted || 0))
+      const defReb = p.defensiveRebounds ?? Math.max(0, (p.rebounds || 0) - (p.offensiveRebounds || 0))
+      const totalReb = p.rebounds ?? ((p.offensiveRebounds || 0) + (defReb || 0))
+
+      const row = [
+        escapeVal(p.number),
+        escapeVal(p.minutesPlayed),
+        escapeVal(p.points),
+        escapeVal(twoMade),
+        escapeVal(twoAtt),
+        escapeVal(p.threeMade),
+        escapeVal(p.threeAttempted),
+        escapeVal(p.ftMade),
+        escapeVal(p.ftAttempted),
+        escapeVal(p.offensiveRebounds),
+        escapeVal(defReb),
+        escapeVal(totalReb),
+        escapeVal(p.assists),
+        escapeVal(p.blocks), // BlockedShots
+        escapeVal(p.steals),
+        escapeVal(p.deflections),
+        escapeVal(p.turnovers),
+        escapeVal(p.chargesTaken),
+        escapeVal(p.fouls)
+      ]
+
+      lines.push(row.join('|'))
+    })
+
+    return lines.join('\n') + '\n'
+  }
+
   // DEV-ONLY: Calculate team analytics with advanced stats
   const calculateTeamStats = () => {
     const totalPoints = players.reduce((sum, p) => sum + p.points, 0)
@@ -1056,7 +2180,7 @@ const Statistics = () => {
     const totalSteals = players.reduce((sum, p) => sum + p.steals, 0)
     const totalBlocks = players.reduce((sum, p) => sum + p.blocks, 0)
     
-    const gameTimeElapsed = (settings.quarterDuration * 60) - gameState.currentTime
+    const gameTimeElapsed = Date.now() - gameState.gameStartTime
     const pace = Math.round((totalPoints + gameState.opponentScore) / (gameTimeElapsed / 60) * 40)
     
     return {
@@ -1120,8 +2244,9 @@ const Statistics = () => {
     const newLineup: Lineup = {
       id: Date.now().toString(),
       players: selectedLineupPlayers,
-      startTime: (settings.quarterDuration * 60) - gameState.currentTime,
-      plusMinus: 0
+      startTime: Date.now(),
+      plusMinus: 0,
+      name: lineupName || undefined
     }
 
     setLineups(prev => [...prev, newLineup])
@@ -1137,10 +2262,42 @@ const Statistics = () => {
     })))
   }
 
+  const updateLineup = () => {
+    if (selectedLineupPlayers.length !== 5 || !currentLineup) {
+      return // Need exactly 5 players and existing lineup
+    }
+
+    // Update the current lineup with new players
+    const updatedLineup: Lineup = {
+      ...currentLineup,
+      players: selectedLineupPlayers,
+      name: lineupName || currentLineup.name
+    }
+
+    // Update lineups array
+    setLineups(prev => prev.map(l => 
+      l.id === currentLineup.id ? updatedLineup : l
+    ))
+    
+    // Update current lineup
+    setCurrentLineup(updatedLineup)
+    
+    // Reset form
+    setSelectedLineupPlayers([])
+    setLineupName('')
+    setShowLineupBuilder(false)
+
+    // Update player court status
+    setPlayers(prev => prev.map(p => ({
+      ...p,
+      isOnCourt: selectedLineupPlayers.includes(p.id)
+    })))
+  }
+
   const endCurrentLineup = () => {
     if (!currentLineup) return
 
-    const endTime = (settings.quarterDuration * 60) - gameState.currentTime
+    const endTime = Date.now()
     const lineupDuration = endTime - currentLineup.startTime
     
     // Calculate lineup plus/minus
@@ -1159,6 +2316,64 @@ const Statistics = () => {
     setPlayers(prev => prev.map(p => ({ ...p, isOnCourt: false })))
   }
 
+  // Bulk substitution function
+  const applyBulkSubstitution = () => {
+    if (selectedBulkSubPlayers.length !== 5) {
+      message.error('Please select exactly 5 players for the lineup')
+      return
+    }
+
+    // Check if game is started
+    if (!gameState.isPlaying) {
+      message.info('Please start the game first before making substitutions')
+      setShowBulkSubModal(false)
+      setSelectedBulkSubPlayers([])
+      return
+    }
+
+    // End current lineup if it exists
+    if (currentLineup) {
+      const endTime = Date.now()
+      const lineupDuration = endTime - currentLineup.startTime
+      
+      // Calculate lineup plus/minus
+      const lineupPlayers = players.filter(p => currentLineup.players.includes(p.id))
+      const totalPlusMinus = lineupPlayers.reduce((sum, p) => sum + p.plusMinus, 0)
+
+      setLineups(prev => prev.map(l => 
+        l.id === currentLineup.id 
+          ? { ...l, endTime, plusMinus: totalPlusMinus }
+          : l
+      ))
+    }
+
+    // Create new lineup with selected players
+    const newLineup: Lineup = {
+      id: `bulk-sub-${Date.now()}`,
+      players: selectedBulkSubPlayers,
+      startTime: Date.now(),
+      plusMinus: 0,
+      name: `Bulk Sub ${new Date().toLocaleTimeString()}`
+    }
+
+    setCurrentLineup(newLineup)
+    setLineups(prev => [...prev, newLineup])
+
+    // Update player court status
+    setPlayers(prev => prev.map(p => ({
+      ...p,
+      isOnCourt: selectedBulkSubPlayers.includes(p.id)
+    })))
+
+    // Clear selection and close modal
+    setSelectedBulkSubPlayers([])
+    setShowBulkSubModal(false)
+
+    message.success('Bulk substitution applied successfully!')
+  }
+
+
+
   // DEV-ONLY: Enhanced substitution function with comprehensive tracking
   const substitutePlayer = (playerIn: Player, playerOut: Player) => {
     // Save current state for undo
@@ -1172,7 +2387,7 @@ const Statistics = () => {
 
     // End current lineup if it exists
     if (currentLineup) {
-      const endTime = (settings.quarterDuration * 60) - gameState.currentTime
+      const endTime = Date.now()
       const lineupDuration = endTime - currentLineup.startTime
       
       // Calculate lineup plus/minus
@@ -1194,7 +2409,7 @@ const Statistics = () => {
     const newLineup: Lineup = {
       id: `lineup-${Date.now()}`,
       players: newLineupPlayers,
-      startTime: (settings.quarterDuration * 60) - gameState.currentTime,
+      startTime: Date.now(),
       plusMinus: 0
     }
 
@@ -1213,7 +2428,7 @@ const Statistics = () => {
       playerOut,
       timestamp: Date.now(),
       quarter: gameState.quarter,
-      gameTime: (settings.quarterDuration * 60) - gameState.currentTime,
+      gameTime: Date.now(),
       lineupId: newLineup.id
     }
     setSubstitutionHistory(prev => [substitutionRecord, ...prev.slice(0, 49)]) // Keep last 50
@@ -1226,7 +2441,7 @@ const Statistics = () => {
       playerName: playerIn.name,
       eventType: 'substitution_in',
       quarter: gameState.quarter,
-      gameTime: (settings.quarterDuration * 60) - gameState.currentTime
+      gameTime: Date.now()
     }
 
     const substitutionOutEvent: StatEvent = {
@@ -1236,7 +2451,7 @@ const Statistics = () => {
       playerName: playerOut.name,
       eventType: 'substitution_out',
       quarter: gameState.quarter,
-      gameTime: (settings.quarterDuration * 60) - gameState.currentTime
+      gameTime: Date.now()
     }
 
     const lineupChangeEvent: StatEvent = {
@@ -1246,15 +2461,12 @@ const Statistics = () => {
       playerName: 'TEAM',
       eventType: 'lineup_change',
       quarter: gameState.quarter,
-      gameTime: (settings.quarterDuration * 60) - gameState.currentTime
+      gameTime: Date.now()
     }
 
     setEvents(prev => [substitutionEvent, substitutionOutEvent, lineupChangeEvent, ...prev])
 
-    // Auto-pause game during substitution if enabled
-    if (settings.autoPauseOnTimeout && gameState.isPlaying) {
-      setGameState(prev => ({ ...prev, isPlaying: false }))
-    }
+
 
     // Add to action history for undo
     setActionHistory(prev => [{
@@ -1263,6 +2475,9 @@ const Statistics = () => {
       data: { playerIn, playerOut, newLineup },
       previousState
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
+
+    // Auto-save after substitution
+    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
   }
 
   // DEV-ONLY: Quick substitution handler with undo support
@@ -1273,6 +2488,10 @@ const Statistics = () => {
       gameState: gameState,
       events: events,
       lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime,
       currentLineup: currentLineup
     }
 
@@ -1353,7 +2572,7 @@ const Statistics = () => {
     const totalTurnovers = lineupPlayers.reduce((sum, p) => sum + p.turnovers, 0)
     const totalPlusMinus = lineupPlayers.reduce((sum, p) => sum + p.plusMinus, 0)
     
-    const duration = lineup.endTime ? lineup.endTime - lineup.startTime : (settings.quarterDuration * 60) - gameState.currentTime - lineup.startTime
+    const duration = lineup.endTime ? lineup.endTime - lineup.startTime : Date.now() - lineup.startTime
     const minutesPlayed = Math.round(duration / 60 * 10) / 10
 
     return {
@@ -1377,8 +2596,177 @@ const Statistics = () => {
     return players.filter(p => p.isOnCourt)
   }
 
+  // Function to collapse the sidebar
+  const collapseSidebar = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-collapsed', 'true')
+      setSidebarCollapsed(true)
+      // Dispatch custom event to notify layout component
+      window.dispatchEvent(new CustomEvent('sidebar-toggle'))
+    }
+  }
+
+  // Listen for sidebar toggle events to update state
+  useEffect(() => {
+    const handleSidebarToggle = () => {
+      // Check localStorage to determine current sidebar state
+      const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true'
+      setSidebarCollapsed(isCollapsed)
+    }
+    
+    // Listen for sidebar toggle events from the layout
+    window.addEventListener('sidebar-toggle', handleSidebarToggle)
+    
+    // Initialize sidebar state on mount
+    handleSidebarToggle()
+    
+    return () => {
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle)
+    }
+  }, [])
+
   const toggleGame = () => {
-    setGameState(prev => ({ ...prev, isPlaying: !prev.isPlaying }))
+    // Require exactly 5 players on court to start; no starters prerequisite here
+    if (!gameState.isPlaying) {
+      const onCourt = players.filter(p => p.isOnCourt)
+      if (onCourt.length !== 5) {
+        message.warning('You need exactly 5 players on the court to start the game')
+        return
+      }
+    }
+    
+    const newIsPlaying = !gameState.isPlaying
+    
+    // Save current state for undo
+    const previousState = {
+      players: players,
+      gameState: gameState,
+      events: events,
+      lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime
+    }
+    
+    setGameState(prev => ({ ...prev, isPlaying: newIsPlaying }))
+    
+    if (newIsPlaying) {
+      // Starting the quarter - log timestamp
+      const startTime = Date.now()
+      setQuarterStartTime(startTime)
+      
+      // Mark that the game has started (for the first time)
+      if (!hasGameStarted) {
+        setHasGameStarted(true)
+        setGameState(prev => ({ ...prev, gameStartTime: startTime }))
+      }
+      
+      console.log(`Quarter ${gameState.quarter} started at:`, new Date(startTime).toLocaleTimeString())
+
+      // Capture starters at the first Q1 start only
+      if (gameState.quarter === 1 && starterIdsRef.current.length === 0) {
+        starterIdsRef.current = players.filter(p => p.isOnCourt).map(p => p.id)
+      }
+      
+      // Add start event to play by play
+      const startEvent: StatEvent = {
+        id: `start-${Date.now()}`,
+        timestamp: startTime,
+        playerId: 0,
+        playerName: 'GAME',
+        eventType: `Q${gameState.quarter} STARTED`,
+        quarter: gameState.quarter,
+        gameTime: gameState.currentTime,
+        opponentEvent: false
+      }
+      setEvents(prev => [startEvent, ...prev])
+      
+      // Add to action history for undo
+      setActionHistory(prev => [{
+        type: 'quarter',
+        timestamp: Date.now(),
+        data: { action: 'start', quarter: gameState.quarter, startTime },
+        previousState
+      }, ...prev.slice(0, 49)]) // Keep last 50 actions
+      
+      // Enhanced service: Update game state
+      if (liveSessionKey) {
+        try {
+          liveStatService.updateGameState({
+            quarter: gameState.quarter,
+            currentTime: gameState.currentTime,
+            homeScore: gameState.homeScore,
+            awayScore: gameState.opponentScore,
+            opponentScore: gameState.opponentScore,
+            timeoutHome: gameState.timeoutHome,
+            timeoutAway: gameState.timeoutAway,
+            isPlaying: true
+          })
+        } catch (error) {
+          console.error('Failed to update enhanced game state on start:', error)
+        }
+      }
+    } else {
+      // Stopping the quarter - log timestamp and enable report if applicable
+      const stopTime = Date.now()
+      const duration = quarterStartTime ? stopTime - quarterStartTime : 0
+      console.log(`Quarter ${gameState.quarter} stopped at:`, new Date(stopTime).toLocaleTimeString())
+      console.log(`Quarter duration:`, Math.round(duration / 1000), 'seconds')
+      
+      // Add stop event to play by play
+      const stopEvent: StatEvent = {
+        id: `stop-${Date.now()}`,
+        timestamp: stopTime,
+        playerId: 0,
+        playerName: 'GAME',
+        eventType: `Q${gameState.quarter} STOPPED`,
+        quarter: gameState.quarter,
+        gameTime: gameState.currentTime,
+        opponentEvent: false
+      }
+      setEvents(prev => [stopEvent, ...prev])
+      
+      // Add to action history for undo
+      setActionHistory(prev => [{
+        type: 'quarter',
+        timestamp: Date.now(),
+        data: { action: 'stop', quarter: gameState.quarter, stopTime, duration },
+        previousState
+      }, ...prev.slice(0, 49)]) // Keep last 50 actions
+      
+      // Enhanced service: Update game state
+      if (liveSessionKey) {
+        try {
+          liveStatService.updateGameState({
+            quarter: gameState.quarter,
+            currentTime: gameState.currentTime,
+            homeScore: gameState.homeScore,
+            awayScore: gameState.opponentScore,
+            opponentScore: gameState.opponentScore,
+            timeoutHome: gameState.timeoutHome,
+            timeoutAway: gameState.timeoutAway,
+            isPlaying: false
+          })
+          // Push analytics snapshot at quarter stop
+          refinedLiveStatTrackerService.updateAnalytics({ byQuarter: analyticsTotals })
+        } catch (error) {
+          console.error('Failed to update enhanced game state on stop:', error)
+        }
+      }
+      
+      // Enable report button if it's visible and this is Q2
+      if (showReportButton && gameState.quarter === 2) {
+        setIsReportEnabled(true)
+      }
+
+      // Reset possession windows on stop
+      scpWindowHomeRef.current = false
+      scpWindowAwayRef.current = false
+      ptoWindowHomeRef.current = false
+      ptoWindowAwayRef.current = false
+      lastPossessionRef.current = null
+    }
   }
 
   const resetGame = () => {
@@ -1390,32 +2778,87 @@ const Statistics = () => {
       awayScore: 0,
       opponentScore: 0,
       timeoutHome: settings.timeoutCount,
-      timeoutAway: settings.timeoutCount
+      timeoutAway: settings.timeoutCount,
+      gameStartTime: Date.now(),
+      teamFoulsHome: 0,
+      teamFoulsAway: 0
     })
     setPlayers(prev => prev.map(p => ({ 
       ...p, 
       minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, 
       assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, 
       threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, 
-      chargesTaken: 0, deflections: 0, isOnCourt: false 
+      chargesTaken: 0, deflections: 0, isOnCourt: false, isStarter: false, isMainRoster: false 
     })))
     setEvents([])
     setLineups([])
+    setOpponentOnCourt(['', '', '', '', ''])
+    setSelectedOpponentSlot(null)
+    setOpponentFouls([0, 0, 0, 0, 0])
+    setHasGameStarted(false)
   }
-
   const nextQuarter = () => {
+    // Guards: don't allow advancing if game not started or not enough players on court
+    if (!hasGameStarted) {
+      message.warning('Start the game before advancing to next quarter')
+      return
+    }
+    const onCourt = players.filter(p => p.isOnCourt)
+    if (onCourt.length !== 5) {
+      message.warning('You need exactly 5 players on the court to advance to next quarter')
+      return
+    }
+
     // Save current state for undo
     const previousState = {
       players: players,
       gameState: gameState,
-      events: events
+      events: events,
+      lineups: lineups,
+      opponentOnCourt: opponentOnCourt,
+      substitutionHistory: substitutionHistory,
+      quickSubHistory: quickSubHistory,
+      quarterStartTime: quarterStartTime,
+      showReportButton: showReportButton,
+      isReportEnabled: isReportEnabled
     }
 
-    setGameState(prev => ({
-      ...prev,
-      quarter: Math.min(prev.quarter + 1, settings.totalQuarters),
-      currentTime: settings.quarterDuration * 60
-    }))
+    // If regulation completed and not in OT: only suggest OT; do not auto-end
+    if (gameState.quarter >= settings.totalQuarters && !gameState.isOvertime && gameState.homeScore !== gameState.opponentScore) {
+      // Not tied: leave end-of-game to the End Game button
+      message.info('Regulation finished. Use End Game to finalize or Overtime if tied.')
+      return
+    }
+
+    setGameState(prev => {
+      const next = prev.quarter + 1
+      const isOT = next > (prev.regulationQuarters || settings.totalQuarters)
+      const otNum = isOT ? (next - (prev.regulationQuarters || settings.totalQuarters)) : 0
+      return {
+        ...prev,
+        quarter: isOT ? next : Math.min(next, settings.totalQuarters),
+        isOvertime: isOT,
+        overtimeNumber: otNum
+      }
+    })
+    
+    // Enhanced service: Update game state
+    if (liveSessionKey) {
+      try {
+        liveStatService.updateGameState({
+          quarter: gameState.quarter + 1,
+          currentTime: gameState.currentTime,
+          homeScore: gameState.homeScore,
+          awayScore: gameState.opponentScore,
+          opponentScore: gameState.opponentScore,
+          timeoutHome: gameState.timeoutHome,
+          timeoutAway: gameState.timeoutAway,
+          isPlaying: true
+        })
+      } catch (error) {
+        console.error('Failed to update enhanced game state:', error)
+      }
+    }
     
     // DEV-ONLY: Auto-pause on quarter end if enabled
     if (settings.autoPauseOnQuarterEnd) {
@@ -1426,9 +2869,321 @@ const Statistics = () => {
     setActionHistory(prev => [{
       type: 'quarter',
       timestamp: Date.now(),
-      data: { quarter: gameState.quarter + 1 },
+      data: { quarter: gameState.quarter + 1, action: 'next_quarter' },
       previousState
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
+    
+    // Add next quarter event to play by play
+    const nextQtrEvent: StatEvent = {
+      id: `nextqtr-${Date.now()}`,
+      timestamp: Date.now(),
+      playerId: 0,
+      playerName: 'GAME',
+      eventType: `ADVANCED TO Q${gameState.quarter + 1}`,
+      quarter: gameState.quarter,
+      gameTime: gameState.currentTime,
+      opponentEvent: false
+    }
+    setEvents(prev => [nextQtrEvent, ...prev])
+    
+    // Show report button only when advancing to Q2
+    if (gameState.quarter === 1) {
+      setShowReportButton(true)
+      setIsReportEnabled(false) // Disabled until stop is clicked
+    }
+
+    // Record real-time start for new quarter
+    setQuarterStartTime(Date.now())
+  }
+
+  const handleReportClick = () => {
+    if (isReportEnabled) {
+      // Add halftime report event to play by play
+      const halftimeEvent: StatEvent = {
+        id: `halftime-${Date.now()}`,
+        timestamp: Date.now(),
+        playerId: 0,
+        playerName: 'GAME',
+        eventType: 'HALFTIME REPORT',
+        quarter: gameState.quarter,
+        gameTime: gameState.currentTime,
+        opponentEvent: false
+      }
+      setEvents(prev => [halftimeEvent, ...prev])
+      
+      setShowHalftimeReport(true)
+    }
+  }
+
+  // Start Overtime period
+  const startOvertime = () => {
+    const regulation = gameState.regulationQuarters || settings.totalQuarters
+    const nextQuarterNumber = Math.max(gameState.quarter + 1, regulation + 1)
+    const nextOt = nextQuarterNumber - regulation
+    setGameState(prev => ({
+      ...prev,
+      isPlaying: false,
+      quarter: nextQuarterNumber,
+      isOvertime: true,
+      overtimeNumber: nextOt
+    }))
+
+    const startEvent: StatEvent = {
+      id: `otstart-${Date.now()}`,
+      timestamp: Date.now(),
+      playerId: 0,
+      playerName: 'GAME',
+      eventType: `OT${nextOt} STARTED`,
+      quarter: nextQuarterNumber,
+      gameTime: 0,
+      opponentEvent: false
+    }
+    setEvents(prev => [startEvent, ...prev])
+
+    if (liveSessionKey) {
+      try {
+        liveStatService.updateGameState({
+          quarter: nextQuarterNumber,
+          currentTime: gameState.currentTime,
+          homeScore: gameState.homeScore,
+          awayScore: gameState.opponentScore,
+          opponentScore: gameState.opponentScore,
+          timeoutHome: gameState.timeoutHome,
+          timeoutAway: gameState.timeoutAway,
+          isPlaying: false
+        })
+      } catch (e) {}
+    }
+  }
+
+  const handlePipConfirm = (isPip: boolean) => {
+    if (pendingPipEvent) {
+      const { eventType, playerId, isOpponent, opponentSlot } = pendingPipEvent
+      
+      // After points in paint, ask about assist
+      setPendingAssistEvent({ eventType, playerId, isOpponent, opponentSlot, pip: isPip })
+      setShowAssistModal(true)
+    }
+    
+    setShowPipModal(false)
+    setPendingPipEvent(null)
+  }
+
+  const handleAssistConfirm = (assistPlayerId: number | string | null) => {
+    if (pendingAssistEvent) {
+      const { eventType, playerId, isOpponent, opponentSlot, pip } = pendingAssistEvent
+      
+      if (isOpponent) {
+        // For opponent players, record the field goal made with assist metadata
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], eventType, eventType === 'three_made' ? 3 : 2, { pip, assist: assistPlayerId })
+        
+        // If there's an assist, record it for the assisting opponent player
+        if (assistPlayerId && typeof assistPlayerId === 'string' && assistPlayerId.startsWith('opponent-')) {
+          const assistSlotIndex = parseInt(assistPlayerId.split('-')[1])
+          handleOpponentStatEvent(opponentOnCourt[assistSlotIndex], 'assist', 1)
+        }
+      } else if (playerId) {
+        // First, record the field goal made with assist metadata
+        handleStatEvent(playerId, eventType, eventType === 'three_made' ? 3 : 2, false, { pip, assist: assistPlayerId })
+        
+        // Then, if there's an assist, create a separate assist event for the assist player
+        if (assistPlayerId && typeof assistPlayerId === 'number') {
+          handleStatEvent(assistPlayerId, 'assist', 1, false)
+        }
+      }
+    }
+    
+    setShowAssistModal(false)
+    setPendingAssistEvent(null)
+  }
+
+  const handleReboundConfirm = (reboundPlayerId: number | null, isOpponent: boolean = false) => {
+    if (pendingReboundEvent) {
+      const { eventType, playerId, isOpponent: originalIsOpponent, opponentSlot } = pendingReboundEvent
+      
+      // First record the missed shot
+      if (originalIsOpponent) {
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], eventType)
+      } else if (playerId) {
+        handleStatEvent(playerId, eventType)
+      }
+      
+      // Then record the rebound if someone got it
+      if (reboundPlayerId) {
+        if (isOpponent) {
+          // Find the opponent player by slot
+          const opponentPlayer = opponentOnCourt[reboundPlayerId]
+          if (opponentPlayer) {
+            handleOpponentStatEvent(opponentPlayer, 'rebound')
+          }
+        } else {
+          handleStatEvent(reboundPlayerId, 'rebound')
+        }
+      }
+
+      // Update possession windows
+      if (reboundPlayerId) {
+        if (isOpponent) {
+          lastPossessionRef.current = 'away'
+          if (originalIsOpponent) {
+            scpWindowAwayRef.current = true
+          } else {
+            scpWindowHomeRef.current = false
+            ptoWindowHomeRef.current = false
+          }
+        } else {
+          lastPossessionRef.current = 'home'
+          if (!originalIsOpponent) {
+            scpWindowHomeRef.current = true
+          } else {
+            scpWindowAwayRef.current = false
+            ptoWindowAwayRef.current = false
+          }
+        }
+      }
+    }
+    
+    setShowReboundModal(false)
+    setPendingReboundEvent(null)
+  }
+
+  const handleStealConfirm = (turnoverPlayerId: number | null, isOpponent: boolean = false) => {
+    if (pendingStealEvent) {
+      const { playerId, isOpponent: originalIsOpponent, opponentSlot } = pendingStealEvent
+      
+      // First record the steal for the stealing player
+      if (originalIsOpponent) {
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], 'steal')
+      } else if (playerId) {
+        handleStatEvent(playerId, 'steal')
+      }
+      
+      // Then record the turnover for the player who turned it over
+      if (turnoverPlayerId) {
+        if (isOpponent) {
+          // Find the opponent player by slot
+          const opponentPlayer = opponentOnCourt[turnoverPlayerId]
+          if (opponentPlayer) {
+            handleOpponentStatEvent(opponentPlayer, 'turnover')
+          }
+        } else {
+          handleStatEvent(turnoverPlayerId, 'turnover')
+        }
+      }
+    }
+    
+    setShowStealModal(false)
+    setPendingStealEvent(null)
+  }
+
+  const handleTurnoverConfirm = (stealPlayerId: number | null, isOpponent: boolean = false) => {
+    if (pendingTurnoverEvent) {
+      const { playerId, isOpponent: originalIsOpponent, opponentSlot } = pendingTurnoverEvent
+      
+      // First record the turnover for the player who turned it over
+      if (originalIsOpponent) {
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], 'turnover')
+      } else if (playerId) {
+        handleStatEvent(playerId, 'turnover')
+      }
+      
+      // Then record the steal for the player who stole it (if any)
+      if (stealPlayerId) {
+        if (isOpponent) {
+          // Find the opponent player by slot
+          const opponentPlayer = opponentOnCourt[stealPlayerId]
+          if (opponentPlayer) {
+            handleOpponentStatEvent(opponentPlayer, 'steal')
+          }
+        } else {
+          handleStatEvent(stealPlayerId, 'steal')
+        }
+      }
+
+      // Update PTO windows and possession
+      if (originalIsOpponent) {
+        // Opponent committed turnover -> our possession
+        lastPossessionRef.current = 'home'
+        ptoWindowHomeRef.current = true
+        scpWindowAwayRef.current = false
+      } else {
+        // We committed turnover -> opponent possession
+        lastPossessionRef.current = 'away'
+        ptoWindowAwayRef.current = true
+        scpWindowHomeRef.current = false
+      }
+    }
+    
+    setShowTurnoverModal(false)
+    setPendingTurnoverEvent(null)
+  }
+
+  const handleFoulConfirm = (isOffensive: boolean) => {
+    if (pendingFoulEvent) {
+      const { playerId, isOpponent, opponentSlot } = pendingFoulEvent
+      
+      // Record the individual player foul
+      if (isOpponent) {
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], 'foul', 1, { isOffensive })
+      } else if (playerId) {
+        handleStatEvent(playerId, 'foul', 1, false, { isOffensive })
+      }
+      
+      // Only defensive fouls count towards team fouls
+      if (!isOffensive) {
+        setGameState(prev => ({
+          ...prev,
+          teamFoulsHome: isOpponent ? prev.teamFoulsHome : prev.teamFoulsHome + 1,
+          teamFoulsAway: isOpponent ? prev.teamFoulsAway + 1 : prev.teamFoulsAway
+        }))
+      }
+    }
+    
+    setShowFoulModal(false)
+    setPendingFoulEvent(null)
+  }
+
+  const handleBlockConfirm = (blockedPlayerId: number | string | null) => {
+    if (pendingBlockEvent) {
+      const { playerId, isOpponent, opponentSlot } = pendingBlockEvent
+      
+      // Record the block for the blocking player
+      if (isOpponent) {
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], 'block', 1)
+      } else if (playerId) {
+        handleStatEvent(playerId, 'block', 1, false)
+      }
+      
+      // Record the missed shot for the blocked player
+      if (blockedPlayerId) {
+        if (typeof blockedPlayerId === 'string' && blockedPlayerId.startsWith('opponent-')) {
+          // Blocked an opponent player
+          const blockedSlotIndex = parseInt(blockedPlayerId.split('-')[1])
+          handleOpponentStatEvent(opponentOnCourt[blockedSlotIndex], 'fg_missed', 1)
+        } else if (typeof blockedPlayerId === 'number') {
+          // Blocked a home team player
+          handleStatEvent(blockedPlayerId, 'fg_missed', 1, false)
+        }
+      }
+    }
+    
+    setShowBlockModal(false)
+    setPendingBlockEvent(null)
+  }
+
+  const handleHalftimeResume = () => {
+    setShowHalftimeReport(false)
+    // Advance to Q3 and reset report button state
+    setGameState(prev => ({
+      ...prev,
+      quarter: 3,
+      teamFoulsHome: 0,    // Team fouls reset at halftime
+      teamFoulsAway: 0     // Team fouls reset at halftime
+      // Note: Individual player fouls do NOT reset at halftime
+    }))
+    setShowReportButton(false)
+    setIsReportEnabled(false)
+    setQuarterStartTime(null)
   }
 
   const teamStats = calculateTeamStats()
@@ -1442,135 +3197,289 @@ const Statistics = () => {
   const halftimeData = generateHalftimeInsights()
   const timeoutData = generateTimeoutInsights()
 
-  // DEV-ONLY: Enhanced player columns with settings
+  // Analytics table: helper tooltips for column titles
+  const columnHelp: Record<string, string> = {
+    name: 'Player name.',
+    number: 'Jersey number.',
+    position: 'Player position.',
+    points: 'Total points scored.',
+    rebounds: 'Total rebounds (offensive + defensive).',
+    assists: 'Total assists.',
+    steals: 'Total steals.',
+    blocks: 'Total blocks.',
+    turnovers: 'Total turnovers.',
+    fgPercentage: 'Field goal percentage: FG made / FG attempted.',
+    plusMinus: 'Team point differential while the player is on court.',
+    efficiency: 'EFF = PTS + REB + AST + STL + BLK − TO − PF.'
+  }
+
+  // DEV-ONLY: Enhanced player columns with settings, sortable, header tooltips (no click for sorting)
   const playerColumns = [
-    { title: 'Player', dataIndex: 'name', key: 'name' },
-    ...(settings.showPlayerNumbers ? [{ title: '#', dataIndex: 'number', key: 'number' }] : []),
-    ...(settings.showPositions ? [{ title: 'Pos', dataIndex: 'position', key: 'position' }] : []),
-    { title: 'PTS', dataIndex: 'points', key: 'points' },
-    { title: 'REB', dataIndex: 'rebounds', key: 'rebounds' },
-    { title: 'AST', dataIndex: 'assists', key: 'assists' },
-    { title: 'STL', dataIndex: 'steals', key: 'steals' },
-    { title: 'BLK', dataIndex: 'blocks', key: 'blocks' },
-    { title: 'TO', dataIndex: 'turnovers', key: 'turnovers' },
-    { title: 'FG%', key: 'fgPercentage', render: (text: any, record: Player) => 
-      record.fgAttempted > 0 ? `${Math.round((record.fgMade / record.fgAttempted) * 100)}%` : '0%'
+    { 
+      title: (<Tooltip title={columnHelp.name}><span>Player</span></Tooltip>),
+      dataIndex: 'name', key: 'name',
+      sorter: (a: Player, b: Player) => a.name.localeCompare(b.name),
+      width: 150
     },
-    { title: '+/-', dataIndex: 'plusMinus', key: 'plusMinus' },
+    ...(settings.showPlayerNumbers ? [{ 
+      title: (<Tooltip title={columnHelp.number}><span>#</span></Tooltip>),
+      dataIndex: 'number', key: 'number',
+      sorter: (a: Player, b: Player) => Number(a.number) - Number(b.number),
+      width: 60
+    }] : []),
+    ...(settings.showPositions ? [{ 
+      title: (<Tooltip title={columnHelp.position}><span>Pos</span></Tooltip>),
+      dataIndex: 'position', key: 'position',
+      sorter: (a: Player, b: Player) => (a.position || '').localeCompare(b.position || ''),
+      width: 75
+    }] : []),
+    { 
+      title: (<Tooltip title={columnHelp.points}><span>PTS</span></Tooltip>), 
+      dataIndex: 'points', 
+      key: 'points', 
+      sorter: (a: Player, b: Player) => a.points - b.points,
+      render: (text: any, record: Player) => record.points === 0 ? '' : record.points
+    },
+
+    { 
+      title: (<Tooltip title={columnHelp.rebounds}><span>REB</span></Tooltip>), 
+      dataIndex: 'rebounds', 
+      key: 'rebounds', 
+      sorter: (a: Player, b: Player) => a.rebounds - b.rebounds,
+      render: (text: any, record: Player) => record.rebounds === 0 ? '' : record.rebounds
+    },
+    { 
+      title: (<Tooltip title={columnHelp.assists}><span>AST</span></Tooltip>), 
+      dataIndex: 'assists', 
+      key: 'assists', 
+      sorter: (a: Player, b: Player) => a.assists - b.assists,
+      render: (text: any, record: Player) => record.assists === 0 ? '' : record.assists
+    },
+    { 
+      title: (<Tooltip title={columnHelp.steals}><span>STL</span></Tooltip>), 
+      dataIndex: 'steals', 
+      key: 'steals', 
+      sorter: (a: Player, b: Player) => a.steals - b.steals,
+      render: (text: any, record: Player) => record.steals === 0 ? '' : record.steals
+    },
+    { 
+      title: (<Tooltip title={columnHelp.blocks}><span>BLK</span></Tooltip>), 
+      dataIndex: 'blocks', 
+      key: 'blocks', 
+      sorter: (a: Player, b: Player) => a.blocks - b.blocks,
+      render: (text: any, record: Player) => record.blocks === 0 ? '' : record.blocks
+    },
+    { 
+      title: (<Tooltip title={columnHelp.turnovers}><span>TO</span></Tooltip>), 
+      dataIndex: 'turnovers', 
+      key: 'turnovers', 
+      sorter: (a: Player, b: Player) => a.turnovers - b.turnovers,
+      render: (text: any, record: Player) => record.turnovers === 0 ? '' : record.turnovers
+    },
+    { 
+      title: (<Tooltip title="Personal Fouls"><span>PF</span></Tooltip>), 
+      dataIndex: 'fouls', 
+      key: 'fouls', 
+      sorter: (a: Player, b: Player) => a.fouls - b.fouls,
+      render: (text: any, record: Player) => record.fouls === 0 ? '' : record.fouls
+    },
+    { 
+      title: (<Tooltip title={columnHelp.fgPercentage}><span>FG</span></Tooltip>), key: 'fgPercentage',
+      render: (text: any, record: Player) => record.fgAttempted > 0 ? `${Math.round((record.fgMade / record.fgAttempted) * 100)}%` : '0%',
+      sorter: (a: Player, b: Player) => {
+        const aPct = a.fgAttempted > 0 ? a.fgMade / a.fgAttempted : 0
+        const bPct = b.fgAttempted > 0 ? b.fgMade / b.fgAttempted : 0
+        return aPct - bPct
+      }
+    },
+    { 
+      title: (<Tooltip title={columnHelp.plusMinus}><span>+/-</span></Tooltip>), 
+      dataIndex: 'plusMinus', 
+      key: 'plusMinus', 
+      sorter: (a: Player, b: Player) => a.plusMinus - b.plusMinus,
+      render: (text: any, record: Player) => record.plusMinus === 0 ? '' : record.plusMinus,
+      width: 70
+    },
     ...(settings.showEfficiencyRatings ? [{ 
-      title: 'EFF', 
+      title: (<Tooltip title={columnHelp.efficiency}><span>EFF</span></Tooltip>),
       key: 'efficiency', 
       render: (text: any, record: Player) => {
         const efficiency = record.points + record.rebounds + record.assists + record.steals + record.blocks - record.turnovers - record.fouls
         return efficiency >= settings.efficiencyThreshold ? '⭐' : efficiency
+      },
+      sorter: (a: Player, b: Player) => {
+        const effA = a.points + a.rebounds + a.assists + a.steals + a.blocks - a.turnovers - a.fouls
+        const effB = b.points + b.rebounds + b.assists + b.steals + b.blocks - b.turnovers - b.fouls
+        return effA - effB
       }
     }] : [])
   ]
-
   // DEV-ONLY: Create tabs items for modern API
   const tabItems = [
     {
       key: 'tracking',
       label: 'Live Tracking',
       children: (
-        <Row gutter={[16, 8]}>
-          {settings.workflowMode === 'player-first' ? (
-            <>
-              <Col span={12}>
-                {/* Player box */}
-                 <Card title="Player" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
+        <>
+          <Row gutter={[16, 8]}>
+            <Col span={24}>
+      
+            </Col>
+          </Row>
+          <Row gutter={[16, 8]} style={{ flexWrap: 'nowrap' }}>
+            <Col flex="1" style={{ minWidth: 0 }}>
+                  {/* Player box */}
+                   <Card 
+                     title="Player" 
+                     size="default" 
+                     styles={{ body: { padding: 8 } }}
+                   >
                      <Row gutter={[8, 6]}>
                     <Col span={12}>
-                      {players.slice(0, 3).map(player => (
-                        <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`} style={{ padding: 6, margin: '2px 0' }}>
-                          <div onClick={() => setSelectedPlayer(player)} style={{ cursor: 'pointer', flex: 1 }}>
-                            <Text strong style={{ fontSize: settings.compactMode ? '0.8rem' : '0.9rem' }}>{settings.showPlayerNumbers && `#${player.number} `}{player.name}</Text>
-                            {settings.showPositions && (<><br /><Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}>{player.position}</Text></>)}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                            <div>
-                              <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
-                              <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> PTS</Text>
-                              <br />
-                              <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
-                              <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> +/-</Text>
+                      {currentLineup ? (
+                        // Show selected players when lineup is active
+                        currentLineup.players.slice(0, 3).map(playerId => {
+                          const player = players.find(p => p.id === playerId)
+                          if (!player) return null
+                          return (
+                            <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`} style={{ padding: 6, margin: '2px 0' }}>
+                              <div onClick={() => selectPlayer(player)} style={{ cursor: 'pointer', flex: 1 }}>
+                                <Text strong style={{ fontSize: '0.9rem' }}>{settings.showPlayerNumbers && `#${player.number} `}{player.name}</Text>
+                                {settings.showPositions && (<><br /><Text type="secondary" style={{ fontSize: '0.8rem' }}>{player.position} | Fouls: {player.fouls}</Text></>)}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                                <div>
+                                  <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
+                                  <Text type="secondary" style={{ fontSize: '0.8rem' }}> PTS</Text>
+                                  <br />
+                                  <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
+                                  <Text type="secondary" style={{ fontSize: '0.8rem' }}> +/-</Text>
+                                </div>
+                              </div>
                             </div>
-                            {player.isOnCourt && (
-                              <Button 
-                                type="primary"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSubstitution(player)
-                                }}
-                                style={{ 
-                                  fontSize: '0.7rem', 
-                                  height: 24, 
-                                  padding: '0 8px',
-                                  backgroundColor: '#ff4d4f',
-                                  borderColor: '#ff4d4f'
-                                }}
-                              >
-                                Sub
-                              </Button>
-                            )}
+                          )
+                        })
+                      ) : (
+                        // Show empty player boxes when no lineup selected
+                        Array.from({ length: 3 }, (_, index) => (
+                          <div 
+                            key={index} 
+                            className={style.playerCard} 
+                            onClick={() => setShowLineupBuilder(true)}
+                            style={{ 
+                            padding: 6, 
+                            margin: '2px 0',
+                            border: '2px dashed #666',
+                            background: '#333',
+                            minHeight: '60px',
+                            display: 'flex',
+                            alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#444'
+                              e.currentTarget.style.borderColor = '#888'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#333'
+                              e.currentTarget.style.borderColor = '#666'
+                            }}
+                          >
+                            <Text type="secondary" style={{ fontSize: '0.9rem', color: '#999' }}>
+                              Select Player {index + 1}
+                            </Text>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </Col>
                     <Col span={12}>
-                      {players.slice(3, 5).map(player => (
-                        <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`} style={{ padding: 6, margin: '2px 0' }}>
-                          <div onClick={() => setSelectedPlayer(player)} style={{ cursor: 'pointer', flex: 1 }}>
-                            <Text strong style={{ fontSize: settings.compactMode ? '0.8rem' : '0.9rem' }}>{settings.showPlayerNumbers && `#${player.number} `}{player.name}</Text>
-                            {settings.showPositions && (<><br /><Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}>{player.position}</Text></>)}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                            <div>
-                              <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
-                              <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> PTS</Text>
-                              <br />
-                              <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
-                              <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> +/-</Text>
+                      {currentLineup ? (
+                        // Show selected players when lineup is active
+                        currentLineup.players.slice(3, 5).map(playerId => {
+                          const player = players.find(p => p.id === playerId)
+                          if (!player) return null
+                          return (
+                            <div key={player.id} className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`} style={{ padding: 6, margin: '2px 0' }}>
+                              <div onClick={() => selectPlayer(player)} style={{ cursor: 'pointer', flex: 1 }}>
+                                <Text strong style={{ fontSize: '0.9rem' }}>{settings.showPlayerNumbers && `#${player.number} `}{player.name}</Text>
+                                {settings.showPositions && (<><br /><Text type="secondary" style={{ fontSize: '0.8rem' }}>{player.position} | Fouls: {player.fouls}</Text></>)}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                                <div>
+                                  <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
+                                  <Text type="secondary" style={{ fontSize: '0.8rem' }}> PTS</Text>
+                                  <br />
+                                  <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
+                                  <Text type="secondary" style={{ fontSize: '0.8rem' }}> +/-</Text>
+                                </div>
+                              </div>
                             </div>
-                            {player.isOnCourt && (
-                              <Button 
-                                type="primary"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSubstitution(player)
-                                }}
-                                style={{ 
-                                  fontSize: '0.7rem', 
-                                  height: 24, 
-                                  padding: '0 8px',
-                                  backgroundColor: '#ff4d4f',
-                                  borderColor: '#ff4d4f'
-                                }}
-                              >
-                                Sub
-                              </Button>
-                            )}
+                          )
+                        })
+                      ) : (
+                        // Show empty player boxes when no lineup selected
+                        Array.from({ length: 2 }, (_, index) => (
+                          <div 
+                            key={index + 3} 
+                            className={style.playerCard} 
+                            onClick={() => setShowLineupBuilder(true)}
+                            style={{ 
+                            padding: 6, 
+                            margin: '2px 0',
+                            border: '2px dashed #666',
+                            background: '#333',
+                            minHeight: '60px',
+                            display: 'flex',
+                            alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#444'
+                              e.currentTarget.style.borderColor = '#888'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#333'
+                              e.currentTarget.style.borderColor = '#666'
+                            }}
+                          >
+                            <Text type="secondary" style={{ fontSize: '0.9rem', color: '#999' }}>
+                              Select Player {index + 4}
+                            </Text>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                       <div style={{ marginTop: 8 }}>
                         <Button type="primary" icon={<TeamOutlined />} onClick={() => {
                           if (!currentLineup) {
-                            const firstFivePlayers = players.slice(0, 5).map(p => p.id)
-                            const newLineup = { id: `lineup-${Date.now()}`, players: firstFivePlayers, startTime: gameState.currentTime, plusMinus: 0 }
-                            setCurrentLineup(newLineup)
-                            setLineups(prev => [...prev, newLineup])
-                            setPlayers(prev => prev.map(p => ({ ...p, isOnCourt: firstFivePlayers.includes(p.id) })))
+                            // Open modal to select starting 5 players
+                            setShowLineupBuilder(true)
+                          } else {
+                            // Only allow lineup editing before the game has ever started
+                            if (!hasGameStarted && gameState.quarter === 1) {
+                              // If game has never started and we're still in quarter 1, allow editing the lineup
+                              setShowLineupBuilder(true)
+                            } else {
+                              // Game has started or quarter has advanced, open Bulk Substitution modal
+                              const activePlayerIds = players
+                                .filter(p => p.isOnCourt)
+                                .map(p => p.id)
+                                .filter(id => id !== (selectedPlayer?.id ?? -1))
+                              setSelectedBulkSubPlayers(activePlayerIds)
+                              setShowBulkSubModal(true)
+                            }
                           }
-                          setShowQuickSubModal(true)
-                        }} block style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#fff', fontWeight: 600, height: 40, fontSize: '0.9rem' }}>{currentLineup ? 'Quick Substitution' : 'Start Lineup & Sub'}</Button>
+                        }} block style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#fff', fontWeight: 600, height: 40, fontSize: '0.9rem' }}>{currentLineup ? (hasGameStarted || gameState.quarter > 1 ? 'Quick Substitution' : 'Edit Starting Lineup') : 'Select Starting Lineup'}</Button>
                         {quickSubHistory.length > 0 && (
                           <Button onClick={undoLastSubstitution} block style={{ marginTop: 4, height: 28, fontSize: '0.8rem' }}>Undo Last Sub</Button>
                         )}
                       </div>
                     </Col>
                   </Row>
-                  <Divider style={{ margin: settings.compactMode ? '8px 0' : '12px 0' }} />
+                  <Divider style={{ margin: '12px 0' }} />
                   <div>
                     <Text strong style={{ display: 'block', marginBottom: 8 }}>Opponent On-Court</Text>
                      <Row gutter={[8, 6]}>
@@ -1579,7 +3488,7 @@ const Statistics = () => {
                         return (
                           <Col key={idx} span={12}>
                             <div
-                              onClick={() => setSelectedOpponentSlot(idx)}
+                              onClick={() => selectOpponentSlot(idx)}
                               style={{
                                 display: 'flex',
                                 gap: 8,
@@ -1605,15 +3514,21 @@ const Statistics = () => {
                                 danger
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  const next = [...opponentOnCourt]
-                                  next[idx] = ''
-                                  setOpponentOnCourt(next)
-                                  if (selectedOpponentSlot === idx) setSelectedOpponentSlot(null)
+                                  // Focus the input field to start typing
+                                  const inputElement = e.currentTarget.parentElement?.querySelector('input')
+                                  if (inputElement) {
+                                    inputElement.focus()
+                                    inputElement.select() // Select existing text for easy replacement
+                                  }
                                 }}
                               >
                                 Sub
                               </Button>
-                              {jersey && <Badge count={`#${jersey}`} />}
+                              {jersey && (
+                                <Text style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ff4d4f', padding: '2px 6px' }}>
+                                  Fouls: {opponentFouls[idx] || 0}
+                                </Text>
+                              )}
                             </div>
                           </Col>
                         )
@@ -1622,520 +3537,288 @@ const Statistics = () => {
                   </div>
                 </Card>
               </Col>
-              <Col span={12}>
+              <Col flex="1" style={{ minWidth: 0 }}>
                 {/* Action box */}
-                <Card title="Action" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
+                <Card title="Action" size="default" styles={{ body: { padding: 8 } }}>
                   {(() => {
                     const canRecordOpponent = selectedOpponentSlot !== null && !!opponentOnCourt[selectedOpponentSlot!]?.trim()
-                    const recordAction = (eventType: string) => {
-                      if (canRecordOpponent) {
-                        handleOpponentStatEvent(opponentOnCourt[selectedOpponentSlot!], eventType)
-                      } else if (selectedPlayer) {
-                        handleStatEvent(selectedPlayer.id, eventType)
-                      }
-                    }
+                      const recordAction = (eventType: string) => {
+    // Check if game is started
+    if (!gameState.isPlaying) {
+      message.info('Please start the game first before recording actions')
+      return
+    }
+    
+    // Handle Points in Paint modal for 2PT made
+    if (eventType === 'fg_made' && settings.askForPointsInPaint) {
+      setPendingPipEvent({ eventType, playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
+      setShowPipModal(true)
+      return
+    }
+    
+    // Handle Assist modal for 2PT made (when not using points in paint workflow)
+    if (eventType === 'fg_made' && !settings.askForPointsInPaint) {
+      setPendingAssistEvent({ eventType, playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot, pip: false })
+      setShowAssistModal(true)
+      return
+    }
+    
+    // Handle Assist modal for 3PT made
+    if (eventType === 'three_made') {
+      setPendingAssistEvent({ eventType, playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot, pip: false })
+      setShowAssistModal(true)
+      return
+    }
+    
+    // Handle Rebound modal for 2PT, 3PT, and FT missed
+    if (eventType === 'fg_missed' || eventType === 'three_missed' || eventType === 'ft_missed') {
+      setPendingReboundEvent({ eventType, playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
+      setShowReboundModal(true)
+      return
+    }
+    
+    // Handle Steal modal
+    if (eventType === 'steal') {
+      setPendingStealEvent({ playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
+      setShowStealModal(true)
+      return
+    }
+    
+    // Handle Turnover modal
+    if (eventType === 'turnover') {
+      setPendingTurnoverEvent({ playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
+      setShowTurnoverModal(true)
+      return
+    }
+    
+    // Handle Foul modal
+    if (eventType === 'foul') {
+      setPendingFoulEvent({ playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
+      setShowFoulModal(true)
+      return
+    }
+    
+    // Handle Block modal
+    if (eventType === 'block') {
+      setPendingBlockEvent({ playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
+      setShowBlockModal(true)
+      return
+    }
+    
+    if (canRecordOpponent) {
+      handleOpponentStatEvent(opponentOnCourt[selectedOpponentSlot!], eventType)
+    } else if (selectedPlayer) {
+      handleStatEvent(selectedPlayer.id, eventType)
+    }
+  }
                     const isDisabled = !(selectedPlayer || canRecordOpponent)
                     return (
-                  <Row gutter={[8, 8]}>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('fg_made')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        2PT Made
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('fg_missed')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        2PT Miss
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('three_made')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        3PT Made
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('three_missed')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        3PT Miss
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('ft_made')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        FT Made
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('ft_missed')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        FT Miss
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('rebound')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        Rebound
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('assist')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        Assist
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('steal')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        Steal
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        onClick={() => recordAction('block')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        Block
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        danger
-                        onClick={() => recordAction('turnover')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        Turnover
-                      </Button>
-                    </Col>
-                    <Col span={8}>
-                      <Button 
-                        size="middle"
-                        block 
-                        danger
-                        onClick={() => recordAction('foul')}
-                        disabled={isDisabled}
-                        className={style.quickStatButton}
-                      >
-                        Foul
-                      </Button>
-                    </Col>
-                  </Row>
+                      <Row gutter={[8, 8]}>
+                        {/* Column 1: 2PT Made/Miss stacked vertically */}
+                        <Col span={8}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <Button 
+                            size="middle"
+                            block 
+                            onClick={() => recordAction('fg_made')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                            2PT Made
+                          </Button>
+                          <Button 
+                            size="middle"
+                            block 
+                            onClick={() => recordAction('fg_missed')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                            2PT Miss
+                          </Button>
+                          </div>
+                        </Col>
+                        
+                        {/* Column 2: 3PT Made/Miss stacked vertically */}
+                        <Col span={8}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <Button 
+                            size="middle"
+                            block 
+                            onClick={() => recordAction('three_made')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                            3PT Made
+                          </Button>
+                          <Button 
+                            size="middle"
+                            block 
+                            onClick={() => recordAction('three_missed')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                            3PT Miss
+                          </Button>
+                          </div>
+                        </Col>
+                        
+                        {/* Column 3: FT Made/Miss stacked vertically */}
+                        <Col span={8}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <Button 
+                            size="middle"
+                            block 
+                            onClick={() => recordAction('ft_made')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                            FT Made
+                          </Button>
+                          <Button 
+                            size="middle"
+                            block 
+                            onClick={() => recordAction('ft_missed')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                            FT Miss
+                          </Button>
+                          </div>
+                        </Col>
+                        
+                        {/* Row 2: Assist over Rebound, Block over Steal, Foul over Turnover */}
+                        <Col span={8}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <Button 
+                            size="middle"
+                            block 
+                              onClick={() => recordAction('assist')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                              Assist
+                          </Button>
+                          <Button 
+                            size="middle"
+                            block 
+                              onClick={() => recordAction('rebound')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                              Rebound
+                          </Button>
+                          </div>
+                        </Col>
+                        <Col span={8}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <Button 
+                            size="middle"
+                            block 
+                              onClick={() => recordAction('block')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                              Block
+                          </Button>
+                          <Button 
+                            size="middle"
+                            block 
+                              onClick={() => recordAction('steal')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                              Steal
+                          </Button>
+                          </div>
+                        </Col>
+                        <Col span={8}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <Button 
+                            size="middle"
+                            block 
+                            danger
+                              onClick={() => recordAction('foul')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                              Foul
+                          </Button>
+                          <Button 
+                            size="middle"
+                            block 
+                            danger
+                              onClick={() => recordAction('turnover')}
+                            disabled={isDisabled}
+                            className={style.quickStatButton}
+                          >
+                              Turnover
+                          </Button>
+                          </div>
+                        </Col>
+                      </Row>
                     )
                   })()}
                 </Card>
-                <Card title="Play by Play" styles={{ body: { paddingTop: 8 } }} style={{ marginTop: 8 }}>
-                  <div className={style.eventsFeed}>
-                    {events.slice(0, 10).map(event => (
+                                                                   <Card title="Play by Play" styles={{ body: { padding: '2px 8px' } }} style={{ marginTop: 8, height: '221px', overflow: 'hidden' }}>
+                  <div className={style.eventsFeed} style={{ height: '175px', overflowY: 'auto' }}> 
+                    {events.slice(0, 10).map(event => {
+                      // Format event type for better readability
+                      const formatEventType = (eventType: string) => {
+                        switch (eventType) {
+                          case 'fg_made': return '2PT Made'
+                          case 'fg_missed': return '2PT Miss'
+                          case 'three_made': return '3PT Made'
+                          case 'three_missed': return '3PT Miss'
+                          case 'ft_made': return 'FT Made'
+                          case 'ft_missed': return 'FT Miss'
+                          case 'rebound': return 'Rebound'
+                          case 'assist': return 'Assist'
+                          case 'steal': return 'Steal'
+                          case 'block': return 'Block'
+                          case 'foul': return 'Foul'
+                          case 'turnover': return 'Turnover'
+                          case 'charge_taken': return 'Charge Taken'
+                          case 'deflection': return 'Deflection'
+                          case 'fg_attempt': return '2PT Attempt'
+                          case 'three_attempt': return '3PT Attempt'
+                          case 'ft_attempt': return 'FT Attempt'
+                          default: return eventType
+                        }
+                      }
+                      
+                      return (
                       <div key={event.id} className={style.eventItem}>
-                        <Text type="secondary">{formatTime(event.gameTime)}</Text>
-                        <Text strong>{event.playerName}</Text>
-                        <Text>{event.eventType}</Text>
-                        {event.value && <Badge count={event.value} />}
-                        {event.opponentEvent && <Badge count="OPP" style={{ backgroundColor: '#f5222d' }} />}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </Col>
-            </>
-          ) : (
-            <>
-              <Col span={12}>
-                {/* Action box */}
-                <Card title="Action" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
-                  <Row gutter={[8, 8]}>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'fg_made' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'fg_made' ? null : 'fg_made')}
-                      >
-                        {settings.compactMode ? '2PT' : '2PT Made'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'three_made' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'three_made' ? null : 'three_made')}
-                      >
-                        {settings.compactMode ? '3PT' : '3PT Made'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'ft_made' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'ft_made' ? null : 'ft_made')}
-                      >
-                        {settings.compactMode ? 'FT' : 'FT Made'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'defensive_rebound' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'defensive_rebound' ? null : 'defensive_rebound')}
-                      >
-                        {settings.compactMode ? 'DEF' : 'Def Rebound'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'offensive_rebound' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'offensive_rebound' ? null : 'offensive_rebound')}
-                      >
-                        {settings.compactMode ? 'OFF' : 'Off Rebound'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'assist' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'assist' ? null : 'assist')}
-                      >
-                        {settings.compactMode ? 'AST' : 'Assist'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'steal' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'steal' ? null : 'steal')}
-                      >
-                        {settings.compactMode ? 'STL' : 'Steal'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'block' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'block' ? null : 'block')}
-                      >
-                        {settings.compactMode ? 'BLK' : 'Block'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        danger
-                        type={selectedAction === 'foul' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'foul' ? null : 'foul')}
-                      >
-                        {settings.compactMode ? 'FL' : 'Foul'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        danger
-                        type={selectedAction === 'turnover' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'turnover' ? null : 'turnover')}
-                      >
-                        {settings.compactMode ? 'TO' : 'Turnover'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'charge_taken' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'charge_taken' ? null : 'charge_taken')}
-                      >
-                        {settings.compactMode ? 'CHG' : 'Charge'}
-                      </Button>
-                    </Col>
-                    <Col span={settings.compactMode ? 12 : 8}>
-                      <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        block 
-                        type={selectedAction === 'deflection' ? 'primary' : 'default'}
-                        onClick={() => setSelectedAction(selectedAction === 'deflection' ? null : 'deflection')}
-                      >
-                        {settings.compactMode ? 'DEFL' : 'Deflection'}
-                      </Button>
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
-              <Col span={12}>
-                {/* Player Selection for Action First */}
-                <Card title="Player" size={settings.compactMode ? 'small' : 'default'} styles={{ body: { padding: settings.compactMode ? 6 : 8 } }}>
-                  <Row gutter={[8, 8]}>
-                    {/* First Column - Players 1-3 */}
-                     <Col span={12}>
-                       {players.slice(0, 3).map(player => (
-                        <div 
-                          key={player.id} 
-                          className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`}
-                          style={{ padding: 6, margin: '2px 0' }}
-                          onClick={() => {
-                            if (selectedAction) {
-                              // If an action is selected, record it for this player
-                              handleStatEvent(player.id, selectedAction);
-                              setSelectedAction(null); // Clear the selected action
-                              setSelectedPlayer(player); // Also update the selected player
-                            } else {
-                              // If no action is selected, just select the player
-                              setSelectedPlayer(player);
-                            }
-                          }}
-                        >
-                          <div>
-                            <Text strong style={{ fontSize: settings.compactMode ? '0.8rem' : '0.9rem' }}>
-                              {settings.showPlayerNumbers && `#${player.number} `}{player.name}
-                            </Text>
-                            {settings.showPositions && (
-                              <>
-                                <br />
-                                <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}>
-                                  {player.position}
-                                </Text>
-                              </>
-                            )}
-                          </div>
-                          <div>
-                            <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
-                            <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> PTS</Text>
-                            <br />
-                            <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
-                            <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> +/-</Text>
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                          <Text type="secondary" style={{ minWidth: '60px' }}>{formatWallClock(event.timestamp)}</Text>
+                          <Text strong style={{ margin: '0 12px', flex: 1 }}>{event.playerName}</Text>
+                            <Text style={{ marginRight: 8 }}>{formatEventType(event.eventType)}</Text>
+                          {event.value && <Badge count={event.value} style={{ marginRight: 8 }} />}
+                          {event.opponentEvent && <Badge count="OPP" style={{ backgroundColor: '#f5222d', marginRight: 8 }} />}
                         </div>
-                      ))}
-                    </Col>
-                    {/* Second Column - Players 4-5 + Substitution Button */}
-                     <Col span={12}>
-                       {players.slice(3, 5).map(player => (
-                        <div 
-                          key={player.id} 
-                          className={`${style.playerCard} ${selectedPlayer?.id === player.id ? style.selected : ''}`}
-                          style={{ padding: 6, margin: '2px 0' }}
-                          onClick={() => {
-                            if (selectedAction) {
-                              // If an action is selected, record it for this player
-                              handleStatEvent(player.id, selectedAction);
-                              setSelectedAction(null); // Clear the selected action
-                              setSelectedPlayer(player); // Also update the selected player
-                            } else {
-                              // If no action is selected, just select the player
-                              setSelectedPlayer(player);
-                            }
-                          }}
-                        >
-                          <div>
-                            <Text strong style={{ fontSize: settings.compactMode ? '0.8rem' : '0.9rem' }}>
-                              {settings.showPlayerNumbers && `#${player.number} `}{player.name}
-                            </Text>
-                            {settings.showPositions && (
-                              <>
-                                <br />
-                                <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}>
-                                  {player.position}
-                                </Text>
-                              </>
-                            )}
-                          </div>
-                          <div>
-                            <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
-                            <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> PTS</Text>
-                            <br />
-                            <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
-                            <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.6rem' : '0.8rem' }}> +/-</Text>
-                          </div>
-                        </div>
-                      ))}
-                      {/* Substitution Button in 3rd row of second column */}
-                      <div style={{ marginTop: 8 }}>
                         <Button
-                          type="primary"
-                          icon={<TeamOutlined />}
-                          onClick={() => {
-                            if (!currentLineup) {
-                              const firstFivePlayers = players.slice(0, 5).map(p => p.id)
-                              const newLineup = { id: `lineup-${Date.now()}`, players: firstFivePlayers, startTime: gameState.currentTime, plusMinus: 0 }
-                              setCurrentLineup(newLineup)
-                              setLineups(prev => [...prev, newLineup])
-                              setPlayers(prev => prev.map(p => ({
-                                ...p,
-                                isOnCourt: firstFivePlayers.includes(p.id)
-                              })))
-                            }
-                            setShowQuickSubModal(true)
-                            setSubstitutionPlayerOut(null)
-                            setSubstitutionPlayerIn(null)
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteEvent(event.id)
                           }}
-                          block
-                          style={{
-                            backgroundColor: '#2563eb',
-                            borderColor: '#2563eb',
-                            color: '#fff',
-                            fontWeight: 600,
-                            height: 40,
-                            fontSize: '0.9rem',
+                          style={{ 
+                            padding: '4px 8px',
+                            height: 'auto',
+                            minWidth: 'auto'
                           }}
-                        >
-                          {currentLineup ? 'Substitution' : 'Start Lineup & Sub'}
-                        </Button>
-                        {quickSubHistory.length > 0 && (
-                          <Button
-                            onClick={undoLastSubstitution}
-                            block
-                            style={{
-                              marginTop: 4,
-                              height: 28,
-                              fontSize: '0.8rem',
-                            }}
-                          >
-                            Undo Last Sub
-                          </Button>
-                        )}
+                        />
                       </div>
-                    </Col>
-                  </Row>
-                  <Divider style={{ margin: settings.compactMode ? '8px 0' : '12px 0' }} />
-                  <div>
-                    <Text strong style={{ display: 'block', marginBottom: 8 }}>Opponent On-Court</Text>
-                    <Row gutter={[8, 8]}>
-                      {opponentOnCourt.map((jersey, idx) => {
-                        const isSelected = selectedOpponentSlot === idx
-                        return (
-                          <Col key={idx} span={12}>
-                            <div
-                              onClick={() => {
-                                if (selectedAction && jersey) {
-                                  handleOpponentStatEvent(jersey, selectedAction)
-                                  setSelectedAction(null)
-                                  setSelectedOpponentSlot(idx)
-                                } else {
-                                  setSelectedOpponentSlot(idx)
-                                }
-                              }}
-                              style={{
-                                display: 'flex',
-                                gap: 8,
-                                alignItems: 'center',
-                                padding: 8,
-                                borderRadius: 6,
-                                border: isSelected ? '1px solid #2563eb' : '1px solid #334155',
-                                background: isSelected ? '#0b2a4a' : '#0f2741',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <Input
-                                placeholder="Opp #"
-                                value={jersey}
-                                onChange={(e) => {
-                                  const next = [...opponentOnCourt]
-                                  next[idx] = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
-                                  setOpponentOnCourt(next)
-                                }}
-                                style={{ width: 90 }}
-                              />
-                              <Button
-                                danger
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  const next = [...opponentOnCourt]
-                                  next[idx] = ''
-                                  setOpponentOnCourt(next)
-                                  if (selectedOpponentSlot === idx) setSelectedOpponentSlot(null)
-                                }}
-                              >
-                                Sub
-                              </Button>
-                              {jersey && <Badge count={`#${jersey}`} />}
-                            </div>
-                          </Col>
-                        )
-                      })}
-                    </Row>
+                      )
+                    })}
                   </div>
                 </Card>
               </Col>
-              <Col span={12} />
-              <Col span={12}>
-                <Card title="Play by Play">
-                  <div className={style.eventsFeed}>
-                    {events.slice(0, 10).map(event => (
-                      <div key={event.id} className={style.eventItem}>
-                        <Text type="secondary">{formatTime(event.gameTime)}</Text>
-                        <Text strong>{event.playerName}</Text>
-                        <Text>{event.eventType}</Text>
-                        {event.value && <Badge count={event.value} />}
-                        {event.opponentEvent && <Badge count="OPP" style={{ backgroundColor: '#f5222d' }} />}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </Col>
-            </>
-          )}
-        </Row>
-      )
+            </Row>
+          </>
+        )
     },
     {
       key: 'analytics',
@@ -2143,16 +3826,18 @@ const Statistics = () => {
       children: (
         <Row gutter={[16, 16]}>
           <Col span={24}>
-            <Card title="Player Performance" className={style.playerPerformanceCard}>
+            <Card title="Box Score" className={style.playerPerformanceCard}>
               <Table 
                 dataSource={players} 
                 columns={playerColumns} 
                 pagination={false}
                 scroll={{ y: 300 }}
+                showSorterTooltip={false}
               />
             </Card>
           </Col>
-          <Col span={12}>
+          {/* Team Statistics - Commented out for now */}
+          {/* <Col span={12}>
             <Card title="Team Statistics" className={style.teamStatsCard}>
               <Row gutter={16}>
                 <Col span={12}>
@@ -2181,18 +3866,13 @@ const Statistics = () => {
                     <Col span={12}>
                       <Statistic title="Total Blocks" value={teamStats.totalBlocks} />
                     </Col>
-                    <Col span={12}>
-                      <Statistic title="Game Pace" value={`${teamStats.pace} pts/game`} />
-                    </Col>
-                    <Col span={12}>
-                      <Statistic title="Projected Final" value={`${teamStats.projectedFinal} pts`} />
-                    </Col>
                   </>
                 )}
               </Row>
             </Card>
-          </Col>
-          <Col span={12}>
+          </Col> */}
+          {/* Opponent Statistics - Commented out for now */}
+          {/* <Col span={12}>
             <Card title="Opponent Statistics" className={style.teamStatsCard}>
               {(() => {
                 const oppStats = calculateOpponentStats()
@@ -2229,79 +3909,93 @@ const Statistics = () => {
                 )
               })()}
             </Card>
+          </Col> */}
+          <Col span={24}>
+            <TeamComparisonTable 
+              teamStats={teamStats} 
+              opponentStats={(() => {
+                const oppStats = calculateOpponentStats()
+                return oppStats
+              })()}
+              teamName="HOME"
+              opponentName="OPPONENT"
+            />
           </Col>
-          <Col span={12}>
-            <Card title="Substitution History & Analytics">
-              <Row gutter={[16, 16]}>
-                <Col span={8}>
-                  <Card title="Substitution Stats">
-                    {(() => {
-                      const stats = getSubstitutionStats()
-                      return (
-                        <div>
-                          <Statistic title="Total Substitutions" value={stats.totalSubs} />
-                          <Statistic title="Unique Players Used" value={stats.uniquePlayers} />
-                          {stats.mostSubbedIn.player && (
-                            <div style={{ marginTop: 16 }}>
-                              <Text strong>Most Subbed In:</Text>
-                              <br />
-                              <Text>#{stats.mostSubbedIn.player.number} {stats.mostSubbedIn.player.name}</Text>
-                              <br />
-                              <Text type="secondary">{stats.mostSubbedIn.count} times</Text>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </Card>
-                </Col>
-                <Col span={16}>
-                  <Card title="Recent Substitutions">
-                    {quickSubHistory.length > 0 ? (
-                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                        {quickSubHistory.map((sub, index) => (
-                          <div key={index} style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            padding: '8px 12px',
-                            margin: '4px 0',
-                            background: '#f5f5f5',
-                            borderRadius: 6,
-                            border: '1px solid #e8e8e8'
-                          }}>
-                            <div>
-                              <Text strong>#{sub.playerOut.number} {sub.playerOut.name}</Text>
-                              <Text type="secondary" style={{ margin: '0 8px' }}>→</Text>
-                              <Text strong>#{sub.playerIn.number} {sub.playerIn.name}</Text>
-                            </div>
-                            <div>
-                              <Text type="secondary" style={{ fontSize: '0.8rem' }}>
-                                {new Date(sub.timestamp).toLocaleTimeString()}
-                              </Text>
-                              <Button 
-                                size="small" 
-                                type="text"
-                                onClick={() => {
-                                  substitutePlayer(sub.playerOut, sub.playerIn)
-                                  setQuickSubHistory(prev => prev.filter((_, i) => i !== index))
-                                }}
-                                style={{ marginLeft: 8 }}
-                              >
-                                Undo
-                              </Button>
-                            </div>
+          {/* Substitution History & Analytics - temporarily disabled */}
+          {false && (
+            <Col span={12}>
+              <Card title="Substitution History & Analytics">
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <Card title="Substitution Stats">
+                      {(() => {
+                        const stats = getSubstitutionStats()
+                        return (
+                          <div>
+                            <Statistic title="Total Substitutions" value={stats.totalSubs} />
+                            <Statistic title="Unique Players Used" value={stats.uniquePlayers} />
+                            {(stats.mostSubbedIn && stats.mostSubbedIn.player) && (
+                              <div style={{ marginTop: 16 }}>
+                                <Text strong>Most Subbed In:</Text>
+                                <br />
+                                <Text>#{stats.mostSubbedIn.player!.number} {stats.mostSubbedIn.player!.name}</Text>
+                                <br />
+                                <Text type="secondary">{stats.mostSubbedIn.count} times</Text>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <Text type="secondary">No substitutions yet</Text>
-                    )}
-                  </Card>
-                </Col>
-              </Row>
-            </Card>
-          </Col>
+                        )
+                      })()}
+                    </Card>
+                  </Col>
+                  <Col span={16}>
+                    <Card title="Recent Substitutions">
+                      {quickSubHistory.length > 0 ? (
+                        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                          {quickSubHistory.map((sub, index) => (
+                            <div key={index} style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              padding: '8px 12px',
+                              margin: '4px 0',
+                              background: '#f5f5f5',
+                              borderRadius: 6,
+                              border: '1px solid #e8e8e8'
+                            }}>
+                              <div>
+                                <Text strong>#{sub.playerOut.number} {sub.playerOut.name}</Text>
+                                <Text type="secondary" style={{ margin: '0 8px' }}>→</Text>
+                                <Text strong>#{sub.playerIn.number} {sub.playerIn.name}</Text>
+                              </div>
+                              <div>
+                                <Text type="secondary" style={{ fontSize: '0.8rem' }}>
+                                  {new Date(sub.timestamp).toLocaleTimeString()}
+                                </Text>
+                                <Button 
+                                  size="small" 
+                                  type="text"
+                                  onClick={() => {
+                                    substitutePlayer(sub.playerOut, sub.playerIn)
+                                    setQuickSubHistory(prev => prev.filter((_, i) => i !== index))
+                                  }}
+                                  style={{ marginLeft: 8 }}
+                                >
+                                  Undo
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <Text type="secondary">No substitutions yet</Text>
+                      )}
+                    </Card>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          )}
         </Row>
       )
     },
@@ -2426,7 +4120,14 @@ const Statistics = () => {
                       type="primary" 
                       size="middle"
                       icon={<TeamOutlined />}
-                      onClick={() => setShowQuickSubModal(true)}
+                      onClick={() => {
+                        const activePlayerIds = players
+                          .filter(p => p.isOnCourt)
+                          .map(p => p.id)
+                          .filter(id => id !== (selectedPlayer?.id ?? -1))
+                        setSelectedBulkSubPlayers(activePlayerIds)
+                        setShowBulkSubModal(true)
+                      }}
                       style={{ 
                         width: '100%', 
                         marginBottom: 8,
@@ -2451,32 +4152,19 @@ const Statistics = () => {
 
                   {quickSubHistory.length > 0 && (
                     <div style={{ marginBottom: 16 }}>
-                      <Text strong style={{ fontSize: '0.9rem', color: '#94a3b8', marginBottom: 8, display: 'block' }}>
-                        Recent Substitutions:
-                      </Text>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Recent Substitutions</Text>
+                        <Button size="small" onClick={() => setQuickSubHistory([])}>Clear</Button>
+                      </div>
                       <div style={{ maxHeight: 120, overflowY: 'auto' }}>
-                        {quickSubHistory.slice(0, 3).map((sub, index) => (
-                          <div key={index} style={{ 
-                            padding: '8px 12px',
-                            margin: '4px 0',
-                            background: '#1e3a5c',
-                            borderRadius: 6,
-                            border: '1px solid #2563eb'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <Text strong style={{ fontSize: '0.9rem', color: '#f5f7fa' }}>
-                                  #{sub.playerOut.number} {sub.playerOut.name}
-                                </Text>
-                                <Text style={{ margin: '0 8px', fontSize: '0.9rem', color: '#94a3b8' }}>→</Text>
-                                <Text strong style={{ fontSize: '0.9rem', color: '#f5f7fa' }}>
-                                  #{sub.playerIn.number} {sub.playerIn.name}
-                                </Text>
-                              </div>
-                              <Text style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                                {new Date(sub.timestamp).toLocaleTimeString()}
-                              </Text>
+                        {quickSubHistory.slice(0, 5).map((sub, index) => (
+                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', margin: '4px 0', background: '#0f2741', borderRadius: 6, border: '1px solid #1e3a8a' }}>
+                            <div>
+                              <Text strong style={{ fontSize: '0.9rem', color: '#f5f7fa' }}>#{sub.playerOut.number} {sub.playerOut.name}</Text>
+                              <Text style={{ margin: '0 6px', color: '#94a3b8' }}>→</Text>
+                              <Text strong style={{ fontSize: '0.9rem', color: '#f5f7fa' }}>#{sub.playerIn.number} {sub.playerIn.name}</Text>
                             </div>
+                            <Text style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{new Date(sub.timestamp).toLocaleTimeString()}</Text>
                           </div>
                         ))}
                       </div>
@@ -2538,7 +4226,19 @@ const Statistics = () => {
                     return (
                       <div key={lineup.id} className={style.lineupCard}>
                         <div className={style.lineupHeader}>
-                          <Text strong style={{ fontSize: '1rem' }}>Lineup #{lineup.id.slice(-4)}</Text>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Text strong style={{ fontSize: '1rem' }}>Lineup #{lineup.id.slice(-4)}</Text>
+                            <Button 
+                              size="small" 
+                              type="text" 
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                setEditingLineupId(lineup.id)
+                                setEditingLineupName(lineup.name || `Lineup ${lineup.id.slice(-4)}`)
+                              }}
+                              style={{ padding: '2px 4px', height: 'auto' }}
+                            />
+                          </div>
                           <Badge 
                             count={effectiveness.totalPlusMinus} 
                             style={{ 
@@ -2548,6 +4248,34 @@ const Statistics = () => {
                             }}
                           />
                         </div>
+                        {editingLineupId === lineup.id ? (
+                          <div style={{ marginBottom: 8 }}>
+                            <Input
+                              value={editingLineupName}
+                              onChange={(e) => setEditingLineupName(e.target.value)}
+                              onPressEnter={() => {
+                                // Update lineup name
+                                setLineups(prev => prev.map(l => 
+                                  l.id === lineup.id ? { ...l, name: editingLineupName } : l
+                                ))
+                                setEditingLineupId(null)
+                                setEditingLineupName('')
+                              }}
+                              onBlur={() => {
+                                setEditingLineupId(null)
+                                setEditingLineupName('')
+                              }}
+                              style={{ fontSize: '0.9rem' }}
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <div style={{ marginBottom: 8 }}>
+                            <Text type="secondary" style={{ fontSize: '0.9rem', color: '#a6a6a6' }}>
+                              {lineup.name || `Lineup ${lineup.id.slice(-4)}`}
+                            </Text>
+                          </div>
+                        )}
                         <div className={style.lineupPlayers}>
                           {lineup.players.map(playerId => {
                             const player = players.find(p => p.id === playerId)
@@ -2584,7 +4312,7 @@ const Statistics = () => {
   // DEV-ONLY: Ensure consistent className to prevent hydration mismatch
   const containerClassName = [
     style.container,
-    settings.compactMode ? style.compactMode : '',
+            '',
     settings.darkMode ? style.darkMode : ''
   ].filter(Boolean).join(' ')
 
@@ -2595,6 +4323,19 @@ const Statistics = () => {
       clockInputRef.current.select();
     }
   }, [isEditingClock]);
+
+  // Pre-populate lineup builder when editing existing lineup
+  useEffect(() => {
+    if (showLineupBuilder && currentLineup && !hasGameStarted && gameState.quarter === 1) {
+      // Editing existing lineup - pre-populate form (only before game has ever started)
+      setSelectedLineupPlayers(currentLineup.players)
+      setLineupName(currentLineup.name || '')
+    } else if (showLineupBuilder && !currentLineup) {
+      // Creating new lineup - reset form
+      setSelectedLineupPlayers([])
+      setLineupName('')
+    }
+  }, [showLineupBuilder, currentLineup, hasGameStarted, gameState.quarter]);
 
   // Parse mm:ss string to seconds
   const parseClockInput = (value: string) => {
@@ -2622,8 +4363,28 @@ const Statistics = () => {
     setIsEditingClock(false);
   };
 
-  // Before return, compute if scrolling is needed
+  // Before return, compute if scrolling is needed and calculate dynamic padding
   const needsScoreScroll = gameState.homeScore >= 100 || gameState.opponentScore >= 100;
+  
+  // Force horizontal scrolling when sidebar is open to prevent wrapping
+  const needsSidebarScroll = !sidebarCollapsed;
+  
+  // Calculate dynamic padding based on score size and sidebar state
+  const calculatePadding = () => {
+    const maxScore = Math.max(gameState.homeScore, gameState.opponentScore);
+    
+    if (sidebarCollapsed) {
+      // Sidebar is collapsed - use normal padding
+      if (maxScore >= 100) return '8px'; // Minimal padding for 3-digit scores
+      if (maxScore >= 50) return '24px'; // Medium padding for 2-digit scores
+      return '48px'; // Full padding for 1-digit scores
+    } else {
+      // Sidebar is open - use minimal padding to prevent wrapping
+      if (maxScore >= 100) return '2px'; // Almost no padding for 3-digit scores
+      if (maxScore >= 50) return '4px'; // Minimal padding for 2-digit scores
+      return '6px'; // Very small padding for 1-digit scores
+    }
+  };
 
   // After all hooks, before return in Statistics component
   const selectedPlayerData = selectedPlayer ? players.find(p => p.id === selectedPlayer.id) : null;
@@ -2641,22 +4402,132 @@ const Statistics = () => {
       setShowQuickSubModal(true);
     }
   }, [substitutionPlayerOut]);
-
-  // After the Modal JSX, add this effect:
-  useEffect(() => {
-    if (showQuickSubModal && substitutionPlayerOut && substitutionPlayerIn) {
-      handleQuickSubstitution(substitutionPlayerIn, substitutionPlayerOut)
-      setShowQuickSubModal(false)
-      setSubstitutionPlayerIn(null)
-      setSubstitutionPlayerOut(null)
-    }
-  }, [showQuickSubModal, substitutionPlayerOut, substitutionPlayerIn])
-
   // DEV-ONLY: Enhanced substitution handler with modal flow management
-  const handleSubstitution = (playerOut: Player) => {
-    setSubstitutionPlayerOut(playerOut)
-    setSubstitutionStep('select-in')
-    setShowSubstitutionModal(true)
+  const handleSubstitution = (playerOut: Player, playerIn: Player) => {
+    // End current lineup and save its stats
+    if (currentLineup) {
+      const endTime = Date.now()
+      const lineupDuration = endTime - currentLineup.startTime
+      
+      // Calculate aggregate stats for the lineup
+      const lineupPlayers = players.filter(p => currentLineup.players.includes(p.id))
+      const aggregateStats = {
+        points: lineupPlayers.reduce((sum, p) => sum + p.points, 0),
+        rebounds: lineupPlayers.reduce((sum, p) => sum + p.rebounds, 0),
+        assists: lineupPlayers.reduce((sum, p) => sum + p.assists, 0),
+        steals: lineupPlayers.reduce((sum, p) => sum + p.steals, 0),
+        blocks: lineupPlayers.reduce((sum, p) => sum + p.blocks, 0),
+        turnovers: lineupPlayers.reduce((sum, p) => sum + p.turnovers, 0),
+        fgMade: lineupPlayers.reduce((sum, p) => sum + p.fgMade, 0),
+        fgAttempted: lineupPlayers.reduce((sum, p) => sum + p.fgAttempted, 0),
+        plusMinus: lineupPlayers.reduce((sum, p) => sum + p.plusMinus, 0),
+        duration: lineupDuration
+      }
+      
+      // Update lineup with final stats
+      setLineups(prev => prev.map(l => 
+        l.id === currentLineup.id 
+          ? { ...l, endTime, plusMinus: aggregateStats.plusMinus, stats: aggregateStats }
+          : l
+      ))
+    }
+
+    // Create new lineup with the substitution
+    const newLineupPlayers = currentLineup ? 
+      currentLineup.players.map(p => p === playerOut.id ? playerIn.id : p) :
+      [playerIn.id, ...players.filter(p => p.isOnCourt && p.id !== playerOut.id).map(p => p.id)]
+
+    const newLineup: Lineup = {
+      id: `lineup-${Date.now()}`,
+      players: newLineupPlayers,
+      startTime: Date.now(),
+      plusMinus: 0,
+      stats: {
+        points: 0,
+        rebounds: 0,
+        assists: 0,
+        steals: 0,
+        blocks: 0,
+        turnovers: 0,
+        fgMade: 0,
+        fgAttempted: 0,
+        plusMinus: 0,
+        duration: 0
+      }
+    }
+
+    setCurrentLineup(newLineup)
+    setLineups(prev => [...prev, newLineup])
+
+    // Update player court status
+    setPlayers(prev => prev.map(p => ({
+      ...p,
+      isOnCourt: p.id === playerIn.id ? true : p.id === playerOut.id ? false : p.isOnCourt
+    })))
+
+    // Add substitution event
+    const substitutionEvent: StatEvent = {
+      id: `sub_${Date.now()}`,
+      timestamp: Date.now(),
+      playerId: playerIn.id,
+      playerName: playerIn.name,
+      eventType: 'substitution_in',
+      quarter: gameState.quarter,
+      gameTime: Date.now()
+    }
+
+    const substitutionOutEvent: StatEvent = {
+      id: `sub_out_${Date.now()}`,
+      timestamp: Date.now(),
+      playerId: playerOut.id,
+      playerName: playerOut.name,
+      eventType: 'substitution_out',
+      quarter: gameState.quarter,
+      gameTime: Date.now()
+    }
+
+    setEvents(prev => [substitutionEvent, substitutionOutEvent, ...prev])
+    
+    // Close modal and reset state
+    setShowSubModal(false)
+    setPlayerToSubOut(null)
+    setAvailableSubs([])
+  }
+
+  // Unified selection system - only one player can be selected at a time
+  const selectPlayer = (player: Player) => {
+    // If no lineup exists, open the lineup builder modal instead of selecting player
+    if (!currentLineup) {
+      setShowLineupBuilder(true)
+      return
+    }
+    
+    // Clear any opponent selection first
+    setSelectedOpponentSlot(null)
+    // Set the new player selection
+    setSelectedPlayer(player)
+  }
+
+  const selectOpponentSlot = (slotIndex: number) => {
+    // Clear any player selection first
+    setSelectedPlayer(null)
+    // Set the new opponent slot selection
+    setSelectedOpponentSlot(slotIndex)
+  }
+
+  // Open substitution modal
+  const openSubModal = (player: Player) => {
+    // Check if game is started
+    if (!gameState.isPlaying) {
+      message.info('Please start the game first before making substitutions')
+      return
+    }
+    
+    setSubstitutionPlayerOut(player)
+    // Get available substitutes (players not currently on court)
+    const subs = players.filter(p => !p.isOnCourt && p.id !== player.id)
+    setAvailableSubs(subs)
+    setShowQuickSubModal(true)
   }
 
   // DEV-ONLY: Enhanced substitution confirmation
@@ -2701,172 +4572,461 @@ const Statistics = () => {
     return { totalSubs, uniquePlayers, mostSubbedIn, mostSubbedOut }
   }
 
+  // Substitution state
+  const [showSubModal, setShowSubModal] = useState(false)
+  const [playerToSubOut, setPlayerToSubOut] = useState<Player | null>(null)
+  const [availableSubs, setAvailableSubs] = useState<Player[]>([])
+  const [currentLineupStats, setCurrentLineupStats] = useState<any>(null)
+
+  // Auto-save game data every 30 seconds and on important actions
+  useEffect(() => {
+    if (!eventId) return
+    
+    const autoSaveInterval = setInterval(() => {
+      if (hasGameStarted || events.length > 0) {
+        saveGameDataOffline({ silent: true })
+      }
+    }, 30000) // Save every 30 seconds
+    
+    return () => clearInterval(autoSaveInterval)
+  }, [eventId, hasGameStarted, events.length])
+
+  // Load saved game data on component mount
+  useEffect(() => {
+    if (!eventId) return
+    
+    const savedGameData = liveStatService.loadGameData(eventId)
+    if (savedGameData) {
+      // Restore game state
+      setGameState(savedGameData.gameState)
+      setPlayers(savedGameData.players)
+      setEvents(savedGameData.events)
+      setLineups(savedGameData.lineups)
+      setOpponentOnCourt(savedGameData.opponentOnCourt)
+      setSubstitutionHistory(savedGameData.substitutionHistory)
+      setQuickSubHistory(savedGameData.quickSubHistory)
+      setActionHistory(savedGameData.actionHistory)
+      
+      // Check if game was in progress
+      if (savedGameData.gameState.isPlaying || savedGameData.events.length > 0) {
+        setHasGameStarted(true)
+        message.success('Previous game data restored from offline storage')
+      }
+    }
+  }, [eventId])
+
+
+
+  // Enhanced save function for offline storage
+  const saveGameDataOffline = (options?: { showToast?: boolean; silent?: boolean; throttle?: boolean }) => {
+    if (!eventId) return
+    
+    const gameData: Partial<OfflineGameData> = {
+      gameState,
+      players,
+      events,
+      lineups,
+      opponentOnCourt,
+      substitutionHistory,
+      quickSubHistory,
+      actionHistory
+    }
+    
+    try {
+      liveStatService.saveGameData(eventId, gameData)
+      if (options?.showToast) {
+        message.success('Game data saved offline successfully')
+      }
+    } catch (error: any) {
+      if ((error as any).name === 'QuotaExceededError') {
+        message.warning('Storage space low. Automatically cleaned up old data and saved essential game data.', 5)
+      } else {
+        message.error('Failed to save game data offline')
+        console.error('Save error:', error)
+      }
+    }
+  }
+
+  // Add offline status indicator to the UI
+  const renderOfflineStatus = () => {
+    const offlineStatus = liveStatService.getOfflineStatus()
+    const storageUsage = liveStatService.getStorageUsage()
+    
+    return (
+      <div style={{ 
+        position: 'fixed', 
+        top: 20, 
+        right: 20, 
+        zIndex: 1000,
+        background: offlineStatus.isOnline ? '#52c41a' : '#f5222d',
+        color: 'white',
+        padding: '8px 12px',
+        borderRadius: '6px',
+        fontSize: '14px',
+        fontWeight: 600,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ 
+            width: 8, 
+            height: 8, 
+            borderRadius: '50%', 
+            background: offlineStatus.isOnline ? '#fff' : '#fff',
+            animation: offlineStatus.isOnline ? 'none' : 'pulse 2s infinite'
+          }} />
+          {offlineStatus.isOnline ? 'Online' : 'Offline'}
+        </div>
+        <div style={{ fontSize: '10px', marginTop: 4 }}>
+          Storage: {storageUsage.percentage}%
+        </div>
+      </div>
+    )
+  }
+
+  // Navigation guard to prevent accidental exits during active game
+  const navigationGuardEnabled = !suppressNavigationGuard && (hasGameStarted || gameState.isPlaying || events.length > 0)
+  // Navigation guard - prevent accidental exits during active game
+  useEffect(() => {
+    if (!navigationGuardEnabled) return
+
+    // 1) Block all navigation attempts globally
+    // 1) Warn on browser refresh/close
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+      return ''
+    }
+
+    // 2) Intercept anchor clicks and external navigations
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      // Bubble up to find anchor
+      const anchor = target?.closest && target.closest('a') as HTMLAnchorElement | null
+      const menuItem = target?.closest && (target.closest('.ant-menu-item') as HTMLElement | null)
+      const roleMenuItem = target?.closest && (target.closest('[role="menuitem"]') as HTMLElement | null)
+
+              // Case 1: Regular anchor navigation
+        if (anchor) {
+          const href = anchor.getAttribute('href') || ''
+          if (!href || href.startsWith('#') || href.startsWith('javascript:')) return
+          const url = new URL(href, window.location.href)
+          const sameLocation = url.pathname === window.location.pathname && url.search === window.location.search
+          if (sameLocation) return
+          e.preventDefault()
+          e.stopPropagation()
+          modal.confirm({
+          title: 'Leave Live Stat Tracking?',
+          content: 'You have an active game in progress. Leaving this screen may interrupt tracking. Do you want to continue?',
+          okText: 'Leave',
+          cancelText: 'Stay',
+          okButtonProps: { danger: true },
+          onOk: () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            document.removeEventListener('click', handleDocumentClick, true)
+            window.removeEventListener('popstate', handlePopState)
+            window.location.href = url.toString()
+          }
+        })
+        return
+      }
+
+      // Case 2: AntD Menu or custom elements that navigate via router.push
+      if (menuItem || roleMenuItem) {
+        e.preventDefault()
+        e.stopPropagation()
+        modal.confirm({
+          title: 'Leave Live Stat Tracking?',
+          content: 'You have an active game in progress. Leaving this screen may interrupt tracking. Do you want to continue?',
+          okText: 'Leave',
+          cancelText: 'Stay',
+          okButtonProps: { danger: true },
+          onOk: () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            document.removeEventListener('click', handleDocumentClick, true)
+            window.removeEventListener('popstate', handlePopState)
+            // Re-dispatch original click to proceed
+            ;(menuItem || roleMenuItem)?.click()
+          }
+        })
+      }
+    }
+
+    // Also capture pointer events for robustness
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!navigationGuardEnabled) return
+      const target = e.target as HTMLElement
+      if (target.closest('.ant-menu-item') || target.closest('[role="menuitem"]')) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+
+    // 4) Override router.push and router.replace to catch Next.js navigation
+    const originalRouterPush = router.push
+    const originalRouterReplace = router.replace
+    
+    router.push = function(href: string) {
+      if (navigationGuardEnabled) {
+        modal.confirm({
+          title: 'Leave Live Stat Tracking?',
+          content: 'You have an active game in progress. Leaving this screen may interrupt tracking. Do you want to continue?',
+          okText: 'Leave',
+          cancelText: 'Stay',
+          okButtonProps: { danger: true },
+          onOk: () => {
+            // Temporarily remove all guards and navigate
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            document.removeEventListener('click', handleDocumentClick, true)
+            document.removeEventListener('pointerdown', handlePointerDown, true)
+            window.removeEventListener('popstate', handlePopState)
+            setTimeout(() => originalRouterPush(href), 100)
+          }
+        })
+        return
+      }
+      return originalRouterPush(href)
+    }
+    
+    router.replace = function(href: string) {
+      if (navigationGuardEnabled) {
+        modal.confirm({
+          title: 'Leave Live Stat Tracking?',
+          content: 'You have an active game in progress. Leaving this screen may interrupt tracking. Do you want to continue?',
+          okText: 'Leave',
+          cancelText: 'Stay',
+          okButtonProps: { danger: true },
+          onOk: () => {
+            // Temporarily remove all guards and navigate
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            document.removeEventListener('click', handleDocumentClick, true)
+            document.removeEventListener('pointerdown', handlePointerDown, true)
+            window.removeEventListener('popstate', handlePopState)
+            setTimeout(() => originalRouterReplace(href), 100)
+          }
+        })
+        return
+      }
+      return originalRouterReplace(href)
+    }
+
+    // 5) Add global navigation interceptor for any missed navigation attempts
+    const handleGlobalNavigation = (e: Event) => {
+      if (!navigationGuardEnabled) return
+      
+      // Check if this is a navigation event
+      const target = e.target as HTMLElement
+      if (target?.closest && (
+        target.closest('a') ||
+        target.closest('.ant-menu-item') ||
+        target.closest('[role="menuitem"]') ||
+        target.closest('.ant-menu-submenu') ||
+        target.closest('[class*="menu"]') ||
+        target.closest('[class*="nav"]') ||
+        target.closest('[class*="sidebar"]')
+      )) {
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        
+        modal.confirm({
+          title: 'Leave Live Stat Tracking?',
+          content: 'You have an active game in progress. Leaving this screen may interrupt tracking. Do you want to continue?',
+          okText: 'Leave',
+          cancelText: 'Stay',
+          okButtonProps: { danger: true },
+          onOk: () => {
+            // Temporarily remove all guards and allow navigation
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            document.removeEventListener('click', handleDocumentClick, true)
+            document.removeEventListener('pointerdown', handlePointerDown, true)
+            window.removeEventListener('popstate', handlePopState)
+            // Re-trigger the original event
+            setTimeout(() => {
+              if (target) {
+                target.click()
+              }
+            }, 100)
+          }
+        })
+      }
+    }
+
+    // 3) Block back/forward button
+    const pushState = () => {
+      try { history.pushState(null, '', window.location.href) } catch {}
+    }
+    const handlePopState = (e: PopStateEvent) => {
+      // Immediately push state back to block navigation
+      pushState()
+      modal.confirm({
+        title: 'Leave Live Stat Tracking?',
+        content: 'You have an active game in progress. Leaving this screen may interrupt tracking. Do you want to continue?',
+        okText: 'Leave',
+        cancelText: 'Stay',
+        okButtonProps: { danger: true },
+        onOk: () => {
+          // Remove guards and go back
+          window.removeEventListener('beforeunload', handleBeforeUnload)
+          document.removeEventListener('click', handleDocumentClick, true)
+          document.removeEventListener('pointerdown', handlePointerDown, true)
+          window.removeEventListener('popstate', handlePopState)
+          history.back()
+        }
+      })
+    }
+
+         // Attach
+     window.addEventListener('beforeunload', handleBeforeUnload)
+     document.addEventListener('click', handleDocumentClick, true)
+     document.addEventListener('pointerdown', handlePointerDown, true)
+     document.addEventListener('click', handleGlobalNavigation, true)
+     document.addEventListener('mousedown', handleGlobalNavigation, true)
+     document.addEventListener('touchstart', handleGlobalNavigation, true)
+     pushState()
+     window.addEventListener('popstate', handlePopState)
+
+         // Cleanup
+     return () => {
+       window.removeEventListener('beforeunload', handleBeforeUnload)
+       document.removeEventListener('click', handleDocumentClick, true)
+       document.removeEventListener('pointerdown', handlePointerDown, true)
+       document.removeEventListener('click', handleGlobalNavigation, true)
+       document.removeEventListener('mousedown', handleGlobalNavigation, true)
+       document.removeEventListener('touchstart', handleGlobalNavigation, true)
+       window.removeEventListener('popstate', handlePopState)
+       // Restore original router methods
+       router.push = originalRouterPush
+       router.replace = originalRouterReplace
+     }
+  }, [navigationGuardEnabled])
   return (
-    <div className={containerClassName}>
+    <div 
+      className={containerClassName}
+      style={{
+        paddingLeft: sidebarCollapsed ? '24px' : '16px',
+        paddingRight: sidebarCollapsed ? '24px' : '16px',
+        maxWidth: sidebarCollapsed ? '1400px' : '1200px',
+        margin: '0 auto',
+        width: '100%',
+        transition: 'all 0.3s ease'
+      }}
+    >
+      {/* Offline status indicator */}
+      {renderOfflineStatus()}
+      
+      {/* Enhanced Service Status Indicator */}
+      <div style={{ 
+        marginBottom: '16px', 
+        padding: '8px 16px', 
+        backgroundColor: serviceStatus === 'connected' ? '#f6ffed' : serviceStatus === 'error' ? '#fff2f0' : '#fff7e6',
+        border: `1px solid ${serviceStatus === 'connected' ? '#b7eb8f' : serviceStatus === 'error' ? '#ffccc7' : '#ffe58f'}`,
+        borderRadius: '6px',
+        textAlign: 'center'
+      }}>
+        <Badge 
+          status={serviceStatus === 'connected' ? 'success' : serviceStatus === 'error' ? 'error' : 'processing'}
+          text={
+            serviceStatus === 'connected' ? 'Enhanced Live Stat Tracker Active - Data syncing to database' :
+            serviceStatus === 'error' ? 'Enhanced Service Error - Check console for details' :
+            'Connecting to Enhanced Live Stat Tracker...'
+          }
+          style={{ 
+            color: serviceStatus === 'connected' ? '#52c41a' : serviceStatus === 'error' ? '#ff4d4f' : '#faad14',
+            fontSize: '14px',
+            fontWeight: 500
+          }}
+        />
+      </div>
+      
       <Row gutter={[16, 16]}>
         {/* Game Clock and Controls */}
         <Col span={24}>
-          <Card
-            className={style.gameControlBar + (needsScoreScroll ? ' scroll-on-large-score' : '')}
-            styles={{ body: { padding: settings.compactMode ? '10px 8px' : '12px 12px' } }}
-          >
-            <div className={style.centerContent}>
+                      <Card
+              className={style.gameControlBar + (needsScoreScroll || needsSidebarScroll ? ' scroll-on-large-score' : '')}
+              styles={{ body: { padding: `12px ${sidebarCollapsed ? '16px' : '12px'}` } }}
+              title={needsSidebarScroll ? '← Scroll to see all controls →' : undefined}
+            >
+                        <div className={style.centerContent}>
               <div className={style.scoreboardInner}>
-                <Row align="middle" justify="center" style={{ minHeight: settings.compactMode ? 90 : 120 }}>
-                  {/* Left: Quarter, Clock, Pace, Projected */}
-                  <Col flex="none" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 90 }}>
-                    <Title level={settings.compactMode ? 2 : 1} style={{ margin: 0, letterSpacing: 2, lineHeight: 1 }}>
-                      Q{gameState.quarter}
-                    </Title>
-                    <div
-                      style={{ fontWeight: 700, fontSize: settings.compactMode ? '1.5rem' : '2.2rem', color: '#fff', lineHeight: 1, marginTop: 2, marginBottom: 2, cursor: isEditingClock ? 'auto' : 'pointer' }}
-                      title="Click to edit clock"
-                      onClick={() => {
-                        if (!isEditingClock) {
-                          setClockInputValue(formatClockInput(gameState.currentTime));
-                          setIsEditingClock(true);
-                        }
-                      }}
-                    >
-                      {isEditingClock ? (
-                        <input
-                          ref={clockInputRef}
-                          type="text"
-                          value={clockInputValue}
-                          onChange={e => setClockInputValue(e.target.value)}
-                          onBlur={saveClockEdit}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') saveClockEdit();
-                            if (e.key === 'Escape') setIsEditingClock(false);
-                          }}
-                          style={{
-                            fontWeight: 700,
-                            fontSize: settings.compactMode ? '1.5rem' : '2.2rem',
-                            width: '100px',
-                            textAlign: 'center',
-                            borderRadius: 4,
-                            border: '1px solid #1890ff',
-                            outline: 'none',
-                            color: '#222',
-                            background: '#fff',
-                            padding: '2px 6px',
-                          }}
-                          maxLength={5}
-                          pattern="^\\d{1,2}:\\d{2}$"
-                        />
-                      ) : (
-                        formatTime(gameState.currentTime)
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'center', marginTop: 4 }}>
-                      <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.8rem' : '1rem', display: 'block' }}>
-                        Pace: {teamStats.pace}
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.8rem' : '1rem', display: 'block' }}>
-                        Projected: {teamStats.projectedFinal}
-                      </Text>
-                    </div>
-                  </Col>
-
-                  {/* Game Controls: vertical stack */}
-                  <Col flex="none" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 12px' }}>
+                <Row 
+                  align="middle" 
+                  justify="space-around" 
+                  wrap={false}
+                  style={{ 
+                    minHeight: 80, 
+                    width: needsSidebarScroll ? '1200px' : '100%',
+                    minWidth: needsSidebarScroll ? '1200px' : 'auto'
+                  }}
+                >
+                  {/* Left: Start button above Quarter */}
+                  <Col 
+                    flex={needsSidebarScroll ? "0 0 110px" : "none"} 
+                    style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      minWidth: 110,
+                      width: needsSidebarScroll ? '110px' : 'auto'
+                    }}
+                  >
                     <Button 
                       type="primary" 
-                      size={settings.compactMode ? 'small' : 'middle'}
+                      size={'middle'}
                       icon={gameState.isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />} 
                       onClick={toggleGame}
+                      disabled={
+                        gameState.quarter >= settings.totalQuarters ||
+                        (!gameState.isPlaying && !currentLineup)
+                      }
                       style={{ marginBottom: 8, width: 110 }}
                     >
                       {gameState.isPlaying ? 'Pause' : 'Start'}
                     </Button>
+                    <Title level={1} style={{ margin: 0, letterSpacing: 2, lineHeight: 1 }}>
+                      {gameState.isOvertime ? `OT${Math.max(1, gameState.overtimeNumber || 1)}` : `Q${gameState.quarter}`}
+                    </Title>
+                  </Col>
+
+                  {/* Game Controls: Undo and Next Qtr */}
+                  <Col flex="none" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 12px' }}>
                     <Button 
-                      size={settings.compactMode ? 'small' : 'middle'}
+                      size={'middle'}
                       icon={<StopOutlined />} 
                       onClick={undoLastAction}
-                      disabled={actionHistory.length === 0}
+                      disabled={actionHistory.length === 0 || gameState.quarter >= settings.totalQuarters}
                       style={{ marginBottom: 8, width: 110 }}
                     >
                       Undo
                     </Button>
                     <Button 
-                      size={settings.compactMode ? 'small' : 'middle'}
-                      icon={<ClockCircleOutlined />} 
-                      onClick={nextQuarter} 
-                      disabled={gameState.quarter >= settings.totalQuarters}
-                      style={{ width: 110 }}
+                      type={showReportButton && isReportEnabled ? 'primary' : 'default'}
+                      size={'middle'}
+                      icon={showReportButton ? <LockerIcon color={isReportEnabled ? '#b58842' : '#ccc'} /> : <ClockCircleOutlined />} 
+                      onClick={showReportButton ? handleReportClick : nextQuarter} 
+                      disabled={showReportButton ? !isReportEnabled : (() => {
+                        if (gameState.quarter >= settings.totalQuarters) return true
+                        if (!hasGameStarted) return true
+                        const onCourt = players.filter(p => p.isOnCourt)
+                        if (onCourt.length !== 5) return true
+                        if (gameState.isPlaying) return true
+                        return false
+                      })()}
+                      style={{ 
+                        width: 110,
+                        backgroundColor: showReportButton && !isReportEnabled ? '#666' : undefined,
+                        borderColor: showReportButton && !isReportEnabled ? '#666' : undefined,
+                        color: showReportButton && !isReportEnabled ? '#ccc' : undefined
+                      }}
                     >
-                      Next Qtr
+                      {showReportButton
+                        ? 'Report'
+                        : (
+                          (gameState.quarter >= settings.totalQuarters && (gameState.homeScore === gameState.opponentScore) && !gameState.isPlaying)
+                            ? 'Overtime?'
+                            : (gameState.quarter >= settings.totalQuarters ? 'End Game' : 'Next Qtr')
+                        )}
                     </Button>
-                  </Col>
-
-                  {/* Divider */}
-                  <Col flex="none" style={{ display: 'flex', alignItems: 'stretch', height: '100%' }}>
-                    <Divider type="vertical" className={style.scoreboardDivider} style={{ height: '100%', minHeight: 80, margin: '0 3px' }} />
-                  </Col>
-
-                  {/* Center: Score, Timeouts, Timeout Buttons */}
-                  <Col flex="none" style={{ display: 'flex', alignItems: 'center', minWidth: 260 }}>
-                    <div style={{ textAlign: 'center', flex: 1 }}>
-                      <Title level={settings.compactMode ? 2 : 1} style={{ margin: 0, letterSpacing: 2, lineHeight: 1 }}>
-                        <span
-                          className="score-value"
-                          style={{ color: '#fff', fontWeight: 700 }}
-                        >
-                          HOME {gameState.homeScore}
-                        </span>
-                        <span style={{ color: '#aaa', fontWeight: 400 }}> - </span>
-                        <span
-                          className="score-value"
-                          style={{ color: '#fff', fontWeight: 700 }}
-                        >
-                          {gameState.opponentScore} OPP
-                        </span>
-                      </Title>
-                      <div style={{ marginTop: 4, marginBottom: 4 }}>
-                        <Text type="secondary" style={{ fontSize: settings.compactMode ? '0.8rem' : '1rem' }}>
-                          <span style={{ marginRight: 8 }}>Timeouts:</span>
-                          <Badge count={gameState.timeoutHome} style={{ backgroundColor: '#1890ff', marginRight: 4 }} />
-                          <Badge count={gameState.timeoutAway} style={{ backgroundColor: '#aaa', marginRight: 0 }} />
-                        </Text>
-                      </div>
-                      {/* Opponent Score Controls */}
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 4 }}>
-                        <Button size={settings.compactMode ? 'small' : 'middle'} onClick={() => handleOpponentScoreChange(1)}>+1 OPP</Button>
-                        <Button size={settings.compactMode ? 'small' : 'middle'} onClick={() => handleOpponentScoreChange(2)}>+2 OPP</Button>
-                        <Button size={settings.compactMode ? 'small' : 'middle'} onClick={() => handleOpponentScoreChange(3)}>+3 OPP</Button>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 12 }}>
-                      <div style={{ textAlign: 'center', marginBottom: 2 }}>
-                        <Text style={{ fontSize: '0.7rem', color: '#fff', opacity: 0.4, letterSpacing: 1 }}>TIMEOUTS:</Text>
-                      </div>
-                      <Tooltip title="Timeout - Home">
-                        <Badge count={gameState.timeoutHome} style={{ backgroundColor: '#1890ff', marginBottom: 8 }}>
-                          <Button 
-                            type="dashed" 
-                            size={settings.compactMode ? 'small' : 'middle'}
-                            onClick={() => handleTimeout('home')}
-                            disabled={gameState.timeoutHome <= 0}
-                            style={{ minWidth: 70, marginBottom: 8 }}
-                          >
-                            HOME
-                          </Button>
-                        </Badge>
-                      </Tooltip>
-                      <Tooltip title="Timeout - OPP">
-                        <Badge count={gameState.timeoutAway} style={{ backgroundColor: '#aaa' }}>
-                          <Button 
-                            type="dashed" 
-                            size={settings.compactMode ? 'small' : 'middle'}
-                            onClick={() => handleTimeout('away')}
-                            disabled={gameState.timeoutAway <= 0}
-                            style={{ minWidth: 70 }}
-                          >
-                            OPP
-                          </Button>
-                        </Badge>
-                      </Tooltip>
-                    </div>
                   </Col>
 
                   {/* Divider */}
@@ -2874,12 +5034,110 @@ const Statistics = () => {
                     <Divider type="vertical" className={style.scoreboardDivider} style={{ height: '100%', minHeight: 80, margin: '0 12px' }} />
                   </Col>
 
+                  {/* Center: Score, Timeouts, Timeout Buttons */}
+                  <Col flex="none" style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    minWidth: sidebarCollapsed ? 320 : 260,
+                    maxWidth: sidebarCollapsed ? 'none' : 400
+                  }}>
+                    <div style={{ 
+                      textAlign: 'center', 
+                      flex: 1,
+                      padding: `0 ${sidebarCollapsed ? calculatePadding() : '4px'}`
+                    }}>
+                      <Title level={1} style={{ 
+                        margin: 0, 
+                        letterSpacing: needsScoreScroll ? 1 : 2, 
+                        lineHeight: 1,
+                        fontSize: needsScoreScroll ? '2.5rem' : '3rem'
+                      }}>
+                        <span
+                          className="score-value"
+                          style={{ 
+                            color: '#fff', 
+                            fontWeight: 700,
+                            display: 'inline-block',
+                            minWidth: needsScoreScroll ? '80px' : '60px',
+                            textAlign: 'right'
+                          }}
+                        >
+                          HOME {gameState.homeScore}
+                        </span>
+                        <span style={{ 
+                          color: '#aaa', 
+                          fontWeight: 400,
+                          margin: '0 8px'
+                        }}> - </span>
+                        <span
+                          className="score-value"
+                          style={{ 
+                            color: '#fff', 
+                            fontWeight: 700,
+                            display: 'inline-block',
+                            minWidth: needsScoreScroll ? '80px' : '60px',
+                            textAlign: 'left'
+                          }}
+                        >
+                          {gameState.opponentScore} OPP
+                        </span>
+                      </Title>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 4, gap: 8 }}>
+                        <Tooltip title="Team Fouls - Home">
+                          <Text style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e6f2ff', padding: '4px 10px', border: '1px solid #295a8f', borderRadius: 6, background: '#0f2e52' }}>
+                            TF: {gameState.teamFoulsHome}
+                          </Text>
+                        </Tooltip>
+                        <Tooltip title="Timeout - Home">
+                          <Badge count={gameState.timeoutHome} style={{ backgroundColor: '#1890ff' }}>
+                            <Button 
+                              type="dashed" 
+                              size={'middle'}
+                              onClick={() => handleTimeout('home')}
+                              disabled={gameState.timeoutHome <= 0 || gameState.quarter >= settings.totalQuarters}
+                              style={{ minWidth: 50 }}
+                            >
+                              HOME
+                            </Button>
+                          </Badge>
+                        </Tooltip>
+                        <Text type="secondary" style={{ fontSize: '0.9rem', margin: '0 12px' }}>
+                          Timeouts
+                        </Text>
+                        <Tooltip title="Timeout - OPP">
+                          <Badge count={gameState.timeoutAway} style={{ backgroundColor: '#aaa' }}>
+                            <Button 
+                              type="dashed" 
+                              size={'middle'}
+                              onClick={() => handleTimeout('away')}
+                              disabled={gameState.timeoutAway <= 0 || gameState.quarter >= settings.totalQuarters}
+                              style={{ minWidth: 50 }}
+                            >
+                              OPP
+                            </Button>
+                          </Badge>
+                        </Tooltip>
+                        <Tooltip title="Team Fouls - Away">
+                          <Text style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e6f2ff', padding: '4px 10px', border: '1px solid #295a8f', borderRadius: 6, background: '#0f2e52' }}>
+                            TF: {gameState.teamFoulsAway}
+                          </Text>
+                        </Tooltip>
+                      </div>
+
+                    </div>
+                  </Col>
+
+                  {/* Divider */}
+                  <Col flex="none" style={{ display: 'flex', alignItems: 'stretch', height: '100%' }}>
+                    <Divider type="vertical" className={style.scoreboardDivider} style={{ height: '100%', minHeight: 80, margin: '0 16px' }} />
+                  </Col>
+
                   {/* Right: Export/Settings vertical stack */}
                   <Col flex="none" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 140 }}>
                     <div className={style.scoreboardRightGrid}>
                       {/* Row 1 */}
                       <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
+                        size={'middle'}
                         icon={<ExportOutlined />} 
                         onClick={() => setShowExportModal(true)}
                         style={{ width: 110, gridRow: 1, gridColumn: 1 }}
@@ -2895,40 +5153,19 @@ const Statistics = () => {
                       </Button>
                       {/* Row 2 */}
                       <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        icon={<SettingOutlined />} 
-                        onClick={() => setShowSettingsModal(true)}
-                        style={{ width: 110, gridRow: 2, gridColumn: 1 }}
-                      >
-                        Settings
-                      </Button>
-                      <Button 
                         type={activeTab === 'analytics' ? 'primary' : 'default'} 
                         onClick={() => setActiveTab('analytics')}
                         style={{ width: 110, gridRow: 2, gridColumn: 2 }}
                       >
                         Analytics
                       </Button>
-                      {/* Row 3: Halftime Report spans both columns */}
+                      {/* Settings under Export (same column, next row) */}
                       <Button 
-                        size={settings.compactMode ? 'small' : 'middle'}
-                        icon={<TrophyOutlined />} 
-                        onClick={() => setShowHalftimeReport(true)}
-                        disabled={gameState.quarter < 2 || (gameState.quarter === 2 && gameState.currentTime > 1)}
-                        style={{ 
-                          width: 220,
-                          gridRow: 3,
-                          gridColumn: '1 / span 2',
-                          backgroundColor: (gameState.quarter < 2 || (gameState.quarter === 2 && gameState.currentTime > 1)) ? '#666' : '#1890ff',
-                          color: '#fff',
-                          fontWeight: 600,
-                          border: 'none',
-                          borderRadius: 12,
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-                          cursor: (gameState.quarter < 2 || (gameState.quarter === 2 && gameState.currentTime > 1)) ? 'not-allowed' : 'pointer',
-                        }}
+                        icon={<SettingOutlined />}
+                        onClick={() => { setShowSettingsModal(true); setSuppressNavigationGuard(true) }}
+                        style={{ width: 110, gridRow: 2, gridColumn: 1 }}
                       >
-                        LKRM Halftime Report
+                        Settings
                       </Button>
                     </div>
                   </Col>
@@ -2945,7 +5182,7 @@ const Statistics = () => {
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>🏀 HALFTIME REPORT</span>
-                  <Button type="primary" onClick={() => setShowHalftimeReport(false)}>Continue Game</Button>
+                  <Button type="primary" onClick={handleHalftimeResume}>Continue Game</Button>
                 </div>
               }
               className={style.halftimeReport}
@@ -2970,34 +5207,28 @@ const Statistics = () => {
                   <Card title="🏆 Player Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Top Scorer:</Text> #{halftimeData.topScorer.number} {halftimeData.topScorer.name} ({halftimeData.topScorer.points} pts)
+                        <Text strong>Top Scorer:</Text> #{halftimeData.topScorer?.number ?? 'N/A'} {halftimeData.topScorer?.name ?? 'N/A'} ({halftimeData.topScorer?.points ?? 0} pts)
                       </div>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Top Rebounder:</Text> #{halftimeData.topRebounder.number} {halftimeData.topRebounder.name} ({halftimeData.topRebounder.rebounds} reb)
+                        <Text strong>Top Rebounder:</Text> #{halftimeData.topRebounder?.number ?? 'N/A'} {halftimeData.topRebounder?.name ?? 'N/A'} ({halftimeData.topRebounder?.rebounds ?? 0} reb)
                       </div>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Top Assister:</Text> #{halftimeData.topAssister.number} {halftimeData.topAssister.name} ({halftimeData.topAssister.assists} ast)
+                        <Text strong>Top Assister:</Text> #{halftimeData.topAssister?.number ?? 'N/A'} {halftimeData.topAssister?.name ?? 'N/A'} ({halftimeData.topAssister?.assists ?? 0} ast)
                       </div>
                       <div>
-                        <Text strong>Most Efficient:</Text> #{halftimeData.mostEfficient.player.number} {halftimeData.mostEfficient.player.name} (+{halftimeData.mostEfficient.efficiency})
+                        <Text strong>Most Efficient:</Text> #{halftimeData.mostEfficient?.player?.number ?? 'N/A'} {halftimeData.mostEfficient?.player?.name ?? 'N/A'} (+{halftimeData.mostEfficient?.efficiency ?? 0})
                       </div>
                     </div>
                   </Card>
                 </Col>
+                {/* Removed score context per request */}
                 <Col span={24}>
-                  <Card title="🎯 Game Pace & Projections" className={style.insightCard}>
-                    <Row gutter={16}>
-                      <Col span={8}>
-                        <Statistic title="Current Pace" value={`${halftimeData.pace} pts/game`} />
-                      </Col>
-                      <Col span={8}>
-                        <Statistic title="Projected Final" value={`${Math.round(halftimeData.pace * 0.4)} pts`} />
-                      </Col>
-                      <Col span={8}>
-                        <Statistic title="Lead/Deficit" value={gameState.homeScore - gameState.opponentScore} />
-                      </Col>
-                    </Row>
-                  </Card>
+                  <TeamComparisonTable 
+                    teamStats={halftimeData.teamStats} 
+                    opponentStats={(halftimeData as any).opponentStats || {}} 
+                    teamName="HOME"
+                    opponentName="OPPONENT"
+                  />
                 </Col>
                 {settings.showRecommendations && (
                   <Col span={24}>
@@ -3042,10 +5273,10 @@ const Statistics = () => {
                         />
                       </div>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Recent Events:</Text> {timeoutData.recentEvents.length} events
+                        <Text strong>Recent Events:</Text> {timeoutData.recentEvents?.length ?? 0} events
                       </div>
                       <div>
-                        <Text strong>Key Player:</Text> #{timeoutData.keyPlayer.number} {timeoutData.keyPlayer.name} (+{timeoutData.keyPlayer.plusMinus})
+                        <Text strong>Key Player:</Text> #{timeoutData.keyPlayer?.number ?? 'N/A'} {timeoutData.keyPlayer?.name ?? 'N/A'} (+{timeoutData.keyPlayer?.plusMinus ?? 0})
                       </div>
                     </div>
                   </Card>
@@ -3086,16 +5317,16 @@ const Statistics = () => {
                   <Card title="🏆 Player Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Top Scorer:</Text> #{timeoutData.topScorer.number} {timeoutData.topScorer.name} ({timeoutData.topScorer.points} pts)
+                        <Text strong>Top Scorer:</Text> #{timeoutData.topScorer?.number ?? 'N/A'} {timeoutData.topScorer?.name ?? 'N/A'} ({timeoutData.topScorer?.points ?? 0} pts)
                       </div>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Top Rebounder:</Text> #{timeoutData.topRebounder.number} {timeoutData.topRebounder.name} ({timeoutData.topRebounder.rebounds} reb)
+                        <Text strong>Top Rebounder:</Text> #{timeoutData.topRebounder?.number ?? 'N/A'} {timeoutData.topRebounder?.name ?? 'N/A'} ({timeoutData.topRebounder?.rebounds ?? 0} reb)
                       </div>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Top Assister:</Text> #{timeoutData.topAssister.number} {timeoutData.topAssister.name} ({timeoutData.topAssister.assists} ast)
+                        <Text strong>Top Assister:</Text> #{timeoutData.topAssister?.number ?? 'N/A'} {timeoutData.topAssister?.name ?? 'N/A'} ({timeoutData.topAssister?.assists ?? 0} ast)
                       </div>
                       <div>
-                        <Text strong>Most Efficient:</Text> #{timeoutData.mostEfficient.player.number} {timeoutData.mostEfficient.player.name} (+{timeoutData.mostEfficient.efficiency})
+                        <Text strong>Most Efficient:</Text> #{timeoutData.mostEfficient?.player?.number ?? 'N/A'} {timeoutData.mostEfficient?.player?.name ?? 'N/A'} (+{timeoutData.mostEfficient?.efficiency ?? 0})
                       </div>
                     </div>
                   </Card>
@@ -3104,16 +5335,16 @@ const Statistics = () => {
                   <Card title="📊 Team Performance" className={style.insightCard}>
                     <Row gutter={16}>
                       <Col span={12}>
-                        <Statistic title="Shooting Efficiency" value={`${timeoutData.teamStats.fgPercentage}%`} />
+                        <Statistic title="Shooting Efficiency" value={`${timeoutData.teamStats?.fgPercentage ?? 0}%`} />
                       </Col>
                       <Col span={12}>
-                        <Statistic title="Rebound Rate" value={`${timeoutData.teamStats.totalRebounds}`} />
+                        <Statistic title="Rebound Rate" value={`${timeoutData.teamStats?.totalRebounds ?? 0}`} />
                       </Col>
                       <Col span={12}>
-                        <Statistic title="A/T Ratio" value={timeoutData.teamStats.assistToTurnoverRatio.toFixed(2)} />
+                        <Statistic title="A/T Ratio" value={(timeoutData.teamStats?.assistToTurnoverRatio ?? 0).toFixed(2)} />
                       </Col>
                       <Col span={12}>
-                        <Statistic title="Points (2min)" value={timeoutData.teamStats.totalPoints} />
+                        <Statistic title="Points (2min)" value={timeoutData.teamStats?.totalPoints ?? 0} />
                       </Col>
                     </Row>
                   </Card>
@@ -3126,26 +5357,20 @@ const Statistics = () => {
                       </div>
                       {timeoutData.hotOpponent && (
                         <div>
-                          <Text strong>Hot Opponent:</Text> {timeoutData.hotOpponent.name} ({timeoutData.hotOpponent.points} pts)
+                          <Text strong>Hot Opponent:</Text> {timeoutData.hotOpponent?.name ?? 'N/A'} ({timeoutData.hotOpponent?.points ?? 0} pts)
                         </div>
                       )}
                     </div>
                   </Card>
                 </Col>
-                <Col span={12}>
-                  <Card title="🎯 Game Pace & Projections" className={style.insightCard}>
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Statistic title="Current Pace" value={`${timeoutData.pace} pts/game`} />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic title="Projected Final" value={`${timeoutData.projectedFinal} pts`} />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic title="Lead/Deficit" value={timeoutData.lead} />
-                      </Col>
-                    </Row>
-                  </Card>
+                {/* Removed score context per request */}
+                <Col span={24}>
+                  <TeamComparisonTable 
+                    teamStats={timeoutData.teamStats || {}} 
+                    opponentStats={(timeoutData as any).opponentStats || {}} 
+                    teamName="HOME"
+                    opponentName="OPPONENT"
+                  />
                 </Col>
                 <Col span={24}>
                   <Card title="💡 Strategic Recommendations" className={style.recommendations}>
@@ -3175,6 +5400,20 @@ const Statistics = () => {
         open={showExportModal}
         onCancel={() => setShowExportModal(false)}
         footer={null}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <Button icon={<DownloadOutlined />} onClick={() => exportGameData('json')} block>
@@ -3183,14 +5422,989 @@ const Statistics = () => {
           <Button icon={<DownloadOutlined />} onClick={() => exportGameData('csv')} block>
             Export as CSV
           </Button>
+          <Button 
+            icon={<DownloadOutlined />} 
+            onClick={() => exportGameData('maxpreps')} 
+            block
+            style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#ffffff', fontWeight: 700 }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div>Export for MaxPreps (.txt)</div>
+              
+            </div>
+          </Button>
         </Space>
+      </Modal>
+
+      {/* Points in Paint Modal */}
+      <Modal
+        open={showPipModal}
+        onCancel={() => handlePipConfirm(false)}
+        footer={null}
+        centered
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '24px' }}>
+            Was this 2-point field goal made in the paint?
+          </p>
+          <Space size="large">
+            <Button 
+              type="primary" 
+              size="large"
+              onClick={() => handlePipConfirm(true)}
+              style={{ 
+                minWidth: '200px', 
+                height: '80px', 
+                fontSize: '24px',
+                fontWeight: 'bold',
+                padding: '12px 24px'
+              }}
+            >
+              ✓ Yes
+            </Button>
+            <Button 
+              size="large"
+              onClick={() => handlePipConfirm(false)}
+              style={{ 
+                minWidth: '200px', 
+                height: '80px', 
+                fontSize: '24px',
+                fontWeight: 'bold',
+                padding: '12px 24px'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div>✕ No</div>
+                <Text type="secondary" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  (or click out)
+                </Text>
+              </div>
+            </Button>
+          </Space>
+        </div>
+      </Modal>
+
+      {/* Assist Selection Modal */}
+      <Modal
+        open={showAssistModal}
+        onCancel={() => handleAssistConfirm(null)}
+        footer={null}
+        centered
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <div style={{ padding: '20px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '24px', textAlign: 'center' }}>
+            Who assisted on this field goal?
+          </p>
+          
+          {/* 2x2 Grid of other 4 players */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '12px', 
+            marginBottom: '24px',
+            maxWidth: '400px',
+            margin: '0 auto 24px auto'
+          }}>
+            {(() => {
+              if (!pendingAssistEvent) return null
+              
+              // Get the other 4 players (excluding the scorer)
+              const scorerId = pendingAssistEvent.playerId
+              const isOpponent = pendingAssistEvent.isOpponent
+              const opponentSlot = pendingAssistEvent.opponentSlot
+              
+              let otherPlayers = []
+              
+              if (isOpponent) {
+                // For opponent players, get the other 4 opponent players on court
+                otherPlayers = opponentOnCourt
+                  .map((jersey, index) => ({ jersey, index }))
+                  .filter(({ jersey, index }) => jersey && index !== opponentSlot)
+                  .map(({ jersey, index }) => ({
+                    id: `opponent-${index}`,
+                    number: jersey,
+                    name: `#${jersey}`,
+                    position: 'Opponent'
+                  }))
+              } else {
+                // For home team players, get the other 4 players from current lineup
+                if (!currentLineup) return null
+                otherPlayers = currentLineup.players
+                  .filter(playerId => playerId !== scorerId)
+                  .map(playerId => players.find(p => p.id === playerId))
+                  .filter(Boolean)
+              }
+              
+              return otherPlayers.map((player, index) => {
+                if (!player) return null
+                return (
+                  <div
+                    key={player.id}
+                    onClick={() => handleAssistConfirm(player.id)}
+                    style={{
+                      padding: '16px',
+                      border: '2px solid #434343',
+                      borderRadius: '12px',
+                      background: '#262626',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'center',
+                      minHeight: '80px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#1890ff'
+                      e.currentTarget.style.background = '#1a3a5c'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#434343'
+                      e.currentTarget.style.background = '#262626'
+                    }}
+                  >
+                    <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                      {player.name}
+                    </Text>
+                    {!isOpponent && (
+                      <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.35rem' }}>
+                        {`#${player.number} | ${player.position}`}
+                      </Text>
+                    )}
+                    {isOpponent && (
+                      <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        Opponent
+                      </Text>
+                    )}
+                  </div>
+                )
+              })
+            })()}
+          </div>
+          
+          {/* Wide red No Assist button */}
+          <div style={{ textAlign: 'center' }}>
+            <Button 
+              danger
+              size="large"
+              onClick={() => handleAssistConfirm(null)}
+              style={{ 
+                minWidth: '300px',
+                height: '48px',
+                fontSize: '16px',
+                fontWeight: 600
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div>✕   No Assist   ✕</div>
+                <Text type="secondary" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  (or click out)
+                </Text>
+              </div>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Block Selection Modal */}
+      <Modal
+        open={showBlockModal}
+        onCancel={() => {
+          message.warning('Please select whose shot was blocked to complete the block')
+        }}
+        footer={null}
+        centered
+        closable={false}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa',
+            position: 'relative'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        {/* X button to undo the block action - positioned at top right of modal */}
+        <Button
+          type="text"
+          icon={<CloseOutlined />}
+          onClick={() => {
+            // Undo the block action by removing the last block event
+            if (pendingBlockEvent) {
+              const { playerId, isOpponent, opponentSlot } = pendingBlockEvent
+              
+              // Remove the block event from events
+              setEvents(prev => prev.filter(event => 
+                !(event.eventType === 'block' && 
+                  event.playerId === (isOpponent ? -1 : playerId) &&
+                  event.timestamp > Date.now() - 5000) // Remove recent block events
+              ))
+              
+              // Update player stats to remove the block
+              if (isOpponent) {
+                // For opponent, we can't easily track individual stats, so just remove the event
+              } else if (playerId) {
+                // For home team, update the player's block count
+                setPlayers(prev => prev.map(p => 
+                  p.id === playerId 
+                    ? { ...p, blocks: Math.max(0, p.blocks - 1) }
+                    : p
+                ))
+              }
+            }
+            
+            setShowBlockModal(false)
+            setPendingBlockEvent(null)
+            message.success('Block action undone')
+          }}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            color: '#ff4d4f',
+            fontSize: '18px',
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid #ff4d4f',
+            borderRadius: '50%',
+            zIndex: 1000
+          }}
+        />
+        <div style={{ padding: '20px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '24px', textAlign: 'center' }}>
+            Select the player whose shot was blocked:
+          </p>
+          
+          {/* 2x2 Grid of all 5 players on court */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '12px', 
+            marginBottom: '24px',
+            maxWidth: '400px',
+            margin: '0 auto 24px auto'
+          }}>
+            {(() => {
+              if (!pendingBlockEvent) return null
+              
+              const { isOpponent } = pendingBlockEvent
+              let allPlayers = []
+              
+              if (isOpponent) {
+                // For opponent blocks, show all 5 home team players from current lineup
+                if (!currentLineup) return null
+                allPlayers = currentLineup.players
+                  .map(playerId => players.find(p => p.id === playerId))
+                  .filter(Boolean)
+              } else {
+                // For home team blocks, show all 5 opponent players on court
+                allPlayers = opponentOnCourt
+                  .map((jersey, index) => ({ jersey, index }))
+                  .filter(({ jersey }) => jersey)
+                  .map(({ jersey, index }) => ({
+                    id: `opponent-${index}`,
+                    number: jersey,
+                    name: jersey,
+                    position: 'Opponent'
+                  }))
+              }
+              
+              return allPlayers.map((player, index) => {
+                if (!player) return null
+                return (
+                  <div
+                    key={player.id}
+                    onClick={() => handleBlockConfirm(player.id)}
+                    style={{
+                      padding: '16px',
+                      border: '2px solid #434343',
+                      borderRadius: '12px',
+                      background: '#262626',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'center',
+                      minHeight: '80px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#1890ff'
+                      e.currentTarget.style.background = '#1a3a5c'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#434343'
+                      e.currentTarget.style.background = '#262626'
+                    }}
+                  >
+                    <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                      {player.name}
+                    </Text>
+                    <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                    #{player.number} | {player.position}
+                    </Text>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Rebound Selection Modal */}
+      <Modal
+        
+        open={showReboundModal}
+        onCancel={() => handleReboundConfirm(null)}
+        footer={null}
+        centered
+        width={1100}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <div style={{ padding: '12px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '12px', textAlign: 'center' }}>
+            Who got the rebound?
+          </p>
+          
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+            {/* Home Team */}
+            <div style={{ flex: 1 }}>
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                <Text strong style={{ fontSize: '18px', color: '#f5f7fa' }}>Home Team</Text>
+              </div>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '8px'
+              }}>
+                {(() => {
+                  const homePlayers = players.filter(p => p.isOnCourt)
+                  return homePlayers.slice(0, 5).map((player, index) => (
+                    <div key={player.id}>
+                      <div
+                        onClick={() => handleReboundConfirm(player.id, false)}
+                        style={{
+                          padding: '8px',
+                          border: '2px solid #434343',
+                          borderRadius: '12px',
+                          background: '#262626',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          textAlign: 'center',
+                          width: '240px',
+                          height: '70px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#1890ff'
+                          e.currentTarget.style.background = '#1a3a5c'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#434343'
+                          e.currentTarget.style.background = '#262626'
+                        }}
+                      >
+                        <Text strong style={{ 
+                          color: '#f5f7fa', 
+                          fontSize: `#${player.number} ${player.name}`.length > 20 ? '1rem' : '1.25rem', 
+                          display: 'block',
+                          lineHeight: '1.2',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                           {player.name}
+                        </Text>
+                        <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        #{player.number} | {player.position}
+                        </Text>
+                      </div>
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+            
+            {/* Vertical Divider */}
+            <div style={{ 
+              width: '2px', 
+              background: '#434343', 
+              margin: '6px 10px',
+              height: '225px' // Shorter height for just the first 2 rows
+            }}></div>
+            
+            {/* Opponent Team */}
+            <div style={{ flex: 1 }}>
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                <Text strong style={{ fontSize: '18px', color: '#f5f7fa' }}>Opponent</Text>
+              </div>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '8px'
+              }}>
+                {(() => {
+                  const opponentEntries = Object.entries(opponentOnCourt).filter(([slot, jerseyNumber]) => jerseyNumber?.trim())
+                  const players = opponentEntries.slice(0, 5)
+                  
+                  // Create a 2x3 grid with empty slots where needed
+                  const gridSlots = [
+                    [players[0], players[1]], // Row 1: players 1, 2
+                    [players[2], players[3]], // Row 2: players 3, 4  
+                    [null, players[4]]        // Row 3: empty, player 5 (right column)
+                  ]
+                  
+                  return gridSlots.flat().map((player, index) => (
+                    <div key={player ? player[0] : `empty-${index}`}>
+                      {player ? (
+                        <div
+                          onClick={() => handleReboundConfirm(parseInt(player[0]), true)}
+                        style={{
+                            padding: '8px',
+                          border: '2px solid #434343',
+                          borderRadius: '12px',
+                          background: '#262626',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          textAlign: 'center',
+                            width: '240px',
+                            height: '70px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#ff4d4f'
+                          e.currentTarget.style.background = '#5c1a1a'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#434343'
+                          e.currentTarget.style.background = '#262626'
+                        }}
+                      >
+                          <Text strong style={{ 
+                            color: '#f5f7fa', 
+                            fontSize: '1.25rem', 
+                            display: 'block',
+                            lineHeight: '1.2',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            #{player[1]}
+                        </Text>
+                        <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        Opponent
+                        </Text>
+                      </div>
+                      ) : (
+                        <div style={{ width: '240px', height: '70px' }}></div>
+                      )}
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+          </div>
+          
+          {/* No Rebound button - positioned in the empty slot between teams below the divider */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            marginTop: '0px',
+            paddingLeft: '60px', // Start from halfway of second home column (240px/2)
+            paddingRight: '60px' // End at halfway of first opponent column (240px/2)
+          }}>
+            <div style={{ 
+              padding: '8px',
+              border: '2px solid #434343',
+              borderRadius: '12px',
+              background: '#262626',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              textAlign: 'center',
+              height: '70px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              width: '100%',
+              maxWidth: '300px'
+            }}
+            onClick={() => handleReboundConfirm(null)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#ff4d4f'
+              e.currentTarget.style.background = '#5c1a1a'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#434343'
+              e.currentTarget.style.background = '#262626'
+            }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                  ✕ No Rebound ✕
+                </Text>
+                <Text type="secondary" style={{ fontSize: '0.8rem', marginTop: '0px', color: '#a6a6a6' }}>
+                  (or click out)
+                </Text>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Steal Selection Modal */}
+      <Modal
+        open={showStealModal}
+        onCancel={() => {
+          message.warning('Please select who turned the ball over to complete the steal')
+        }}
+        closable={false}
+        footer={null}
+        centered
+        width={600}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa',
+            position: 'relative'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        {/* X button to undo the steal action - positioned at top right of modal */}
+        <Button
+          type="text"
+          icon={<CloseOutlined />}
+          onClick={() => {
+            // Undo the steal action by removing the last steal event
+            if (pendingStealEvent) {
+              const { playerId, isOpponent, opponentSlot } = pendingStealEvent
+              
+              // Remove the steal event from events
+              setEvents(prev => prev.filter(event => 
+                !(event.eventType === 'steal' && 
+                  event.playerId === (isOpponent ? -1 : playerId) &&
+                  event.timestamp > Date.now() - 5000) // Remove recent steal events
+              ))
+              
+              // Update player stats to remove the steal
+              if (isOpponent) {
+                // For opponent, we can't easily track individual stats, so just remove the event
+              } else if (playerId) {
+                // For home team, update the player's steal count
+                setPlayers(prev => prev.map(p => 
+                  p.id === playerId 
+                    ? { ...p, steals: Math.max(0, p.steals - 1) }
+                    : p
+                ))
+              }
+            }
+            
+            setShowStealModal(false)
+            setPendingStealEvent(null)
+            message.success('Steal action undone')
+          }}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            color: '#ff4d4f',
+            fontSize: '18px',
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid #ff4d4f',
+            borderRadius: '50%',
+            zIndex: 1000
+          }}
+        />
+        <div style={{ padding: '20px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '24px', textAlign: 'center' }}>
+            Who turned the ball over?
+          </p>
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '12px'
+          }}>
+            {(() => {
+              // Show opposite team players (if home player stole, show opponent players)
+              const { isOpponent } = pendingStealEvent || {}
+              
+              if (isOpponent) {
+                // Opponent stole, show home team players
+                const homePlayers = players.filter(p => p.isOnCourt)
+                return homePlayers.map((player) => (
+                  <div key={player.id}>
+                    <div
+                      onClick={() => handleStealConfirm(player.id, false)}
+                      style={{
+                        padding: '16px',
+                        border: '2px solid #434343',
+                        borderRadius: '12px',
+                        background: '#262626',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'center',
+                        minHeight: '80px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#1890ff'
+                        e.currentTarget.style.background = '#1a3a5c'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#434343'
+                        e.currentTarget.style.background = '#262626'
+                      }}
+                    >
+                      <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                        #{player.number} {player.name}
+                      </Text>
+                      <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        {player.position}
+                      </Text>
+                    </div>
+                  </div>
+                ))
+              } else {
+                // Home player stole, show opponent players
+                const opponentEntries = Object.entries(opponentOnCourt).filter(([slot, jerseyNumber]) => jerseyNumber?.trim())
+                return opponentEntries.map(([slot, jerseyNumber]) => (
+                  <div key={slot}>
+                    <div
+                      onClick={() => handleStealConfirm(parseInt(slot), true)}
+                      style={{
+                        padding: '16px',
+                        border: '2px solid #434343',
+                        borderRadius: '12px',
+                        background: '#262626',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'center',
+                        minHeight: '80px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#ff4d4f'
+                        e.currentTarget.style.background = '#5c1a1a'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#434343'
+                        e.currentTarget.style.background = '#262626'
+                      }}
+                    >
+                      <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                        #{jerseyNumber}
+                      </Text>
+                      <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        Opponent
+                      </Text>
+                    </div>
+                  </div>
+                ))
+              }
+            })()}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Turnover Selection Modal */}
+      <Modal
+        open={showTurnoverModal}
+        onCancel={() => handleTurnoverConfirm(null)}
+        footer={null}
+        centered
+        width={600}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <div style={{ padding: '20px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '24px', textAlign: 'center' }}>
+            Who stole the ball?
+          </p>
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '12px',
+            maxWidth: '500px',
+            margin: '0 auto'
+          }}>
+            {(() => {
+              // Show opposite team players (if home player turned it over, show opponent players)
+              const { isOpponent } = pendingTurnoverEvent || {}
+              
+              if (isOpponent) {
+                // Opponent turned it over, show home team players
+                const homePlayers = players.filter(p => p.isOnCourt)
+                return homePlayers.map((player) => (
+                  <div key={player.id}>
+                    <div
+                      onClick={() => handleTurnoverConfirm(player.id, false)}
+                      style={{
+                        padding: '8px',
+                        border: '2px solid #434343',
+                        borderRadius: '12px',
+                        background: '#262626',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'center',
+                        width: '100%',
+                        height: '70px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#1890ff'
+                        e.currentTarget.style.background = '#1a3a5c'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#434343'
+                        e.currentTarget.style.background = '#262626'
+                      }}
+                    >
+                      <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                        #{player.number} {player.name}
+                      </Text>
+                      <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        {player.position}
+                      </Text>
+                    </div>
+                  </div>
+                ))
+              } else {
+                // Home player turned it over, show opponent players
+                const opponentEntries = Object.entries(opponentOnCourt).filter(([slot, jerseyNumber]) => jerseyNumber?.trim())
+                return opponentEntries.map(([slot, jerseyNumber]) => (
+                  <div key={slot}>
+                    <div
+                      onClick={() => handleTurnoverConfirm(parseInt(slot), true)}
+                      style={{
+                        padding: '8px',
+                        border: '2px solid #434343',
+                        borderRadius: '12px',
+                        background: '#262626',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'center',
+                        width: '100%',
+                        height: '70px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#1890ff'
+                        e.currentTarget.style.background = '#1a3a5c'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#434343'
+                        e.currentTarget.style.background = '#262626'
+                      }}
+                    >
+                      <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                        #{jerseyNumber}
+                      </Text>
+                      <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '1.1rem' }}>
+                        Opponent
+                      </Text>
+                    </div>
+                  </div>
+                ))
+              }
+            })()}
+            
+            {/* No Steal button */}
+            <div>
+              <div
+                onClick={() => handleTurnoverConfirm(null)}
+                style={{
+                  padding: '8px',
+                  border: '2px solid #434343',
+                  borderRadius: '12px',
+                  background: '#262626',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'center',
+                  width: '100%',
+                  height: '70px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#ff4d4f'
+                  e.currentTarget.style.background = '#5c1a1a'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#434343'
+                  e.currentTarget.style.background = '#262626'
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '1.25rem', display: 'block' }}>
+                    ✕ No Steal ✕
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: '0.8rem', marginTop: '4px', color: '#a6a6a6' }}>
+                    (or click out)
+                  </Text>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Foul Type Selection Modal */}
+      <Modal
+        open={showFoulModal}
+        onCancel={() => handleFoulConfirm(false)}
+        footer={null}
+        centered
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ fontSize: '22px', marginBottom: '24px' }}>
+            What type of foul was this?
+          </p>
+          <Space size="large">
+            <Button 
+              type="primary" 
+              size="large"
+              onClick={() => handleFoulConfirm(false)}
+              style={{ 
+                minWidth: '200px', 
+                height: '80px', 
+                fontSize: '24px',
+                fontWeight: 'bold',
+                padding: '12px 24px'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div>Defensive</div>
+                <Text type="secondary" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  (or click out)
+                </Text>
+              </div>
+            </Button>
+            <Button 
+              size="large"
+              onClick={() => handleFoulConfirm(true)}
+              style={{ 
+                minWidth: '200px', 
+                height: '80px', 
+                fontSize: '24px',
+                fontWeight: 'bold',
+                padding: '12px 24px'
+              }}
+                        >
+              Offensive
+            </Button>
+          </Space>
+          
+        </div>
       </Modal>
 
       {/* Settings Modal */}
       <Modal
         title="Game Settings"
         open={showSettingsModal}
-        onCancel={() => setShowSettingsModal(false)}
+        onCancel={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}
         width={800}
         footer={[
           <Button key="reset" onClick={resetSettings}>
@@ -3199,10 +6413,10 @@ const Statistics = () => {
           // <Button key="export" onClick={exportSettings}>
           //   Export Settings
           // </Button>,
-          <Button key="cancel" onClick={() => setShowSettingsModal(false)}>
+          <Button key="cancel" onClick={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}>
             Cancel
           </Button>,
-          <Button key="save" type="primary" onClick={() => setShowSettingsModal(false)}>
+          <Button key="save" type="primary" onClick={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}>
             Save Settings
           </Button>
         ]}
@@ -3236,9 +6450,7 @@ const Statistics = () => {
               label: 'Workflow',
               children: (
                 <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Workflow Mode:" controlType="select" value={settings.workflowMode} onChange={value => saveSettings({ workflowMode: value })} options={[{value: 'player-first', label: 'Player First (Select player, then action)'}, {value: 'action-first', label: 'Action First (Select action, then player)'}]} />
-                  </Col>
+
                   <Col span={12}>
                     <SettingRow label="Auto-pause on Timeout:" controlType="switch" value={settings.autoPauseOnTimeout} onChange={checked => saveSettings({ autoPauseOnTimeout: checked })} />
                   </Col>
@@ -3266,8 +6478,9 @@ const Statistics = () => {
                     <SettingRow label="Show Efficiency Ratings:" controlType="switch" value={settings.showEfficiencyRatings} onChange={checked => saveSettings({ showEfficiencyRatings: checked })} />
                   </Col>
                   <Col span={12}>
-                    <SettingRow label="Compact Mode:" controlType="switch" value={settings.compactMode} onChange={checked => saveSettings({ compactMode: checked })} />
+                    <SettingRow label="Ask after 2PT Made: Points in Paint?" controlType="switch" value={settings.askForPointsInPaint} onChange={checked => saveSettings({ askForPointsInPaint: checked })} />
                   </Col>
+
                 </Row>
               )
             },
@@ -3342,16 +6555,214 @@ const Statistics = () => {
                   </Col>
                 </Row>
               )
+            },
+            {
+              key: 'offline',
+              label: 'Offline Management',
+              children: (
+                <Row gutter={[16, 16]}>
+                  <Col span={24}>
+                    <Card title="Offline Storage Status" size="small" style={{ marginBottom: 16 }}>
+                      <Row gutter={[16, 16]}>
+                        <Col span={8}>
+                          <Statistic 
+                            title="Storage Used" 
+                            value={liveStatService.getStorageUsage().percentage} 
+                            suffix="%" 
+                            valueStyle={{ color: liveStatService.getStorageUsage().percentage > 80 ? '#f5222d' : '#52c41a' }}
+                          />
+                        </Col>
+                        <Col span={8}>
+                          <Statistic 
+                            title="Saved Games" 
+                            value={savedGames.length} 
+                            suffix="games"
+                          />
+                        </Col>
+                        <Col span={8}>
+                          <Statistic 
+                            title="Connection" 
+                            value={liveStatService.getOfflineStatus().isOnline ? 'Online' : 'Offline'} 
+                            valueStyle={{ color: liveStatService.getOfflineStatus().isOnline ? '#52c41a' : '#f5222d' }}
+                          />
+                        </Col>
+                      </Row>
+                    </Card>
+                  </Col>
+                  <Col span={12}>
+                    <Button 
+                      type="primary" 
+                      icon={<DownloadOutlined />}
+                      onClick={() => {
+                        const data = liveStatService.exportOfflineData()
+                        const blob = new Blob([data], { type: 'application/json' })
+                        const url = URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.download = `offline-data-${Date.now()}.json`
+                        link.click()
+                        message.success('Offline data exported successfully')
+                      }}
+                      block
+                    >
+                      Export All Offline Data
+                    </Button>
+                  </Col>
+                  <Col span={12}>
+                    <Button 
+                      danger
+                      icon={<CloseOutlined />}
+                      onClick={() => {
+                        modal.confirm({
+                          title: 'Clear All Offline Data',
+                          content: 'This will permanently delete all saved games and offline data. This action cannot be undone.',
+                          okText: 'Clear All',
+                          cancelText: 'Cancel',
+                          onOk: async () => {
+                            liveStatService.clearAllOfflineData()
+                            message.success('All offline data cleared')
+                            refreshSavedGames()
+                          }
+                        })
+                      }}
+                      block
+                    >
+                      Clear All Offline Data
+                    </Button>
+                  </Col>
+                  <Col span={24}>
+                    <Card 
+                      title="Saved Games" 
+                      size="small"
+                      extra={
+                        <Space>
+                          <Button 
+                            size="small" 
+                            icon={<ReloadOutlined />} 
+                            onClick={refreshSavedGames}
+                          >
+                            Refresh
+                          </Button>
+                          <Button 
+                            size="small" 
+                            type="primary"
+                            onClick={async () => {
+                              try {
+                                const sessionId = liveStatService.getCurrentSessionKey()
+                                if (sessionId) {
+                                  const result = await liveStatService.aggregateGameStats(parseInt(sessionId))
+                                  message.success(`Stats aggregated! Game ID: ${result.gameId}`)
+                                  refreshSavedGames()
+                                } else {
+                                  message.info('No active session to aggregate')
+                                }
+                              } catch (error) {
+                                console.error('Failed to aggregate stats:', error)
+                                message.error('Failed to aggregate stats')
+                              }
+                            }}
+                          >
+                            Aggregate Current
+                          </Button>
+                          <Button 
+                            size="small" 
+                            type="default"
+                            onClick={async () => {
+                              try {
+                                // Aggregate the existing session (ID 1) that has data
+                                const result = await liveStatService.aggregateExistingSession(1)
+                                message.success(`Existing session aggregated! Game ID: ${result.gameId}`)
+                                refreshSavedGames()
+                              } catch (error) {
+                                console.error('Failed to aggregate existing session:', error)
+                                message.error('Failed to aggregate existing session')
+                              }
+                            }}
+                          >
+                            Aggregate Existing
+                          </Button>
+                        </Space>
+                      }
+                    >
+                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {savedGames.length > 0 ? (
+                          savedGames.map((game, index) => (
+                            <div key={game.id} style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              padding: '10px 14px',
+                              margin: '6px 0',
+                              background: index % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.1)',
+                              borderRadius: 8,
+                              border: '1px solid rgba(255,255,255,0.12)'
+                            }}>
+                              <div>
+                                <Text strong>Event #{game.eventId}</Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '0.8rem' }}>
+                                  {new Date(game.timestamp).toLocaleString()} • {game.events.length} events
+                                </Text>
+                              </div>
+                              <Space>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => {
+                                    if (game.eventId === eventId) {
+                                      // Load this game data
+                                      const gameData = liveStatService.loadGameData(game.eventId)
+                                      if (gameData) {
+                                        setGameState(gameData.gameState)
+                                        setPlayers(gameData.players)
+                                        setEvents(gameData.events)
+                                        setLineups(gameData.lineups)
+                                        setOpponentOnCourt(gameData.opponentOnCourt)
+                                        setSubstitutionHistory(gameData.substitutionHistory)
+                                        setQuickSubHistory(gameData.quickSubHistory)
+                                        setActionHistory(gameData.actionHistory)
+                                        message.success('Game data loaded successfully')
+                                      }
+                                    } else {
+                                      message.info('Switch to Event #' + game.eventId + ' to load this game')
+                                    }
+                                  }}
+                                >
+                                  Load
+                                </Button>
+                                <Button 
+                                  size="small" 
+                                  danger
+                                  onClick={async () => {
+                                    await liveStatService.deleteGameData(game.eventId)
+                                    message.success('Game data deleted')
+                                    refreshSavedGames()
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </Space>
+                            </div>
+                          ))
+                        ) : (
+                          <Text type="secondary">No saved games found</Text>
+                        )}
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
+              )
             }
           ]}
         />
       </Modal>
 
+
       {/* Lineup Builder Modal */}
       <Modal
-        title="Create New Lineup"
+        title={currentLineup && !hasGameStarted && gameState.quarter === 1 ? "Edit Starting Lineup" : "Create New Lineup"}
         open={showLineupBuilder}
         onCancel={() => setShowLineupBuilder(false)}
+        width={800}
         footer={[
           <Button key="cancel" onClick={() => setShowLineupBuilder(false)}>
             Cancel
@@ -3359,24 +6770,56 @@ const Statistics = () => {
           <Button 
             key="create" 
             type="primary" 
-            onClick={createLineup}
+            onClick={currentLineup && !hasGameStarted && gameState.quarter === 1 ? updateLineup : createLineup}
             disabled={selectedLineupPlayers.length !== 5}
           >
-            Create Lineup ({selectedLineupPlayers.length}/5)
+            {currentLineup && !hasGameStarted && gameState.quarter === 1 ? "Update Starting Lineup" : "Create Lineup"} ({selectedLineupPlayers.length}/5)
           </Button>
         ]}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
       >
-        <div>
+        <div style={{ color: '#f5f7fa' }}>
           <div style={{ marginBottom: 16 }}>
-            <Text strong>Select 5 Players:</Text>
+            <Text strong style={{ color: '#f5f7fa' }}>Select 5 Players:</Text>
             <Input
               placeholder="Lineup name (optional)"
               value={lineupName}
               onChange={(e) => setLineupName(e.target.value)}
               style={{ marginTop: 8 }}
+              allowClear
             />
+            {lineupName && (
+              <div style={{ marginTop: 4 }}>
+                <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '0.8rem' }}>
+                  Lineup will be saved as: "{lineupName}"
+                </Text>
+              </div>
+            )}
           </div>
-          <div className={style.playerSelection}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(5, 1fr)', 
+            gap: '12px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            padding: '8px',
+            border: '1px solid #434343',
+            borderRadius: '8px',
+            backgroundColor: '#1e293b'
+          }}>
             {players.map(player => (
               <div
                 key={player.id}
@@ -3388,15 +6831,43 @@ const Statistics = () => {
                     setSelectedLineupPlayers(prev => [...prev, player.id])
                   }
                 }}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: selectedLineupPlayers.includes(player.id) 
+                    ? '2px solid #49aa19' 
+                    : '1px solid #434343',
+                  background: selectedLineupPlayers.includes(player.id)
+                    ? '#1a3a1a'
+                    : '#262626',
+                  transition: 'all 0.2s ease',
+                  minHeight: '100px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative'
+                }}
               >
-                <div>
-                  <Text strong>#{player.number} {player.name}</Text>
-                  <br />
-                  <Text type="secondary">{player.position}</Text>
+                <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                  <Badge count={player.points} style={{ backgroundColor: '#52c41a', fontSize: '0.7rem' }} />
+                  <Badge 
+                    count={player.plusMinus >= 0 ? `+${player.plusMinus}` : player.plusMinus} 
+                    style={{ 
+                      backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d',
+                      fontSize: '0.7rem'
+                    }} 
+                  />
                 </div>
-                <div>
-                  <Badge count={player.points} style={{ backgroundColor: '#52c41a' }} />
-                  <Badge count={player.plusMinus} style={{ backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d' }} />
+                <div style={{ marginTop: '20px' }}>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>
+                    #{player.number}
+                  </Text>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '0.85rem', display: 'block', marginBottom: '4px', lineHeight: '1.2' }}>
+                    {player.name}
+                  </Text>
+                  <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '0.75rem', display: 'block' }}>
+                    {player.position}
+                  </Text>
                 </div>
               </div>
             ))}
@@ -3404,6 +6875,120 @@ const Statistics = () => {
         </div>
       </Modal>
 
+      {/* Bulk Substitution Modal */}
+      <Modal
+        title="Bulk Substitution"
+        open={showBulkSubModal}
+        onCancel={() => {
+          setShowBulkSubModal(false)
+          setSelectedBulkSubPlayers([])
+        }}
+        width={800}
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setShowBulkSubModal(false)
+            setSelectedBulkSubPlayers([])
+          }}>
+            Cancel
+          </Button>,
+          <Button 
+            key="apply" 
+            type="primary" 
+            onClick={applyBulkSubstitution}
+            disabled={selectedBulkSubPlayers.length !== 5}
+          >
+            Apply Substitution ({selectedBulkSubPlayers.length}/5)
+          </Button>
+        ]}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <div style={{ color: '#f5f7fa' }}>
+          <div style={{ marginBottom: 16 }}>
+            <Text strong style={{ color: '#f5f7fa' }}>Select 5 Players for New Lineup:</Text>
+            <div style={{ marginTop: 8, padding: '8px 12px', background: '#1a3a1a', borderRadius: 6, border: '1px solid #49aa19' }}>
+              <Text style={{ color: '#52c41a', fontSize: '0.9rem' }}>
+                Selected: {selectedBulkSubPlayers.length}/5 players
+              </Text>
+            </div>
+          </div>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(5, 1fr)', 
+            gap: '12px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            padding: '8px',
+            border: '1px solid #434343',
+            borderRadius: '8px',
+            backgroundColor: '#1e293b'
+          }}>
+            {players.map(player => (
+              <div
+                key={player.id}
+                className={`${style.selectablePlayer} ${selectedBulkSubPlayers.includes(player.id) ? style.selected : ''}`}
+                onClick={() => {
+                  if (selectedBulkSubPlayers.includes(player.id)) {
+                    setSelectedBulkSubPlayers(prev => prev.filter(id => id !== player.id))
+                  } else if (selectedBulkSubPlayers.length < 5) {
+                    setSelectedBulkSubPlayers(prev => [...prev, player.id])
+                  }
+                }}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: selectedBulkSubPlayers.includes(player.id) 
+                    ? '2px solid #49aa19' 
+                    : '1px solid #434343',
+                  background: selectedBulkSubPlayers.includes(player.id)
+                    ? '#1a3a1a'
+                    : '#262626',
+                  transition: 'all 0.2s ease',
+                  minHeight: '100px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                  <Badge count={player.points} style={{ backgroundColor: '#52c41a', fontSize: '0.7rem' }} />
+                  <Badge 
+                    count={player.plusMinus >= 0 ? `+${player.plusMinus}` : player.plusMinus} 
+                    style={{ 
+                      backgroundColor: player.plusMinus >= 0 ? '#52c41a' : '#f5222d',
+                      fontSize: '0.7rem'
+                    }} 
+                  />
+                </div>
+                <div style={{ marginTop: '20px' }}>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>
+                    #{player.number}
+                  </Text>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '0.85rem', display: 'block', marginBottom: '4px', lineHeight: '1.2' }}>
+                    {player.name}
+                  </Text>
+                  <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '0.75rem', display: 'block' }}>
+                    {player.position}
+                  </Text>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
       {/* DEV-ONLY: Quick Substitution Modal */}
       <Modal
         title="Substitution"
@@ -3431,38 +7016,6 @@ const Statistics = () => {
         }}
       >
         <div style={{ color: '#f5f7fa' }}>
-          {/* Step 1: Select Player Out */}
-          {!substitutionPlayerOut && (
-            <>
-              <div style={{
-                background: '#1e3a5c',
-                padding: 16,
-                borderRadius: 8,
-                marginBottom: 16,
-                border: '1px solid #334155',
-                textAlign: 'center',
-              }}>
-                <Text strong style={{ color: '#f5f7fa', fontSize: '1rem' }}>
-                  Select Player to Sub OUT
-                </Text>
-              </div>
-              <Select
-                placeholder="Select player to sub out"
-                style={{ width: '100%', marginBottom: 16 }}
-                onChange={(value) => {
-                  const player = players.find(p => p.id === value)
-                  if (player) setSubstitutionPlayerOut(player)
-                }}
-                dropdownStyle={{ backgroundColor: '#1e293b' }}
-              >
-                {getCourtPlayers().map(player => (
-                  <Option key={player.id} value={player.id}>
-                    #{player.number} {player.name} ({player.position})
-                  </Option>
-                ))}
-              </Select>
-            </>
-          )}
           {/* Step 2: Select Player In */}
           {substitutionPlayerOut && !substitutionPlayerIn && (
             <>
@@ -3489,7 +7042,6 @@ const Statistics = () => {
                   const player = players.find(p => p.id === value)
                   if (player && substitutionPlayerOut) {
                     setSubstitutionPlayerIn(player)
-                    // handleQuickSubstitution will be called in the next effect
                   }
                 }}
                 dropdownStyle={{ backgroundColor: '#1e293b' }}
@@ -3502,9 +7054,58 @@ const Statistics = () => {
               </Select>
             </>
           )}
-          {/* Step 3: Perform Substitution and Close Modal */}
+          
+          {/* Step 3: Confirmation */}
           {substitutionPlayerOut && substitutionPlayerIn && (
-            <>{/* This effect will run after both are set */}</>
+            <>
+              <div style={{
+                background: '#1e3a5c',
+                padding: 16,
+                borderRadius: 8,
+                marginBottom: 16,
+                border: '1px solid #334155',
+                textAlign: 'center',
+              }}>
+                <Text strong style={{ color: '#f5f7fa', fontSize: '1rem' }}>
+                  Confirm Substitution
+                </Text>
+                <div style={{ marginTop: 8 }}>
+                  <Text style={{ color: '#f5f7fa' }}>
+                    <span style={{ color: '#ff4d4f' }}>OUT:</span> #{substitutionPlayerOut.number} {substitutionPlayerOut.name}
+                  </Text>
+                  <br />
+                  <Text style={{ color: '#f5f7fa' }}>
+                    <span style={{ color: '#52c41a' }}>IN:</span> #{substitutionPlayerIn.number} {substitutionPlayerIn.name}
+                  </Text>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <Button 
+                  onClick={() => {
+                    setSubstitutionPlayerIn(null)
+                    setSubstitutionPlayerOut(null)
+                    setShowQuickSubModal(false)
+                  }}
+                  style={{ minWidth: 100 }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="primary"
+                  onClick={() => {
+                    handleQuickSubstitution(substitutionPlayerIn, substitutionPlayerOut)
+                  }}
+                  style={{ 
+                    minWidth: 100,
+                    backgroundColor: '#52c41a',
+                    borderColor: '#52c41a'
+                  }}
+                >
+                  Confirm Sub
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </Modal>
@@ -3732,6 +7333,204 @@ const Statistics = () => {
             </>
           )}
         </div>
+      </Modal>
+
+      {/* Bottom Action Row: Exit, Save Game Data, End Game */}
+      <div style={{ 
+        backgroundColor: '#1a1a1a', 
+        borderTop: '2px solid #333333',
+        padding: '24px',
+        marginTop: '32px',
+        textAlign: 'center'
+      }}>
+        <Space size={16}>
+          <Button 
+            type="primary" 
+            danger
+            size="large"
+            icon={<CloseOutlined />}
+            onClick={async () => {
+              // End live session (without aggregating) and exit
+              if (liveSessionKey) {
+                try {
+                  await liveStatService.endLiveGame()
+                  console.log('Enhanced live session ended successfully')
+                } catch (error) {
+                  console.error('Failed to end enhanced live session:', error)
+                }
+              }
+              if (onExit) onExit();
+            }}
+            style={{ 
+              height: '48px', 
+              fontSize: '16px',
+              backgroundColor: '#ff4d4f',
+              borderColor: '#ff4d4f',
+              boxShadow: '0 2px 8px rgba(255, 77, 79, 0.3)',
+              minWidth: '200px'
+            }}
+          >
+            Exit Live Stat Tracking
+          </Button>
+
+          <Button 
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={async () => {
+              // Enhanced service: Update game state before saving
+              if (liveSessionKey) {
+                try {
+                  await liveStatService.updateGameState({
+                    quarter: gameState.quarter,
+                    currentTime: gameState.currentTime,
+                    homeScore: gameState.homeScore,
+                    awayScore: gameState.opponentScore,
+                    opponentScore: gameState.opponentScore,
+                    timeoutHome: gameState.timeoutHome,
+                    timeoutAway: gameState.timeoutAway,
+                    isPlaying: true
+                  })
+                  console.log('Enhanced game state updated before save')
+                } catch (error) {
+                  console.error('Failed to update enhanced game state before save:', error)
+                }
+              }
+              
+              saveGameDataOffline({ showToast: true })
+            }}
+            style={{ 
+              height: '48px', 
+              fontSize: '16px',
+              backgroundColor: '#52c41a',
+              borderColor: '#52c41a',
+              minWidth: '200px'
+            }}
+          >
+            Save Game Data
+          </Button>
+
+          <Button 
+            type="primary"
+            size="large"
+            icon={<StopOutlined />}
+            disabled={gameState.quarter < 4}
+            onClick={() => {
+              Modal.confirm({
+                title: 'End Game?',
+                content: 'Do you want to save game data before ending? This will finalize the session.',
+                okText: 'Save and End',
+                cancelText: 'Cancel',
+                onOk: async () => {
+                  try {
+                    // Save current game data first
+                    if (liveSessionKey) {
+                      try {
+                        await liveStatService.updateGameState({
+                          quarter: gameState.quarter,
+                          currentTime: gameState.currentTime,
+                          homeScore: gameState.homeScore,
+                          awayScore: gameState.opponentScore,
+                          opponentScore: gameState.opponentScore,
+                          timeoutHome: gameState.timeoutHome,
+                          timeoutAway: gameState.timeoutAway,
+                          isPlaying: false
+                        })
+                      } catch {}
+                    }
+                    saveGameDataOffline({ showToast: false })
+
+                    // End session (and aggregate if available in refined service flow)
+                    if (liveSessionKey) {
+                      try {
+                        const sessionId = refinedLiveStatTrackerService.getCurrentSessionKey()
+                        if (sessionId) {
+                          await refinedLiveStatTrackerService.endGameAndAggregate(parseInt(sessionId))
+                        } else {
+                          await refinedLiveStatTrackerService.endLiveGame()
+                        }
+                      } catch (e) {
+                        console.error('Failed to end game via service:', e)
+                      }
+                    }
+                    message.success('Game ended and saved')
+                  } catch (e) {
+                    message.error('Failed to end game')
+                  }
+                }
+              })
+            }}
+            style={{ 
+              height: '48px', 
+              fontSize: '16px',
+              backgroundColor: '#1677ff',
+              borderColor: '#1677ff',
+              minWidth: '200px'
+            }}
+          >
+            End Game
+          </Button>
+        </Space>
+      </div>
+
+      {/* Substitution Modal */}
+      <Modal
+        title="Substitution"
+        open={showSubModal}
+        onCancel={() => {
+          setShowSubModal(false)
+          setPlayerToSubOut(null)
+          setAvailableSubs([])
+        }}
+        footer={null}
+        width={400}
+      >
+        {playerToSubOut && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>Substituting out:</Text>
+              <div style={{ 
+                padding: 8, 
+                background: '#f0f0f0', 
+                borderRadius: 4, 
+                marginTop: 4 
+              }}>
+                #{playerToSubOut.number} {playerToSubOut.name} ({playerToSubOut.position})
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>Choose replacement:</Text>
+              <div style={{ marginTop: 8 }}>
+                {availableSubs.length > 0 ? (
+                  availableSubs.map(player => (
+                    <Button
+                      key={player.id}
+                      block
+                      style={{ 
+                        marginBottom: 8, 
+                        textAlign: 'left',
+                        height: 'auto',
+                        padding: '8px 12px'
+                      }}
+                      onClick={() => handleSubstitution(playerToSubOut, player)}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600 }}>
+                          #{player.number} {player.name}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#666' }}>
+                          {player.position}
+                        </div>
+                      </div>
+                    </Button>
+                  ))
+                ) : (
+                  <Text type="secondary">No available substitutes</Text>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

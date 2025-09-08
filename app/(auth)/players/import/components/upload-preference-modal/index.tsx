@@ -20,7 +20,7 @@ function UploadPreferenceModal({importId, isShowModal, showModal, onRefresh}: an
       onClose()
       onRefresh()
 
-      const total = res.data?.total || 0
+      const total = (res as any)?.data?.total || 0
       notification.success({
         message: 'Success',
         description: `You imported ${total} Players successfully!`

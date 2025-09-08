@@ -29,7 +29,7 @@ const Login = () => {
 
       if (data.user) {
         message.success('Login successful!')
-        router.push(ROUTES.planner.event)
+        router.push(ROUTES.dashboard)
       }
     } catch (error) {
       message.error('An unexpected error occurred')

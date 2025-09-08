@@ -1,213 +1,335 @@
-import React from 'react';
-import ExpensesChart from './ExpensesChart';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Card, Typography, Progress, Button, Table, Tag, Space, Statistic, Row, Col } from 'antd';
+import { ArrowLeftOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import styles from './style.module.scss';
+import ExpensesChart from './ExpensesChart';
 
-type BucketDetails = {
-  title: string;
-  cadence: string;
-  total: number;
-  expenses: number;
-  description: string;
-  transactions: Array<{
-    id: string;
-    receiptThumb?: string;
-    merchant: string;
-    amount: number;
-    category: string;
-    date: string;
-    event: string;
-  }>
+const { Title, Text, Paragraph } = Typography;
+
+interface Budget {
+  id: number;
+  name: string;
+  amount: number;
+  period: string;
+  description?: string;
+  categoryId: number;
+  category: {
+    name: string;
+    color: string;
+  };
+  season: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const SAMPLE_BUCKETS: Record<string, BucketDetails> = {
-  'equipment-maintenance': {
-    title: 'Equipment Maintenance',
-    cadence: 'Quarterly (Jan - March)',
-    total: 10200,
-    expenses: 7900,
-    description:
-      'This budget is allocated for the regular maintenance, repair, and replacement of team equipment throughout the season. It covers expenses such as routine servicing of training gear, replacement of damaged equipment, and purchasing new tools to ensure peak performance and player safety.',
-    transactions: [
-      { id: 't1', merchant: 'ProTools Supply', amount: 450, category: 'Equipment', date: 'Feb 12, 2025', event: 'Team Workout' },
-      { id: 't2', merchant: 'GearFix Co.', amount: 320, category: 'Equipment', date: 'Feb 09, 2025', event: 'Weekly Practice' },
-      { id: 't3', merchant: 'LockerRoom LLC', amount: 185, category: 'Supplies', date: 'Jan 30, 2025', event: 'Preseason' },
-    ],
-  },
-  'food-drink': {
-    title: 'Food & Drink',
-    cadence: 'Monthly (Feb 2025)',
-    total: 5000,
-    expenses: 4200,
-    description:
-      'Covers meals, snacks, and hydration for players and staff across games, practices, and events. Focused on fueling performance and recovery.',
-    transactions: [
-      { id: 't4', merchant: 'PowerFuel Catering', amount: 900, category: 'Catering', date: 'Feb 10, 2025', event: 'Home Game' },
-      { id: 't5', merchant: 'Hydrate+ Water', amount: 210, category: 'Beverages', date: 'Feb 06, 2025', event: 'Practice' },
-    ],
-  },
-  'tournament-league-fees': {
-    title: 'Tournament & League Fees',
-    cadence: 'Yearly (2025)',
-    total: 25000,
-    expenses: 25500,
-    description:
-      'Registration fees and league dues for tournaments and seasonal play. Includes sanctioning and administrative costs.',
-    transactions: [
-      { id: 't6', merchant: 'National League', amount: 12500, category: 'Fees', date: 'Jan 02, 2025', event: 'Season Registration' },
-      { id: 't7', merchant: 'Spring Classic', amount: 13000, category: 'Fees', date: 'Feb 14, 2025', event: 'Tournament' },
-    ],
-  },
-};
-
-function slugToTitle(slug: string): string {
-  return slug
-    .split('-')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(' ');
+interface Expense {
+  id: number;
+  merchant: string;
+  amount: number;
+  category: string;
+  date: string;
+  description?: string;
+  receiptUrl?: string;
+  eventId?: number;
+  event?: {
+    name: string;
+  };
 }
 
-export default async function BucketDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+interface BudgetDetails {
+  budget: Budget;
+  expenses: Expense[];
+  totalSpent: number;
+  remaining: number;
+  spentPercentage: number;
+}
 
-  const data: BucketDetails | undefined = SAMPLE_BUCKETS[slug];
+export default function BucketDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
+  const [budgetDetails, setBudgetDetails] = useState<BudgetDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [budgetId, setBudgetId] = useState<number | null>(null);
 
-  if (!data) {
-    const fallbackTitle = slugToTitle(slug);
+  useEffect(() => {
+    const fetchBudgetDetails = async () => {
+      try {
+        const resolvedParams = await params;
+        const slug = resolvedParams.slug;
+        
+        // Try to parse slug as budget ID first
+        const id = parseInt(slug);
+        if (!isNaN(id)) {
+          setBudgetId(id);
+          await fetchBudgetById(id);
+        } else {
+          // If not a number, try to find by name (fallback)
+          await fetchBudgetByName(slug);
+        }
+      } catch (error) {
+        console.error('Error fetching budget details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBudgetDetails();
+  }, []); // Remove params from dependency array to avoid read-only property errors
+
+  const fetchBudgetById = async (id: number) => {
+    try {
+      const response = await fetch(`/api/budgets/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBudgetDetails(data.data);
+      } else {
+        console.error('Failed to fetch budget:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching budget:', error);
+    }
+  };
+
+  const fetchBudgetByName = async (name: string) => {
+    try {
+      const response = await fetch(`/api/budgets?name=${encodeURIComponent(name)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data && data.data.length > 0) {
+          const budget = data.data[0];
+          setBudgetId(budget.id);
+          await fetchBudgetById(budget.id);
+        }
+      } else {
+        console.error('Failed to fetch budget by name:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching budget by name:', error);
+    }
+  };
+
+  const handleBudgetDeleted = async () => {
+    // Redirect back to budgets page
+    window.location.href = '/budgets';
+  };
+
+  const handleExpenseDeleted = async (expenseId: number) => {
+    try {
+      const response = await fetch(`/api/expenses/${expenseId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        // Refresh budget details
+        if (budgetId) {
+          await fetchBudgetById(budgetId);
+        }
+      } else {
+        console.error('Failed to delete expense');
+      }
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+    }
+  };
+
+  if (loading) {
+    return <div>Loading budget details...</div>;
+  }
+
+  if (!budgetDetails) {
     return (
       <main className={styles.detailsRoot}>
         <div className={styles.headerBar}>
           <div className={styles.backRow}>
-            <Link href="/budgets" className={styles.backLink}>&larr; Back</Link>
-            <h1 className={styles.pageTitle}>Budget / {fallbackTitle}</h1>
+            <Link href="/budgets" className={styles.backLink}>
+              <ArrowLeftOutlined /> Back
+            </Link>
+            <Title level={1} className={styles.pageTitle}>
+              Budget Not Found
+            </Title>
           </div>
         </div>
         <div className={styles.detailsGrid}>
-          <div className={styles.summaryCard}>
+          <Card className={styles.summaryCard}>
             <div className={styles.summaryHead}>
-              <div className={styles.summaryTitle}>{fallbackTitle}</div>
-              <div className={styles.summaryCadence}>Budget</div>
+              <div className={styles.summaryTitle}>Budget Not Found</div>
+              <div className={styles.summaryCadence}>No Data</div>
             </div>
-            <p className={styles.description}>No configured data for this bucket yet.</p>
-          </div>
+            <Paragraph className={styles.description}>
+              The requested budget could not be found. Please check the URL or return to the budgets list.
+            </Paragraph>
+            <Link href="/budgets">
+              <Button type="primary">Return to Budgets</Button>
+            </Link>
+          </Card>
         </div>
       </main>
     );
   }
 
-  const remaining = Math.max(0, data.total - data.expenses);
-  const expensesPct = Math.min(100, (data.expenses / data.total) * 100);
-  const remainingPct = Math.min(100, (remaining / data.total) * 100);
+  const { budget, expenses, totalSpent, remaining, spentPercentage } = budgetDetails;
 
   return (
     <main className={styles.detailsRoot}>
       <div className={styles.headerBar}>
         <div className={styles.backRow}>
-          <Link href="/budgets" className={styles.backLink}>&larr; Back</Link>
-          <h1 className={styles.pageTitle}>Budget / {data.title}</h1>
+          <Link href="/budgets" className={styles.backLink}>
+            <ArrowLeftOutlined /> Back
+          </Link>
+          <Title level={1} className={styles.pageTitle}>
+            Budget / {budget.name}
+          </Title>
         </div>
-        <div className={styles.headerActions}>
-          <button className={styles.primaryBtn}>Export Report</button>
-        </div>
+        <Space>
+          <Button icon={<EditOutlined />}>Edit Budget</Button>
+          <Button 
+            danger 
+            icon={<DeleteOutlined />}
+            onClick={handleBudgetDeleted}
+          >
+            Delete Budget
+          </Button>
+        </Space>
       </div>
 
       <div className={styles.detailsGrid}>
-        {/* Left: Summary */}
-        <section className={styles.summaryCard}>
+        {/* Budget Summary Card */}
+        <Card className={styles.summaryCard}>
           <div className={styles.summaryHead}>
-            <div className={styles.summaryTitle}>{data.title}</div>
-            <div className={styles.summaryCadence}>{data.cadence}</div>
+            <div className={styles.summaryTitle}>{budget.name}</div>
+            <div className={styles.summaryCadence}>
+              {budget.period} ({budget.season})
+            </div>
           </div>
-          <p className={styles.description}>{data.description}</p>
+          <Paragraph className={styles.description}>
+            {budget.description || 'No description provided.'}
+          </Paragraph>
+          
+          <Row gutter={16} className={styles.summaryStats}>
+            <Col span={8}>
+              <Statistic
+                title="Total Budget"
+                value={budget.amount}
+                prefix="$"
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Col>
+            <Col span={8}>
+              <Statistic
+                title="Spent"
+                value={totalSpent}
+                prefix="$"
+                valueStyle={{ color: '#fa8c16' }}
+              />
+            </Col>
+            <Col span={8}>
+              <Statistic
+                title="Remaining"
+                value={remaining}
+                prefix="$"
+                valueStyle={{ color: remaining >= 0 ? '#52c41a' : '#f5222d' }}
+              />
+            </Col>
+          </Row>
 
-          <div className={styles.rowBetweenLg}>
-            <span>Total Budget</span>
-            <strong>${data.total.toLocaleString()}</strong>
+          <div className={styles.progressSection}>
+            <div className={styles.progressHeader}>
+              <Text>Budget Usage</Text>
+              <Text>{spentPercentage.toFixed(1)}%</Text>
+            </div>
+            <Progress
+              percent={Math.min(100, spentPercentage)}
+              strokeColor={spentPercentage > 100 ? '#f5222d' : '#52c41a'}
+              showInfo={false}
+            />
           </div>
-          <div className={styles.rowBetweenSm}>
-            <span>Expenses</span>
-            <span>${data.expenses.toLocaleString()}</span>
-          </div>
-          <div className={styles.progressTrackMuted}><div className={styles.progressFillOrange} style={{ width: `${Math.round(522 * (expensesPct/100))}px` }} /></div>
-          <div className={styles.rowBetweenSm}>
-            <span>Budget Remaining</span>
-            <span>${remaining.toLocaleString()}</span>
-          </div>
-          <div className={styles.progressTrackMuted}><div className={styles.progressFillWhite} style={{ width: `${Math.round(522 * (remainingPct/100))}px` }} /></div>
+        </Card>
 
-          <div className={styles.notesSection}>
-            <div className={styles.sectionTitle}>Notes</div>
-            <div className={styles.noteCard}>Prioritize essential repairs before new purchases.</div>
-            <div className={styles.noteCard}>Track vendor SLAs to reduce downtime.</div>
-          </div>
-        </section>
+        {/* Expenses Chart */}
+        <Card title="Spending Over Time" className={styles.chartCard}>
+          <ExpensesChart budgetId={budget.id} />
+        </Card>
 
-        {/* Right: Expenses chart */}
-        <section className={styles.expensesPanel}>
-          <div className={styles.sectionTitle}>Expenses</div>
-          <div className={styles.rangeTabs}>
-            <button className={styles.tabInactive}>Week</button>
-            <button className={styles.tabActive}>Month</button>
-            <button className={styles.tabInactive}>Lifetime</button>
-          </div>
-          <div className={styles.graphBox}>
-            <ExpensesChart />
-          </div>
-          <div className={styles.legendRow}>
-            <span className={styles.legendDotOrange} /> Expenses
-            <span className={styles.legendDotWhite} /> Budget Remaining
-          </div>
-        </section>
+        {/* Expenses Table */}
+        <Card 
+          title="Expenses" 
+          className={styles.expensesCard}
+          extra={
+            <Button type="primary" icon={<PlusOutlined />}>
+              Add Expense
+            </Button>
+          }
+        >
+          <Table
+            dataSource={expenses}
+            columns={[
+              {
+                title: 'Date',
+                dataIndex: 'date',
+                key: 'date',
+                render: (date: string) => new Date(date).toLocaleDateString(),
+                sorter: (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+              },
+              {
+                title: 'Merchant',
+                dataIndex: 'merchant',
+                key: 'merchant',
+              },
+              {
+                title: 'Category',
+                dataIndex: 'category',
+                key: 'category',
+                render: (category: string) => (
+                  <Tag color="blue">{category}</Tag>
+                ),
+              },
+              {
+                title: 'Amount',
+                dataIndex: 'amount',
+                key: 'amount',
+                render: (amount: number) => `$${amount.toLocaleString()}`,
+                sorter: (a, b) => a.amount - b.amount,
+              },
+              {
+                title: 'Event',
+                dataIndex: ['event', 'name'],
+                key: 'event',
+                render: (eventName: string) => eventName || 'N/A',
+              },
+              {
+                title: 'Actions',
+                key: 'actions',
+                render: (_, record: Expense) => (
+                  <Space>
+                    <Button type="text" size="small">
+                      View
+                    </Button>
+                    <Button type="text" size="small">
+                      Edit
+                    </Button>
+                    <Button 
+                      type="text" 
+                      size="small" 
+                      danger
+                      onClick={() => handleExpenseDeleted(record.id)}
+                    >
+                      Delete
+                    </Button>
+                  </Space>
+                ),
+              },
+            ]}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+            }}
+            rowKey="id"
+          />
+        </Card>
       </div>
-
-      {/* Transactions (full width) */}
-      <section className={styles.transactionsCard}>
-        <div className={styles.headerRow}>
-          <div className={styles.sectionTitle}>Transactions</div>
-          <Link className={styles.ghostBtn} href={`/budgets/${slug}/new-receipt`}>
-            Add New Transaction
-          </Link>
-        </div>
-        <div className={styles.tableContainer}>
-          <div className={`${styles.tableRow} ${styles.tableHeader}`}>
-            <div>Receipt</div>
-            <div>Merchant Name</div>
-            <div>Amount</div>
-            <div>Category</div>
-            <div>Date</div>
-            <div>Event</div>
-            <div className={styles.actionsCol}>Actions</div>
-          </div>
-          {data.transactions.map((t) => {
-            const [left, right] = t.date.includes(',') ? t.date.split(',') : [t.date, ''];
-            return (
-              <div key={t.id} className={styles.tableRow}>
-                <div className={styles.receiptCell}>New Tools Purchase</div>
-                <div>{t.merchant}</div>
-                <div>${t.amount.toLocaleString()}</div>
-                <div><span className={styles.chipGreen}>{t.category}</span></div>
-                <div><div>{left.trim()},</div><div>{right.trim()}</div></div>
-                <div className={styles.linkText}>{t.event}</div>
-                <div className={styles.actionsCol}><button className={styles.ghostBtn}>View Receipt</button></div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
     </main>
   );
-}
-
-export async function generateStaticParams() {
-  return [
-    { slug: 'equipment-maintenance' },
-    { slug: 'food-drink' },
-    { slug: 'tournament-league-fees' },
-    { slug: 'travel-transportation' },
-    { slug: 'coaching-staff-training' },
-    { slug: 'equipment-uniforms' },
-    { slug: 'technology-licenses' },
-  ];
 }
 
 

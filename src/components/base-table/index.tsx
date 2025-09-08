@@ -17,6 +17,10 @@ function BaseTable({
   const router = useRouter()
   const pathname = usePathname()
 
+  // Handle both array and object dataSource formats
+  const tableData = Array.isArray(dataSource) ? dataSource : dataSource?.data || []
+  const meta = dataSource?.meta || { total: tableData.length, page: 1, perPage: 20 }
+
   const onChangePage = (page: number, perPage: number) => {
     queryParams.page = page.toString()
     router.push(`${pathname}?${stringify(queryParams)}`)
@@ -34,12 +38,12 @@ function BaseTable({
       columns={Array.isArray(columns) ? columns : []}
       pagination={{
         onChange: onChangePage,
-        total: dataSource?.meta?.total,
-        current: dataSource?.meta?.page,
-        pageSize: dataSource?.meta?.perPage,
+        total: meta.total,
+        current: meta.page,
+        pageSize: meta.perPage,
         position: ['bottomCenter']
       }}
-      dataSource={dataSource?.data}
+      dataSource={tableData}
       rowKey={rowKey || "id"}
       locale={{ emptyText: 'No Data' }}
       // onChange={onTableChange}

@@ -23,18 +23,20 @@ export default function GamedayStatusModal({
   statusName, 
   statusId, 
   statusColor,
-  eventId = 1 // Default to event ID 1 for the Eagles vs Hawks game
+  eventId
 }: GamedayStatusModalProps) {
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<Array<{id: number, name: string, status: string}>>([]);
 
   useEffect(() => {
-    if (isOpen && statusId) {
+    if (isOpen && statusId && eventId) {
       fetchTasks();
     }
   }, [isOpen, statusId, eventId]);
 
   const fetchTasks = async () => {
+    if (!eventId) return;
+    
     setLoading(true);
     try {
       // Map status IDs to actual API status values
@@ -52,9 +54,9 @@ export default function GamedayStatusModal({
       });
       
       const res = await api.get(`/api/tasks?${params}`);
-      if (res?.data?.data) {
+      if ((res as any)?.data?.data) {
         // Validate and sanitize the data
-        const sanitizedTasks = res.data.data.map((task: any) => ({
+        const sanitizedTasks = (res as any).data.data.map((task: any) => ({
           id: task.id || `task-${Date.now()}-${Math.random()}`,
           name: task.name || 'Untitled Task',
           description: task.description || '',
@@ -286,10 +288,10 @@ export default function GamedayStatusModal({
       <Flex justify="space-between" align="center" style={{ marginBottom: 24 }}>
         <div>
           <Title level={3} style={{ margin: 0, color: '#ffffff', fontSize: '22px', fontWeight: 600 }}>
-            {statusName} Tasks - Eagles vs Hawks
+            {statusName} Tasks
           </Title>
           <Text style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '14px' }}>
-            {tasks.length} task{tasks.length !== 1 ? 's' : ''} found for this game
+            {tasks.length} task{tasks.length !== 1 ? 's' : ''} found
           </Text>
         </div>
         <div
@@ -381,7 +383,7 @@ export default function GamedayStatusModal({
         </Button>
         <Button 
           type="primary" 
-          onClick={() => window.open(`/tasks?eventId=${eventId}`, '_blank')}
+          onClick={() => window.open(eventId ? `/tasks?eventId=${eventId}` : '/tasks', '_blank')}
           style={{
             backgroundColor: '#1D75D0',
             borderColor: '#1D75D0',
@@ -390,7 +392,7 @@ export default function GamedayStatusModal({
             borderRadius: '8px'
           }}
         >
-          View All Game Tasks
+          View All Tasks
         </Button>
       </Flex>
 

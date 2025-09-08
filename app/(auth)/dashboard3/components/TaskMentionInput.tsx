@@ -34,16 +34,42 @@ export default function TaskMentionInput({ onTaskCreate, onCancel }: TaskMention
   const [eventSearch, setEventSearch] = useState('');
   const [selectedEvent, setSelectedEvent] = useState('');
   const [showEventDropdown, setShowEventDropdown] = useState(false);
+  const [events, setEvents] = useState<any[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const eventDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Mock events data - replace with actual events from your system
-  const events = [
-    { id: '1', name: 'Basketball Practice', date: '2024-01-15' },
-    { id: '2', name: 'Team Meeting', date: '2024-01-16' },
-    { id: '3', name: 'Game vs Eagles', date: '2024-01-18' },
-    { id: '4', name: 'Training Session', date: '2024-01-20' },
-    { id: '5', name: 'Strategy Review', date: '2024-01-22' },
-  ];
+  // Fetch real events data from API
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      setEventsLoading(true);
+      const eventsRes = await fetch('/api/events?perPage=50');
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        const fetchedEvents = eventsData.data || [];
+        setEvents(fetchedEvents.map((event: any) => ({
+          id: event.id,
+          name: event.name,
+          date: new Date(event.startTime).toLocaleDateString('en-US', { 
+            month: '2-digit', 
+            day: '2-digit', 
+            year: 'numeric' 
+          })
+        })));
+      } else {
+        // No events found
+        setEvents([]);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      setEvents([]);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
 
   const filteredEvents = events.filter(event =>
     event.name.toLowerCase().includes(eventSearch.toLowerCase())

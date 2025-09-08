@@ -1,49 +1,49 @@
 'use client'
-import React from 'react';
-import { Card, Table, Tag, Spin, Alert } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Table, Tag, Spin, Alert, Statistic, Row, Col } from 'antd';
+import { 
+  TrophyOutlined, 
+  FireOutlined, 
+  RiseOutlined, 
+  FallOutlined,
+  FullscreenOutlined
+} from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CalendarOutlined, TrophyOutlined, FireOutlined } from '@ant-design/icons';
 import style from '../style.module.scss';
-import { useGameStats } from '../hooks/useStatsData';
+import { statsService } from '../services/statsService';
 
-const GameStatsPanel = () => {
-  const { games, isLoading, error } = useGameStats();
+interface GameStatsPanelProps {
+  isFocused?: boolean;
+  onToggleFocus?: () => void;
+}
 
-  const columns = [
-    {
-      title: 'Date',
-      dataIndex: 'date',
-      key: 'date',
-      render: (date: string) => new Date(date).toLocaleDateString(),
-    },
-    {
-      title: 'Opponent',
-      dataIndex: 'opponent',
-      key: 'opponent',
-    },
-    {
-      title: 'Result',
-      key: 'result',
-      render: (_: any, record: any) => {
-        const win = record.result === 'W';
-        return <Tag color={win ? 'green' : 'red'}>{win ? 'W' : 'L'}</Tag>;
-      },
-    },
-    {
-      title: 'Score',
-      key: 'score',
-      render: (_: any, record: any) => `${record.finalScoreUs} - ${record.finalScoreThem}`,
-    },
-    {
-      title: 'Margin',
-      key: 'margin',
-      render: (_: any, record: any) => {
-        const margin = record.margin;
-        const color = margin > 0 ? 'green' : margin < 0 ? 'red' : 'default';
-        return <Tag color={color}>{margin > 0 ? '+' : ''}{margin}</Tag>;
-      },
-    },
-  ];
+const GameStatsPanel: React.FC<GameStatsPanelProps> = ({ isFocused = false, onToggleFocus }) => {
+  const [gameStats, setGameStats] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const games = await statsService.fetchGameStats();
+        setGameStats(games);
+      } catch (err) {
+        setError('Failed to load game data');
+        console.error('Game stats error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handlePanelClick = () => {
+    if (onToggleFocus) {
+      onToggleFocus();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -61,7 +61,7 @@ const GameStatsPanel = () => {
       <Card title="Game Stats" className={style.panel} variant="outlined">
         <Alert
           message="Error Loading Data"
-          description="Unable to load game statistics. Please try again."
+          description={error}
           type="error"
           showIcon
         />
@@ -69,108 +69,212 @@ const GameStatsPanel = () => {
     );
   }
 
-  if (!games || games.length === 0) {
-    return (
-      <Card title="Game Stats" className={style.panel} variant="outlined">
-        <div style={{ textAlign: 'center', color: '#b8c5d3' }}>
-          No game data available
-        </div>
-      </Card>
-    );
-  }
-
-  // Prepare data for scoring trend chart
-  const scoringTrendData = games.map((game, index) => ({
+  // Prepare data for charts
+  const scoringTrendData = gameStats.slice(-6).map((game, index) => ({
+    key: game.id || `game-${index}`,
     game: index + 1,
-    pointsFor: game.finalScoreUs,
-    pointsAgainst: game.finalScoreThem,
-    opponent: game.opponent,
-    result: game.result
+    points: game.finalScoreUs || 0,
+    pointsAllowed: game.finalScoreThem || 0,
+    opponent: game.opponent || 'Unknown'
   }));
 
-  // Calculate summary stats
-  const wins = games.filter(g => g.result === 'W').length;
-  const losses = games.filter(g => g.result === 'L').length;
-  const avgPointsFor = Math.round(games.reduce((sum, g) => sum + g.finalScoreUs, 0) / games.length);
-  const avgPointsAgainst = Math.round(games.reduce((sum, g) => sum + g.finalScoreThem, 0) / games.length);
+  // Prepare table data
+  const tableData = gameStats.slice(-5).map(game => ({
+    key: game.id,
+    date: new Date(game.date).toLocaleDateString(),
+    opponent: game.opponent || 'Unknown',
+    result: game.result === 'W' ? 'W' : 'L',
+    score: `${game.finalScoreUs || 0}-${game.finalScoreThem || 0}`,
+    margin: (game.finalScoreUs || 0) - (game.finalScoreThem || 0),
+    fgPercentage: game.fieldGoalPercentage ? (game.fieldGoalPercentage * 100).toFixed(1) : 'N/A',
+    threePercentage: game.threePointPercentage ? (game.threePointPercentage * 100).toFixed(1) : 'N/A'
+  }));
+
+  const columns = [
+    {
+      title: 'Date',
+      dataIndex: 'date',
+      key: 'date',
+      render: (text: string) => <span style={{ color: '#ffffff' }}>{text}</span>
+    },
+    {
+      title: 'Opponent',
+      dataIndex: 'opponent',
+      key: 'opponent',
+      render: (text: string) => <span style={{ color: '#ffffff' }}>{text}</span>
+    },
+    {
+      title: 'Result',
+      dataIndex: 'result',
+      key: 'result',
+      render: (result: string) => (
+        <Tag color={result === 'W' ? 'green' : 'red'}>
+          {result}
+        </Tag>
+      )
+    },
+    {
+      title: 'Score',
+      dataIndex: 'score',
+      key: 'score',
+      render: (text: string) => <span style={{ color: '#ffffff' }}>{text}</span>
+    },
+    {
+      title: 'Margin',
+      dataIndex: 'margin',
+      key: 'margin',
+      render: (margin: number) => (
+        <span style={{ color: margin > 0 ? '#52c41a' : '#f5222d' }}>
+          {margin > 0 ? '+' : ''}{margin}
+        </span>
+      )
+    },
+    {
+      title: 'FG%',
+      dataIndex: 'fgPercentage',
+      key: 'fgPercentage',
+      render: (text: string) => <span style={{ color: '#b8c5d3' }}>{text}</span>
+    },
+    {
+      title: '3P%',
+      dataIndex: 'threePercentage',
+      key: 'threePercentage',
+      render: (text: string) => <span style={{ color: '#b8c5d3' }}>{text}</span>
+    }
+  ];
+
+  // Calculate summary statistics
+  const totalGames = gameStats.length;
+  const wins = gameStats.filter(g => g.result === 'W').length;
+  const losses = totalGames - wins;
+  const avgPointsFor = totalGames > 0 ? gameStats.reduce((sum, g) => sum + (g.finalScoreUs || 0), 0) / totalGames : 0;
+  const avgPointsAgainst = totalGames > 0 ? gameStats.reduce((sum, g) => sum + (g.finalScoreThem || 0), 0) / totalGames : 0;
 
   return (
-    <Card title="Game Stats" className={style.panel} variant="outlined">
-      {/* Summary Stats */}
+    <Card 
+      title="Game Stats" 
+      className={`${style.panel} ${isFocused ? style.focusedPanel : ''}`} 
+      variant="outlined"
+      extra={
+        onToggleFocus && (
+          <FullscreenOutlined 
+            onClick={handlePanelClick}
+            style={{ cursor: 'pointer', color: '#1890ff' }}
+          />
+        )
+      }
+    >
+      {/* Summary Statistics */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <Statistic
+            title="Games"
+            value={totalGames}
+            valueStyle={{ color: '#b8c5d3' }}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="Wins"
+            value={wins}
+            valueStyle={{ color: '#52c41a' }}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="Losses"
+            value={losses}
+            valueStyle={{ color: '#f5222d' }}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="Win %"
+            value={totalGames > 0 ? (wins / totalGames * 100).toFixed(1) : 0}
+            suffix="%"
+            valueStyle={{ color: '#1890ff' }}
+          />
+        </Col>
+      </Row>
+
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={12}>
+          <Statistic
+            title="Avg Points For"
+            value={avgPointsFor.toFixed(1)}
+            prefix={<RiseOutlined />}
+            valueStyle={{ color: '#52c41a' }}
+          />
+        </Col>
+        <Col span={12}>
+          <Statistic
+            title="Avg Points Against"
+            value={avgPointsAgainst.toFixed(1)}
+            prefix={<FallOutlined />}
+            valueStyle={{ color: '#f5222d' }}
+          />
+        </Col>
+      </Row>
+
+      {/* Scoring Trends Chart */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ color: '#b8c5d3' }}>
-            <TrophyOutlined style={{ marginRight: 4 }} />
-            Record: {wins}-{losses}
-          </span>
-          <span style={{ color: '#b8c5d3' }}>
-            <FireOutlined style={{ marginRight: 4 }} />
-            Avg: {avgPointsFor} PF / {avgPointsAgainst} PA
-          </span>
-        </div>
+        <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Scoring Trends (Last 6 Games)</h4>
+        {scoringTrendData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={isFocused ? 150 : 100}>
+            <LineChart data={scoringTrendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a4a6b" />
+              <XAxis 
+                dataKey="game" 
+                stroke="#b8c5d3"
+                tick={{ fill: '#b8c5d3', fontSize: 12 }}
+              />
+              <YAxis 
+                stroke="#b8c5d3"
+                tick={{ fill: '#b8c5d3', fontSize: 12 }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#17375c',
+                  border: '1px solid #2a4a6b',
+                  color: '#ffffff'
+                }}
+                labelStyle={{ color: '#b8c5d3' }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="points" 
+                stroke="#52c41a" 
+                strokeWidth={2}
+                dot={{ fill: '#52c41a', strokeWidth: 2, r: 4 }}
+                name="Points For"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="pointsAllowed" 
+                stroke="#f5222d" 
+                strokeWidth={2}
+                dot={{ fill: '#f5222d', strokeWidth: 2, r: 4 }}
+                name="Points Against"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#b8c5d3', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            No scoring trend data available
+          </div>
+        )}
       </div>
 
-      {/* Scoring Trend Chart */}
-      <div style={{ marginBottom: 16 }}>
-        <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Scoring Trend</h4>
-        <ResponsiveContainer width="100%" height={120}>
-          <LineChart data={scoringTrendData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a4a6b" />
-            <XAxis 
-              dataKey="game" 
-              stroke="#b8c5d3"
-              tick={{ fill: '#b8c5d3', fontSize: 12 }}
-            />
-            <YAxis 
-              stroke="#b8c5d3"
-              tick={{ fill: '#b8c5d3', fontSize: 12 }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#17375c',
-                border: '1px solid #2a4a6b',
-                color: '#ffffff'
-              }}
-              labelStyle={{ color: '#b8c5d3' }}
-              formatter={(value: any, name: any, props: any) => [
-                `${value} pts`,
-                name === 'pointsFor' ? 'Points For' : 'Points Against'
-              ]}
-              labelFormatter={(label: any, payload: any) => {
-                if (payload && payload[0]) {
-                  return `Game ${label} vs ${payload[0].payload.opponent}`;
-                }
-                return `Game ${label}`;
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="pointsFor" 
-              stroke="#52c41a" 
-              strokeWidth={2}
-              dot={{ fill: '#52c41a', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, stroke: '#52c41a', strokeWidth: 2 }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="pointsAgainst" 
-              stroke="#f5222d" 
-              strokeWidth={2}
-              dot={{ fill: '#f5222d', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, stroke: '#f5222d', strokeWidth: 2 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Games Table */}
+      {/* Recent Games Table */}
       <div>
         <h4 style={{ color: '#ffffff', marginBottom: 8 }}>Recent Games</h4>
         <Table
+          dataSource={tableData}
           columns={columns}
-          dataSource={games.map(g => ({ ...g, key: g.id }))}
           pagination={false}
-          scroll={{ y: 120 }}
+          size="small"
+          className={style.gameTable}
+          rowClassName={() => style.tableRow}
         />
       </div>
     </Card>

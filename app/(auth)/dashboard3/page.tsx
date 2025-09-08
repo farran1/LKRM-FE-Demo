@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Next7DaysTasksModule from './components/Next7DaysTasksModule';
 import GamedayChecklistModule from './components/GamedayChecklistModule';
 import TeamRosterModule from './components/TeamRosterModule';
-import StickyNotesModule from './components/StickyNotesModule';
+import StickyNotesModule from './components/EnhancedStickyNotesModule';
 import RecentActivityModule from './components/RecentActivityModule';
 import CalendarEventsModule from './components/CalendarEventsModule';
 import TeamStatsModule from './components/TeamStatsModule';

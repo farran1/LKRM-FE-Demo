@@ -1,26 +1,39 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-})
+if (!url) {
+	throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is not set')
+}
+if (!anon) {
+	throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable is not set')
+}
 
-// Server-side client for admin operations
+// Use auth-helpers client in the browser so auth cookies sync with middleware
+export const supabase = typeof window !== 'undefined'
+	? createClientComponentClient<Database>({ 
+		supabaseUrl: url, 
+		supabaseKey: anon
+	})
+	: createClient<Database>(url, anon, { 
+		auth: { 
+			autoRefreshToken: true,
+			persistSession: false 
+		} 
+	})
+
 export const createServerClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  
-  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
+	const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+	if (!serviceKey) {
+		throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set')
+	}
+	return createClient<Database>(url, serviceKey, {
+		auth: { 
+			autoRefreshToken: false, 
+			persistSession: false 
+		}
+	})
 }

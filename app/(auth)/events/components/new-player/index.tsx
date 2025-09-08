@@ -23,8 +23,8 @@ function NewPlayer({ eventId, isOpen, showOpen, onRefresh } : any) {
 
   async function getPositions() {
     const res = await api.get('/api/positions')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
+    if ((res as any)?.data?.data?.length > 0) {
+      const types = (res as any)?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
       setPositions(types)
     }
   }
@@ -44,11 +44,7 @@ function NewPlayer({ eventId, isOpen, showOpen, onRefresh } : any) {
     }
     setLoading(true)
     try {
-      const res = await api.post('/api/players', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
+      const res = await api.post('/api/players', Object.fromEntries((formData as any).entries()))
       showOpen(false)
       onRefresh()
     } catch (error) {

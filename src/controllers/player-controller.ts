@@ -74,7 +74,9 @@ export default class PlayerController {
           take: perPage,
           orderBy: sorts,
           include: {
-            position: true
+            position: true,
+            notes: true,
+            goals: true
           }
         }),
         db.player.count({ where: filters }),
@@ -322,6 +324,8 @@ export default class PlayerController {
             player: {
               include: {
                 position: true,
+                notes: true,
+                goals: true,
               },
             }
           },
@@ -413,7 +417,7 @@ export default class PlayerController {
 
       return res.json({ notes })
     } catch (error) {
-      console.error('Error fetching:', error)
+      console.error('Error fetching notes:', error)
       return res.status(500).json({ message: 'Internal server error' })
     }
   }
@@ -449,7 +453,7 @@ export default class PlayerController {
 
       return res.json({ goals })
     } catch (error) {
-      console.error('Error fetching:', error)
+      console.error('Error fetching goals:', error)
       return res.status(500).json({ message: 'Internal server error' })
     }
   }

@@ -15,7 +15,8 @@ import moment from 'moment'
 const STATUS: Record<string, string> = {
   TODO: 'To do',
   IN_PROGRESS: 'In Progress',
-  DONE: 'Done'
+  DONE: 'Done',
+  ARCHIVE: 'Archive'
 }
 
 function TaskDetailModal({isShowModal, onClose, task, openEdit}: any) {
@@ -35,34 +36,62 @@ function TaskDetailModal({isShowModal, onClose, task, openEdit}: any) {
       {!task && <Skeleton active />}
       {task &&
         <>
-          <Flex className={style.header} justify="space-between" align='flex-end' style={{ marginBottom: 16 }}>
-            <Flex gap={8}>
+          <Flex className={style.header} justify="space-between" align="center">
+            <Flex gap={8} align="center">
               <div className={style.title}>{task?.name}</div>
-              <Tooltip title="Edit Event">
+              <Tooltip title="Edit Task">
                 <EditFilled className={style.edit} onClick={openEdit} />
               </Tooltip>
             </Flex>
             <CloseIcon onClick={onClose} />
           </Flex>
-          <div>
-            <div className={style.subtitle}>
-              <span className={classNames(style.priority, style[task?.priority.name])}>{task?.priority.name}</span>
-              <span>{task?.description}</span>
-            </div>
-            <div>
-              <i>Due date:</i> <b>{moment(task?.dueDate).format('MMMM D, YYYY')}</b>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <i>Status:</i> <b>{STATUS[task?.status]}</b>
-            </div>
-            <div className={style.sectionAssignee}>
-              <Flex justify="space-between" align="center" className={style.header}>
-                <div className={style.title}><UserIcon /><span>{Array.isArray(task?.playerTasks) ? task.playerTasks.length : 0} Asignees</span></div>
-              </Flex>
-              {Array.isArray(task?.playerTasks) && task.playerTasks.map((item: any) =>
-                <Row key={item.player.id}>
-                  <Col span={8}>👤 {item.player.name}</Col>
-                </Row>
+          
+          <div className={style.content}>
+            {task?.description && (
+              <div className={style.descriptionSection}>
+                <span className={style.label}>Description:</span>
+                <div className={style.description}>
+                  {task.description}
+                </div>
+              </div>
+            )}
+            
+            <div className={style.detailsGrid}>
+              <div className={style.detailItem}>
+                <span className={style.label}>Priority:</span>
+                <span className={classNames(style.priority, style[task?.task_priorities?.name?.toLowerCase() || 'default'])}>
+                  {task?.task_priorities?.name || 'No Priority'}
+                </span>
+              </div>
+              
+
+              <div className={style.detailItem}>
+                <CalendarIcon className={style.icon} />
+                <span className={style.label}>Due Date:</span>
+                <span className={style.value}>
+                  {task?.dueDate ? moment(task.dueDate).format('MMM D, YYYY') : 'No due date'}
+                </span>
+              </div>
+
+              <div className={style.detailItem}>
+                <span className={style.label}>Status:</span>
+                <span className={style.status}>{STATUS[task?.status] || 'Unknown'}</span>
+              </div>
+              
+
+              
+              {task?.users?.username ? (
+                <div className={style.detailItem}>
+                  <UserIcon className={style.icon} />
+                  <span className={style.label}>Assignee:</span>
+                  <span className={style.value}>{task.users.username}</span>
+                </div>
+              ) : (
+                <div className={style.detailItem}>
+                  <UserIcon className={style.icon} />
+                  <span className={style.label}>Assignee:</span>
+                  <span className={style.value}>No assignee</span>
+                </div>
               )}
             </div>
           </div>

@@ -61,7 +61,8 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
     setPlayerLoading(true);
     try {
       const res = await api.get(`/api/events/${event.id}/players`);
-      setPlayers(res.data.data);
+      // Ensure players is always an array
+      setPlayers((res as any)?.data?.data || []);
     } catch (error) {
       console.error('Error fetching players:', error);
       setPlayers([]);
@@ -72,6 +73,9 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
   const openEventLanding = () => {
     router.push('/events/' + event.id);
   };
+
+  // Ensure players is always an array for safety
+  const safePlayers = Array.isArray(players) ? players : [];
 
   return (
     <Modal
@@ -181,16 +185,16 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                     color: '#1D75D0'
                   }}>
                     <UserIcon style={{ marginRight: '10px' }} />
-                    <span>{players.length} Players</span>
+                    <span>{safePlayers.length} Players</span>
                   </div>
-                  {players.length > 0 && (
+                  {safePlayers.length > 0 && (
                     <div style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                      0 yes, 0 no, {players.length} awaiting
+                      0 yes, 0 no, {safePlayers.length} awaiting
                     </div>
                   )}
                 </div>
                 {playerLoading && <Skeleton active />}
-                {players.map((item: Player) => (
+                {safePlayers.map((item: Player) => (
                   <Row key={item.id} style={{ color: '#ffffff', marginBottom: '4px' }}>
                     <Col span={8}>👤 {item.name}</Col>
                     <Col span={6}>Going</Col>

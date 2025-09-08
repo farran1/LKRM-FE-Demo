@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Next7DaysTasksModule from '../dashboard3/components/Next7DaysTasksModule';
 import GamedayChecklistModule from '../dashboard3/components/GamedayChecklistModule';
 import TeamRosterModule from '../dashboard3/components/TeamRosterModule';
-import StickyNotesModule from '../dashboard3/components/StickyNotesModule';
+import StickyNotesModule from '../dashboard3/components/EnhancedStickyNotesModule';
 import RecentActivityModule from '../dashboard3/components/RecentActivityModule';
 import CalendarEventsModule from '../dashboard3/components/CalendarEventsModule';
 import TeamStatsModule from '../dashboard3/components/TeamStatsModule';
@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
   return (
     <main style={{ 
-      padding: '0 24px 24px 0', 
+      padding: '0px 4px 4px 0', 
       minHeight: '100vh', 
       background: '#202c3e'
     }}>

@@ -128,7 +128,7 @@ export default function StickyNotesModule({ sidebarCollapsed = false }: StickyNo
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
-                  width: sidebarCollapsed ? '100%' : '370px',
+        width: '100%',
         height: '100%',
         minHeight: '320px',
         maxHeight: '400px',

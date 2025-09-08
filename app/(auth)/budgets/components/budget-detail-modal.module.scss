@@ -1,0 +1,134 @@
+.root {
+  :global(.ant-modal-mask) {
+    background-color: rgba(7,56,83,0.7);
+  }
+  :global(.ant-modal-wrap) {
+    background: transparent !important;
+  }
+}
+
+.container {
+  :global(.ant-modal) {
+    box-shadow: none !important;
+    background: #073853 !important; /* ensure wrapper matches */
+    border-radius: 16px !important;
+    padding: 0 !important;
+    outline: none !important;
+    overflow: hidden; /* hide any mismatch corners */
+  }
+  :global(.ant-modal-content) {
+    background: #073853 !important; /* platform deep blue */
+    border-radius: 16px !important;
+    color: #fff;
+    box-shadow: none !important;
+    border: 1px solid rgba(29,117,208,0.25);
+    padding: 0; /* we'll control body/header spacing */
+    outline: none !important;
+  }
+  :global(.ant-modal-body) {
+    padding: 24px; /* more breathing room all around */
+    background: #073853; /* ensure body matches content */
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-right: 6px; /* keep icon away from edge */
+  svg { 
+    cursor: pointer; 
+    transform: translateY(-8px); /* move X button up 15px */
+  }
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 600;
+  color: #ffffff;
+  transform: translateY(-6px); /* align title with X button */
+}
+
+.metrics {
+  background: rgba(0, 32, 50, 0.6); /* navy card */
+  border-radius: 12px;
+  padding: 16px 18px; /* more inner padding */
+  margin: 8px 0 18px; /* spacing from header and list */
+  border: 1px solid rgba(29, 117, 208, 0.2);
+}
+
+.metricsLeft { 
+  align-items: center; 
+  transform: translateX(10px); /* move wheel 10px right */
+}
+.metricsRight { 
+  text-align: right; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  margin-right: 10px; /* move spent 10px left */
+}
+
+.label {
+  color: rgba(255,255,255,0.85);
+  font-size: 13px;
+}
+
+.valueLarge {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sectionTitle {
+  color: #ffffff !important;
+  margin: 10px 0 12px !important;
+}
+
+.expenseList {
+  max-height: 280px; /* Height for approximately 4 expense items */
+  overflow-y: auto; /* Enable vertical scrolling */
+  
+  :global(.ant-list-item) {
+    background: rgba(0, 32, 50, 0.6);
+    border-radius: 10px;
+    margin-bottom: 12px; /* more gap between items */
+    padding: 14px 20px; /* increased left/right padding to 20px */
+    border: 1px solid rgba(29,117,208,0.2);
+    transition: background-color .2s ease, border-color .2s ease;
+    cursor: pointer;
+  }
+  :global(.ant-list-item:hover) { background: rgba(7,56,83,0.6); border-color: rgba(29,117,208,0.5); }
+  
+  /* Add internal spacing for expense content */
+  :global(.ant-list-item-meta-title) {
+    margin-left: 8px; /* move title text away from left edge */
+  }
+  :global(.ant-list-item-meta-description) {
+    margin-left: 8px; /* move description text away from left edge */
+  }
+  :global(.ant-list-item-meta) {
+    margin-right: 8px; /* move meta content away from right edge */
+  }
+  
+  /* Target the expense title and amount specifically */
+  :global(.ant-list-item .expenseTitle) {
+    margin-left: 8px; /* ensure title moves away from left edge */
+  }
+  :global(.ant-list-item .expenseAmount) {
+    margin-right: 8px; /* move amount away from right edge */
+  }
+  
+  /* Alternative approach - target the actual elements */
+  :global(.ant-list-item-meta-title span) {
+    margin-left: 8px !important; /* force title to move */
+  }
+  :global(.ant-list-item > div:last-child) {
+    margin-right: 8px !important; /* force amount to move */
+  }
+}
+
+.expenseTitle { color: #ffffff; font-weight: 600; }
+.expenseMeta { color: rgba(255,255,255,0.75); font-size: 13px; }
+.expenseAmount { color: #ffffff; font-weight: 700; }

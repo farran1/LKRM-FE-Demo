@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const statCategories = [
   'All',
@@ -9,27 +9,113 @@ const statCategories = [
   'Shooting'
 ];
 
-const allStats = [
-  { id: 1, label: 'Games Played', value: 24, category: 'Offense' },
-  { id: 2, label: 'Wins', value: 18, category: 'Offense' },
-  { id: 3, label: 'Losses', value: 6, category: 'Offense' },
-  { id: 4, label: 'Points Per Game', value: 108.5, category: 'Offense' },
-  { id: 5, label: 'Points Allowed', value: 98.2, category: 'Defense' },
-  { id: 6, label: 'Assists Per Game', value: 24.3, category: 'Offense' },
-  { id: 7, label: 'Rebounds Per Game', value: 42.1, category: 'Defense' },
-  { id: 8, label: 'Steals Per Game', value: 8.7, category: 'Defense' },
-  { id: 9, label: 'Field Goal %', value: 47.2, category: 'Shooting' },
-  { id: 10, label: '3-Point %', value: 36.8, category: 'Shooting' },
-  { id: 11, label: 'Free Throw %', value: 78.5, category: 'Shooting' },
-  { id: 12, label: 'Blocks Per Game', value: 4.2, category: 'Defense' },
-];
-
-const statsPerPage = 8; // 2 columns x 4 rows
-
 export default function TeamStatsModule() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [currentPage, setCurrentPage] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [allStats, setAllStats] = useState<any[]>([]);
+
+  const statsPerPage = 8; // 2 columns x 4 rows
+
+  useEffect(() => {
+    fetchTeamStats();
+  }, []);
+
+  const fetchTeamStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const season = '2024-25'; // TODO: Make this configurable
+      
+      // Fetch team stats from API
+      const [teamStatsRes, gamesRes, playerStatsRes] = await Promise.all([
+        fetch(`/api/stats/team?season=${season}`),
+        fetch(`/api/stats/games?season=${season}`),
+        fetch(`/api/stats/players?season=${season}`)
+      ]);
+
+      if (!teamStatsRes.ok || !gamesRes.ok || !playerStatsRes.ok) {
+        throw new Error('Failed to fetch team statistics');
+      }
+
+      const [teamStatsData, gamesData, playerStatsData] = await Promise.all([
+        teamStatsRes.json(),
+        gamesRes.json(),
+        playerStatsRes.json()
+      ]);
+
+      // Extract data from API responses
+      const teamStats = teamStatsData; // Team stats API returns data directly
+      const games = Array.isArray(gamesData) ? gamesData : (gamesData.data || []);
+      const playerStats = Array.isArray(playerStatsData) ? playerStatsData : (playerStatsData.data || []);
+
+      console.log('Team Stats API Response:', teamStats);
+      console.log('Games API Response:', games);
+      console.log('Player Stats API Response:', playerStats);
+
+      // Calculate team statistics from real data
+      const calculatedStats = calculateTeamStats(teamStats, games, playerStats);
+      console.log('Calculated Stats:', calculatedStats);
+      setAllStats(calculatedStats);
+    } catch (err) {
+      console.error('Error fetching team stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load team statistics');
+      // Set empty stats to prevent errors
+      setAllStats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateTeamStats = (teamStats: any, games: any[], playerStats: any[]) => {
+    if (!teamStats) return [];
+
+    const stats = [];
+
+    // Basic team stats from API
+    if (teamStats.wins !== undefined) {
+      stats.push({ id: 2, label: 'Wins', value: teamStats.wins, category: 'Offense' });
+    }
+    if (teamStats.losses !== undefined) {
+      stats.push({ id: 3, label: 'Losses', value: teamStats.losses, category: 'Offense' });
+    }
+    if (teamStats.ppg !== undefined) {
+      stats.push({ id: 4, label: 'Points Per Game', value: teamStats.ppg.toFixed(1), category: 'Offense' });
+    }
+    if (teamStats.oppg !== undefined) {
+      stats.push({ id: 5, label: 'Points Allowed', value: teamStats.oppg.toFixed(1), category: 'Defense' });
+    }
+    
+    // Per game averages from team stats API
+    if (teamStats.assists !== undefined) {
+      stats.push({ id: 6, label: 'Assists Per Game', value: teamStats.assists.toFixed(1), category: 'Offense' });
+    }
+    if (teamStats.rebounds !== undefined) {
+      stats.push({ id: 7, label: 'Rebounds Per Game', value: teamStats.rebounds.toFixed(1), category: 'Defense' });
+    }
+    if (teamStats.steals !== undefined) {
+      stats.push({ id: 8, label: 'Steals Per Game', value: teamStats.steals.toFixed(1), category: 'Defense' });
+    }
+    if (teamStats.blocks !== undefined) {
+      stats.push({ id: 12, label: 'Blocks Per Game', value: teamStats.blocks.toFixed(1), category: 'Defense' });
+    }
+
+    // Shooting percentages from team stats API
+    if (teamStats.fgPct !== undefined) {
+      stats.push({ id: 9, label: 'Field Goal %', value: teamStats.fgPct.toFixed(1), category: 'Shooting' });
+    }
+    if (teamStats.threePct !== undefined) {
+      stats.push({ id: 10, label: '3-Point %', value: teamStats.threePct.toFixed(1), category: 'Shooting' });
+    }
+    if (teamStats.ftPct !== undefined) {
+      stats.push({ id: 11, label: 'Free Throw %', value: teamStats.ftPct.toFixed(1), category: 'Shooting' });
+    }
+
+    return stats;
+  };
 
   const filteredStats = selectedCategory === 'All'
     ? allStats
@@ -54,6 +140,54 @@ export default function TeamStatsModule() {
   const goToPrevPage = () => setCurrentPage(prev => prev > 0 ? prev - 1 : totalPages - 1);
   const goToNextPage = () => setCurrentPage(prev => prev < totalPages - 1 ? prev + 1 : 0);
 
+  if (loading) {
+    return (
+      <div
+        style={{
+          background: '#17375c',
+          borderRadius: '16px',
+          padding: '20px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          width: '100%',
+          minHeight: '280px',
+          maxHeight: '320px',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#fff' }}>
+          Loading team statistics...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          background: '#17375c',
+          borderRadius: '16px',
+          padding: '20px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          width: '100%',
+          minHeight: '280px',
+          maxHeight: '320px',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#f5222d' }}>
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -64,8 +198,8 @@ export default function TeamStatsModule() {
         flexDirection: 'column',
         gap: '16px',
         width: '100%',
-        minHeight: '280px',
-        maxHeight: '320px',
+        minHeight: '320px', // Increased from 280px to 320px
+        maxHeight: '360px', // Increased from 320px to 360px
         overflow: 'hidden',
         boxSizing: 'border-box'
       }}
@@ -75,21 +209,23 @@ export default function TeamStatsModule() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        minHeight: '20px',
+        minHeight: '24px', // Increased from 20px
         width: '100%',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1', minWidth: 0 }}>
           <div style={{
             fontFamily: 'Inter, sans-serif',
             fontWeight: 600,
             fontSize: '16px',
-            color: '#fff'
+            color: '#fff',
+            whiteSpace: 'nowrap', // Prevent text wrapping
+            flexShrink: 0 // Prevent title from shrinking
           }}>
             Team Stats
           </div>
           {/* Filter Dropdown */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <button
               onClick={e => {
                 e.stopPropagation();
@@ -169,11 +305,12 @@ export default function TeamStatsModule() {
           </div>
         </div>
         {/* Pagination Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <div style={{
             fontSize: '12px',
             color: 'rgba(255,255,255,0.6)',
-            marginRight: '4px'
+            whiteSpace: 'nowrap', // Prevent wrapping
+            minWidth: 'fit-content' // Ensure it doesn't shrink
           }}>
             {totalPages === 0 ? 0 : currentPage + 1} / {totalPages || 1}
           </div>
@@ -227,7 +364,7 @@ export default function TeamStatsModule() {
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
           gridTemplateRows: 'repeat(4, 1fr)',
-          gap: '8px',
+          gap: '12px', // Increased from 8px to 12px
           width: '100%',
           height: '100%',
           overflow: 'hidden',
@@ -251,13 +388,13 @@ export default function TeamStatsModule() {
               style={{
                 background: 'rgba(255,255,255,0.08)',
                 borderRadius: '20px',
-                padding: '12px 10px',
+                padding: '16px 12px', // Increased padding from 12px 10px to 16px 12px
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 border: '1px solid rgba(255,255,255,0.12)',
-                minHeight: '48px',
+                minHeight: '56px', // Increased from 48px to 56px
                 width: '100%',
                 boxSizing: 'border-box'
               }}
@@ -267,7 +404,7 @@ export default function TeamStatsModule() {
                 fontWeight: 700,
                 fontSize: '18px',
                 color: '#B58842',
-                marginBottom: '2px'
+                marginBottom: '6px' // Increased from 2px to 6px
               }}>
                 {stat.value}
               </div>
@@ -276,7 +413,8 @@ export default function TeamStatsModule() {
                 fontWeight: 500,
                 fontSize: '12px',
                 color: '#fff',
-                textAlign: 'center'
+                textAlign: 'center',
+                lineHeight: '1.2' // Added line height for better text spacing
               }}>
                 {stat.label}
               </div>

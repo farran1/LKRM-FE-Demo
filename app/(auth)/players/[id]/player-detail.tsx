@@ -33,6 +33,37 @@ function Detail({
   const [isShowAddNote, showAddNote] = useState(false)
   const [isShowAddGoal, showAddGoal] = useState(false)
 
+  const ComingSoonOverlay = () => (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'rgba(23, 55, 92, 0.55)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
+      }}
+    >
+      <div
+        style={{
+          padding: '12px 18px',
+          borderRadius: 12,
+          border: '1px solid rgba(255,255,255,0.25)',
+          background: 'rgba(0,0,0,0.25)',
+          color: '#fff',
+          fontWeight: 600,
+          letterSpacing: 0.3,
+        }}
+      >
+        Player Stat Profile View Coming Soon...
+      </div>
+    </div>
+  )
+
   const [loadingNote, setLoadingNote] = useState(true)
   const [notes, setNotes] = useState<Array<any>>([])
   const [loadingGoal, setLoadingGoal] = useState(true)
@@ -50,9 +81,12 @@ function Detail({
 
   const fetchDetail = async () => {
     setLoading(true)
+    console.log('Fetching player details for ID:', playerId)
     try {
-      const res = await api.get('/api/players/' + playerId)
-      setPlayer(res.data.player)
+      const res: any = await api.get('/api/players/' + playerId)
+      console.log('Player API response:', res)
+      console.log('Player data:', res.data)
+      setPlayer(res.data.player || res.data.data)
     } catch (error) {
       console.error('Error fetching player:', error)
       setPlayer(null)
@@ -62,8 +96,12 @@ function Detail({
 
   const fetchNotes = async () => {
     setLoadingNote(true)
+    console.log('Fetching notes for player ID:', playerId)
     try {
-      const res = await api.get(`/api/players/${playerId}/notes`)
+      const res: any = await api.get(`/api/players/${playerId}/notes`)
+      console.log('Notes API response:', res.data)
+      console.log('Notes data structure:', JSON.stringify(res.data, null, 2))
+      console.log('Notes array:', res.data.notes)
       setNotes(res.data.notes || [])
     } catch (error) {
       console.error('Error fetching notes:', error)
@@ -74,8 +112,10 @@ function Detail({
 
   const fetchGoals = async () => {
     setLoadingGoal(true)
+    console.log('Fetching goals for player ID:', playerId)
     try {
-      const res = await api.get(`/api/players/${playerId}/goals`)
+      const res: any = await api.get(`/api/players/${playerId}/goals`)
+      console.log('Goals API response:', res.data)
       setGoals(res.data.goals || [])
     } catch (error) {
       console.error('Error fetching goals:', error)
@@ -83,6 +123,8 @@ function Detail({
     }
     setLoadingGoal(false)
   }
+
+
 
   const goBack = () => {
     router.back()
@@ -108,8 +150,16 @@ function Detail({
       <Flex justify="space-between" align="center" style={{ marginBottom: 10 }}>
         <Flex align='center' gap={16}>
           <ArrowIcon onClick={goBack} style={{ cursor: 'pointer' }} />
-          <div className={style.title}>Players</div>
-          {!loading ? <div className={style.playerName}>{'/' + player?.name}</div> : <Skeleton /> }
+          {!loading && player ? (
+            <div className={style.title}>
+              {player.first_name && player.last_name 
+                ? `${player.first_name} ${player.last_name}`
+                : player.name || 'Player'
+              }
+            </div>
+          ) : (
+            <Skeleton.Input style={{ width: 200 }} active />
+          )}
         </Flex>
         <Flex align='center' gap={10}>
           <Input prefix={<SearchIcon />} placeholder="Search" className={style.search} />
@@ -117,7 +167,7 @@ function Detail({
         </Flex>
       </Flex>
       <Flex>
-        <div style={{ marginRight: 12, flex: 1 }}>
+        <div style={{ marginRight: 12, flex: 1, position: 'relative' }}>
           <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
             <Col xs={6}>
               <Card className={style.stateGeneral}>
@@ -205,37 +255,41 @@ function Detail({
               </Card>
             </Col>
           </Row>
+          <ComingSoonOverlay />
         </div>
         <div className={style.right}>
           <Card style={{ marginBottom: 12 }}>
             <Flex justify='space-between'>
               <div className={style.title2}>Profile</div>
-              <Setting onEdit={onEdit} />
+              <Setting onEdit={onEdit} player={player} />
             </Flex>
-            <div className={style.profile}>
-              <div className={style.avatar}>
-                {!player?.avatar && <DefaultAvatar />}
-                {player?.avatar && <img src={player.avatar} loading='lazy' alt='avatar' />}
-              </div>
-              <div className={style.name}>{player?.name}</div>
-              <div className={style.position}>Position: {player?.position?.name}</div>
-            </div>
-            <Flex gap={12} style={{ marginBottom: 32 }}>
+            <Flex gap={12} style={{ marginBottom: 16 }}>
               <Button block onClick={addGoal}>Set Goals</Button>
               <Button block type='primary' onClick={addNote}>Leave a Note</Button>
             </Flex>
+            <div className={style.name} style={{ marginBottom: 16, fontSize: '1.2rem', fontWeight: 600, textAlign: 'center' }}>
+              {player?.first_name && player?.last_name 
+                ? `${player.first_name} ${player.last_name}`
+                : player?.name || 'Player'
+              }
+            </div>
             <div className={style.personalInfo}>
               <div className={style.item}>
+                <div>Position</div>
+                <div className={style.value}>{player?.position?.name || 'Not assigned'}</div>
+              </div>
+              <div className={style.item}>
                 <div>Jersey #</div>
-                <div className={style.value}>{player?.jersey}</div>
+                <div className={style.value}>{player?.jersey_number || player?.jersey || 'Not assigned'}</div>
               </div>
               <div className={style.item}>
-                <div>Phone Number</div>
-                <div className={style.value}>{player?.phoneNumber}</div>
-              </div>
-              <div className={style.item}>
-                <div>Height</div>
-                <div className={style.value}>{player?.height}</div>
+                <div>School Year</div>
+                <div className={style.value}>
+                  {player?.school_year 
+                    ? player.school_year.charAt(0).toUpperCase() + player.school_year.slice(1)
+                    : 'Not assigned'
+                  }
+                </div>
               </div>
             </div>
             <div className={style.notes}>
@@ -246,8 +300,8 @@ function Detail({
               {loadingNote && <Skeleton />}
               {!loadingNote && notes && notes.map((item: any) => (
                 <div className={style.note} key={item.id}>
-                  <div>{item.note}</div>
-                  <div className={style.author}>By Coach {item.createdUser.profile.firstName}</div>
+                  <div>{item.note || item.note_text || 'No content'}</div>
+                  <div className={style.author}>By Coach Andrew</div>
                 </div>
               ))}
             </div>
@@ -259,8 +313,8 @@ function Detail({
               {loadingGoal && <Skeleton />}
               {!loadingGoal && goals && goals.map((item: any) => (
                 <div className={style.goal} key={item.id}>
-                  <div>{item.note}</div>
-                  <div className={style.author}>By Coach {item.createdUser.profile.firstName}</div>
+                  <div>{item.goal || item.goal_text || 'No content'}</div>
+                  <div className={style.author}>By Coach Andrew</div>
                 </div>
               ))}
             </div>
@@ -268,8 +322,12 @@ function Detail({
         </div>
       </Flex>
       <EditPlayer player={player} isOpen={isShowEditPlayer} showOpen={showEditPlayer} onRefresh={fetchDetail} />
-      <AddNote notes={notes} player={player} isOpen={isShowAddNote} showOpen={showAddNote} onRefresh={fetchNotes} />
-      <AddGoal goals={goals} player={player} isOpen={isShowAddGoal} showOpen={showAddGoal} onRefresh={fetchGoals} />
+      {player && (
+        <>
+          <AddNote notes={notes} player={player} isOpen={isShowAddNote} showOpen={showAddNote} onRefresh={fetchNotes} />
+          <AddGoal goals={goals} player={player} isOpen={isShowAddGoal} showOpen={showAddGoal} onRefresh={fetchGoals} />
+        </>
+      )}
     </div>
   )
 }

@@ -1,0 +1,350 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.audit_logs (
+  id integer NOT NULL DEFAULT nextval('audit_logs_id_seq'::regclass),
+  userId integer,
+  action text NOT NULL,
+  table text NOT NULL,
+  recordId integer,
+  oldData jsonb,
+  newData jsonb,
+  ipAddress text,
+  userAgent text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.budget_categories (
+  id integer NOT NULL DEFAULT nextval('budget_categories_id_seq'::regclass),
+  name text NOT NULL,
+  description text,
+  color text NOT NULL DEFAULT '#1890ff'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT budget_categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.budgets (
+  id integer NOT NULL DEFAULT nextval('budgets_id_seq'::regclass),
+  name text NOT NULL,
+  amount numeric NOT NULL,
+  period text NOT NULL,
+  autoRepeat boolean NOT NULL DEFAULT false,
+  description text,
+  categoryId integer NOT NULL,
+  season text NOT NULL DEFAULT '2024-25'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT budgets_pkey PRIMARY KEY (id),
+  CONSTRAINT budgets_categoryId_fkey FOREIGN KEY (categoryId) REFERENCES public.budget_categories(id)
+);
+CREATE TABLE public.event_types (
+  id integer NOT NULL DEFAULT nextval('event_types_id_seq'::regclass),
+  name text NOT NULL,
+  color text NOT NULL DEFAULT '#1890ff'::text,
+  text_color text NOT NULL DEFAULT '#ffffff'::text,
+  icon text,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updated_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT event_types_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.events (
+  id integer NOT NULL DEFAULT nextval('events_id_seq'::regclass),
+  name text NOT NULL,
+  description text,
+  eventTypeId integer NOT NULL,
+  startTime timestamp without time zone NOT NULL,
+  endTime timestamp without time zone,
+  location USER-DEFINED NOT NULL,
+  venue text NOT NULL,
+  oppositionTeam text,
+  isRepeat boolean NOT NULL DEFAULT false,
+  occurence integer NOT NULL DEFAULT 0,
+  isNotice boolean NOT NULL DEFAULT false,
+  notes text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL,
+  CONSTRAINT events_pkey PRIMARY KEY (id),
+  CONSTRAINT events_eventTypeId_fkey FOREIGN KEY (eventTypeId) REFERENCES public.event_types(id),
+  CONSTRAINT events_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.users(id)
+);
+CREATE TABLE public.expenses (
+  id integer NOT NULL DEFAULT nextval('expenses_id_seq'::regclass),
+  budgetId integer,
+  merchant text NOT NULL,
+  amount numeric NOT NULL,
+  category text NOT NULL,
+  date timestamp without time zone NOT NULL,
+  eventId integer,
+  description text,
+  receiptUrl text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT expenses_pkey PRIMARY KEY (id),
+  CONSTRAINT expenses_eventId_fkey FOREIGN KEY (eventId) REFERENCES public.events(id),
+  CONSTRAINT expenses_budgetId_fkey FOREIGN KEY (budgetId) REFERENCES public.budgets(id)
+);
+CREATE TABLE public.game_stats (
+  id integer NOT NULL DEFAULT nextval('game_stats_id_seq'::regclass),
+  gameId integer NOT NULL,
+  playerId integer,
+  userId integer,
+  points integer NOT NULL DEFAULT 0,
+  fieldGoalsMade integer NOT NULL DEFAULT 0,
+  fieldGoalsAttempted integer NOT NULL DEFAULT 0,
+  threePointsMade integer NOT NULL DEFAULT 0,
+  threePointsAttempted integer NOT NULL DEFAULT 0,
+  freeThrowsMade integer NOT NULL DEFAULT 0,
+  freeThrowsAttempted integer NOT NULL DEFAULT 0,
+  rebounds integer NOT NULL DEFAULT 0,
+  offensiveRebounds integer NOT NULL DEFAULT 0,
+  defensiveRebounds integer NOT NULL DEFAULT 0,
+  assists integer NOT NULL DEFAULT 0,
+  steals integer NOT NULL DEFAULT 0,
+  blocks integer NOT NULL DEFAULT 0,
+  turnovers integer NOT NULL DEFAULT 0,
+  fouls integer NOT NULL DEFAULT 0,
+  minutesPlayed integer NOT NULL DEFAULT 0,
+  plusMinus integer NOT NULL DEFAULT 0,
+  quarter integer,
+  period text,
+  timestamp timestamp without time zone,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT game_stats_pkey PRIMARY KEY (id),
+  CONSTRAINT game_stats_playerId_fkey FOREIGN KEY (playerId) REFERENCES public.players(id),
+  CONSTRAINT game_stats_userId_fkey FOREIGN KEY (userId) REFERENCES public.users(id),
+  CONSTRAINT game_stats_gameId_fkey FOREIGN KEY (gameId) REFERENCES public.games(id)
+);
+CREATE TABLE public.games (
+  id integer NOT NULL DEFAULT nextval('games_id_seq'::regclass),
+  eventId integer NOT NULL,
+  opponent text NOT NULL,
+  homeScore integer,
+  awayScore integer,
+  result USER-DEFINED,
+  gameDate timestamp without time zone NOT NULL,
+  season text NOT NULL DEFAULT '2024-25'::text,
+  isPlayoffs boolean NOT NULL DEFAULT false,
+  notes text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT games_pkey PRIMARY KEY (id),
+  CONSTRAINT games_eventId_fkey FOREIGN KEY (eventId) REFERENCES public.events(id)
+);
+CREATE TABLE public.notifications (
+  id integer NOT NULL DEFAULT nextval('notifications_id_seq'::regclass),
+  userId integer NOT NULL,
+  type text NOT NULL,
+  title text NOT NULL,
+  message text NOT NULL,
+  isRead boolean NOT NULL DEFAULT false,
+  data jsonb,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  readAt timestamp without time zone,
+  CONSTRAINT notifications_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.player_events (
+  playerId integer NOT NULL,
+  eventId integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT player_events_pkey PRIMARY KEY (playerId, eventId),
+  CONSTRAINT player_events_eventId_fkey FOREIGN KEY (eventId) REFERENCES public.events(id),
+  CONSTRAINT player_events_playerId_fkey FOREIGN KEY (playerId) REFERENCES public.players(id)
+);
+CREATE TABLE public.player_goals (
+  id integer NOT NULL DEFAULT nextval('player_goals_id_seq'::regclass),
+  playerId integer NOT NULL,
+  goal text NOT NULL,
+  targetDate timestamp without time zone,
+  isAchieved boolean NOT NULL DEFAULT false,
+  achievedAt timestamp without time zone,
+  category text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL,
+  player_id bigint,
+  goal_text text,
+  user_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT player_goals_pkey PRIMARY KEY (id),
+  CONSTRAINT player_goals_playerId_fkey FOREIGN KEY (playerId) REFERENCES public.players(id),
+  CONSTRAINT fk_player_goals_player_id FOREIGN KEY (player_id) REFERENCES public.players(id),
+  CONSTRAINT player_goals_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.users(id)
+);
+CREATE TABLE public.player_notes (
+  id integer NOT NULL DEFAULT nextval('player_notes_id_seq'::regclass),
+  playerId integer NOT NULL,
+  note text NOT NULL,
+  isPublic boolean NOT NULL DEFAULT false,
+  tags ARRAY DEFAULT ARRAY[]::text[],
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL,
+  player_id bigint,
+  note_text text,
+  user_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT player_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT player_notes_playerId_fkey FOREIGN KEY (playerId) REFERENCES public.players(id),
+  CONSTRAINT player_notes_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.users(id),
+  CONSTRAINT fk_player_notes_player_id FOREIGN KEY (player_id) REFERENCES public.players(id)
+);
+CREATE TABLE public.player_tasks (
+  taskId integer NOT NULL,
+  playerId integer NOT NULL,
+  status text NOT NULL DEFAULT 'assigned'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT player_tasks_pkey PRIMARY KEY (taskId, playerId),
+  CONSTRAINT player_tasks_playerId_fkey FOREIGN KEY (playerId) REFERENCES public.players(id),
+  CONSTRAINT player_tasks_taskId_fkey FOREIGN KEY (taskId) REFERENCES public.tasks(id)
+);
+CREATE TABLE public.players (
+  id integer NOT NULL DEFAULT nextval('players_id_seq'::regclass),
+  name text NOT NULL,
+  positionId integer NOT NULL,
+  jersey text NOT NULL,
+  phoneNumber text,
+  email text,
+  height double precision,
+  weight double precision,
+  avatar text,
+  birthDate timestamp without time zone,
+  isActive boolean NOT NULL DEFAULT true,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL,
+  user_id uuid NOT NULL,
+  first_name character varying NOT NULL,
+  last_name character varying NOT NULL,
+  school_year USER-DEFINED NOT NULL,
+  jersey_number character varying NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  profile_id integer NOT NULL,
+  CONSTRAINT players_pkey PRIMARY KEY (id),
+  CONSTRAINT players_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(profile_number),
+  CONSTRAINT players_positionId_fkey FOREIGN KEY (positionId) REFERENCES public.positions(id)
+);
+CREATE TABLE public.positions (
+  id integer NOT NULL DEFAULT nextval('positions_id_seq'::regclass),
+  name text NOT NULL,
+  abbreviation text NOT NULL,
+  description text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT positions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  profile_number integer NOT NULL UNIQUE,
+  first_name text,
+  last_name text,
+  email text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.seasons (
+  id integer NOT NULL DEFAULT nextval('seasons_id_seq'::regclass),
+  name text NOT NULL,
+  startDate timestamp without time zone NOT NULL,
+  endDate timestamp without time zone NOT NULL,
+  isActive boolean NOT NULL DEFAULT false,
+  description text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT seasons_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.settings (
+  id integer NOT NULL DEFAULT nextval('settings_id_seq'::regclass),
+  userId integer NOT NULL,
+  key text NOT NULL,
+  value text NOT NULL,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT settings_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.task_priorities (
+  id integer NOT NULL DEFAULT nextval('task_priorities_id_seq'::regclass),
+  name text NOT NULL,
+  weight integer NOT NULL,
+  color text NOT NULL DEFAULT '#1890ff'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT task_priorities_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.tasks (
+  id integer NOT NULL DEFAULT nextval('tasks_id_seq'::regclass),
+  name text NOT NULL,
+  description text,
+  dueDate timestamp without time zone,
+  priorityId integer NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'TODO'::"TaskStatus",
+  eventId integer,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL,
+  CONSTRAINT tasks_pkey PRIMARY KEY (id),
+  CONSTRAINT tasks_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.users(id),
+  CONSTRAINT tasks_priorityId_fkey FOREIGN KEY (priorityId) REFERENCES public.task_priorities(id),
+  CONSTRAINT tasks_eventId_fkey FOREIGN KEY (eventId) REFERENCES public.events(id)
+);
+CREATE TABLE public.user_tasks (
+  taskId integer NOT NULL,
+  userId integer NOT NULL,
+  status text NOT NULL DEFAULT 'assigned'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT user_tasks_pkey PRIMARY KEY (taskId, userId),
+  CONSTRAINT user_tasks_userId_fkey FOREIGN KEY (userId) REFERENCES public.users(id),
+  CONSTRAINT user_tasks_taskId_fkey FOREIGN KEY (taskId) REFERENCES public.tasks(id)
+);
+CREATE TABLE public.users (
+  id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+  username text NOT NULL,
+  email text NOT NULL,
+  password text NOT NULL,
+  isActive boolean NOT NULL DEFAULT true,
+  role USER-DEFINED NOT NULL DEFAULT 'COACH'::"Role",
+  profileId integer,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdBy integer NOT NULL DEFAULT 0,
+  updatedAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedBy integer NOT NULL DEFAULT 0,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);

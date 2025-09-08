@@ -38,6 +38,12 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api', publicRoutes);
 app.use('/api', privateRoutes);
 
+// Test route to verify server is working
+app.get('/api/test', (req: Request, res: Response) => {
+  console.log('Test route called!');
+  res.json({ message: 'Server is working!', timestamp: new Date().toISOString() });
+});
+
 // Connect to services
 // Promise.all([
 //   cache.connect(),

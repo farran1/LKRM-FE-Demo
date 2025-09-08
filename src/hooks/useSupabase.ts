@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 
@@ -41,12 +42,13 @@ export function useSupabase() {
 // Hook for protected routes
 export function useRequireAuth() {
   const { user, loading } = useSupabase()
+  const router = useRouter()
   
   useEffect(() => {
     if (!loading && !user) {
-      window.location.href = '/login'
+      router.push('/login')
     }
-  }, [user, loading])
+  }, [user, loading, router])
 
   return { user, loading }
 }

@@ -1,4 +1,4 @@
-import { Button, Col, DatePicker, Drawer, Flex, Form, Input, Row, Select, Switch, TimePicker, Typography, Radio, Checkbox } from 'antd'
+import { Button, Col, DatePicker, Drawer, Flex, Form, Input, Row, Select, Switch, TimePicker, Typography, Radio, Checkbox, App } from 'antd'
 import { memo, useEffect, useMemo, useState } from 'react'
 import CloseIcon from '@/components/icon/close.svg'
 import style from './style.module.scss'
@@ -8,35 +8,45 @@ import { convertDateTime } from '@/utils/app'
 import { PlusOutlined } from '@ant-design/icons'
 import NewEventType from '../new-event-type'
 import { locations } from '@/utils/constants'
+import { supabase } from '@/lib/supabase'
 
 const { Title } = Typography
 
-function NewEvent({ isOpen, showOpen, onRefresh } : any) {
+function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [eventTypes, setEventTypes] = useState<{ label: string; value: number }[]>([])
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null)
   const [isShowModalNewType, showModalNewType] = useState(false)
+  const [coaches, setCoaches] = useState<{ label: string; value: string }[]>([])
   const [form] = Form.useForm()
 
   useEffect(() => {
     getEventTypes()
+    getCoaches()
   }, [])
+
+  useEffect(() => {
+    if (isOpen && defaultValues) {
+      form.setFieldsValue(defaultValues)
+    }
+  }, [isOpen, defaultValues, form])
 
   async function getEventTypes() {
     setLoading(true)
     try {
       const res = await api.get('/api/eventTypes')
-      const existing: { label: string; value: number }[] = Array.isArray(res?.data?.data)
-        ? res.data.data.map((item: any) => ({ label: item.name, value: item.id }))
+      const existing: { label: string; value: number }[] = Array.isArray((res as any)?.data?.data)
+        ? (res as any).data.data.map((item: any) => ({ label: item.name, value: item.id }))
         : []
 
       const defaults = [
-        { name: 'Practice',   color: '#2196f3', txtColor: '#ffffff' },
-        { name: 'Game',       color: '#4ecdc4', txtColor: '#ffffff' },
-        { name: 'Workout',    color: '#9c27b0', txtColor: '#ffffff' },
-        { name: 'Meeting',    color: '#4caf50', txtColor: '#ffffff' },
-        { name: 'Scrimmage',  color: '#ff9800', txtColor: '#ffffff' },
-        { name: 'Tournament', color: '#ff5722', txtColor: '#ffffff' },
+        { name: 'Practice',   color: '#2196f3' },
+        { name: 'Game',       color: '#4ecdc4' },
+        { name: 'Workout',    color: '#9c27b0' },
+        { name: 'Meeting',    color: '#4caf50' },
+        { name: 'Scrimmage',  color: '#ff9800' },
+        { name: 'Tournament', color: '#ff5722' },
       ]
 
       // Seed any missing default types on the backend
@@ -46,7 +56,7 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
         await Promise.all(
           missing.map(async d => {
             try {
-              await api.post('/api/eventTypes', { name: d.name, color: d.color, txtColor: d.txtColor })
+              await api.post('/api/eventTypes', { name: d.name, color: d.color })
             } catch (e) {
               // ignore conflicts/authorization issues; we still merge UI below
             }
@@ -58,8 +68,9 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
       let merged = existing
       try {
         const res2 = await api.get('/api/eventTypes')
-        if (Array.isArray(res2?.data?.data) && res2.data.data.length > 0) {
-          merged = res2.data.data.map((item: any) => ({ label: item.name, value: item.id }))
+        const arr = (res2 as any)?.data?.data
+        if (Array.isArray(arr) && arr.length > 0) {
+          merged = arr.map((item: any) => ({ label: item.name, value: item.id }))
         }
       } catch {}
 
@@ -80,6 +91,58 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
     }
   }
 
+  async function getCoaches() {
+    try {
+      console.log('🔄 SUPABASE: Fetching coaches directly from Supabase users table...') // Debug log
+      
+      // Get authenticated users from session instead of public users table
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        console.error('No authenticated user found')
+        setCoaches([])
+        return
+      }
+      
+      // Create coach options from authenticated user
+      const user = session.user
+      const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
+        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+        : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
+      
+      const users = [{
+        id: user.id,
+        username: userName,
+        email: user.email,
+        role: 'COACH',
+        isActive: true
+      }]
+
+      console.log('🔄 SUPABASE: Using authenticated user for coaches:', users) // Debug log
+
+      if (!users || users.length === 0) {
+        console.log('🔄 SUPABASE: No users found') // Debug log
+        setCoaches([])
+        return
+      }
+
+      // Process the users data
+      const processedUsers = users.map(user => ({
+        label: user.username || 'Unknown User',
+        value: user.username || 'Unknown User' // Use username as value, not ID
+      }))
+
+      console.log('🔄 SUPABASE: Final processed users:', processedUsers) // Debug log
+      setCoaches(processedUsers)
+    } catch (error) {
+      console.error('🔄 SUPABASE: Error in getCoaches:', error)
+      message.error('Failed to fetch coaches. Please try again.')
+      setCoaches([])
+    }
+  }
+
+  // Removed coaches (users) fetching; no longer used
+
   const onClose = () => {
     reset()
     showOpen(false)
@@ -99,6 +162,23 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
     payload.startTime = startTime
     payload.endTime = endTime
 
+    // Handle "All Coaches" selection
+    if (payload.attendees && Array.isArray(payload.attendees)) {
+      const allCoachesIndex = payload.attendees.indexOf('all_coaches')
+      if (allCoachesIndex !== -1) {
+        // If "All Coaches" is selected, replace with all coach IDs
+        const allCoachIds = coaches.map(coach => coach.value)
+        if (allCoachIds.length > 0) {
+          payload.attendees = allCoachIds
+          console.log('Replaced "all_coaches" with:', allCoachIds)
+        } else {
+          // If no coaches available, remove "all_coaches" from attendees
+          payload.attendees = payload.attendees.filter((attendee: string | number) => attendee !== 'all_coaches')
+          console.warn('No coaches available to replace "all_coaches"')
+        }
+      }
+    }
+
     // Recurrence mapping (Google/Outlook/Apple style → current API)
     const repeatRule = payload.repeatRule // none | daily | weekly | monthly | yearly
     const endsType = payload.endsType // never | on | after
@@ -107,6 +187,7 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
 
     if (repeatRule && repeatRule !== 'none') {
       payload.isRepeat = true
+      payload.repeatType = repeatRule // Map repeatRule to repeatType
       if (endsType === 'after' && endAfterCount) {
         payload.occurence = Number(endAfterCount)
       } else if (endsType === 'on' && endOnDate && payload.startTime) {
@@ -130,15 +211,25 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
       }
     } else {
       payload.isRepeat = false
+      payload.repeatType = null // Set to null for non-repeating events
       delete payload.occurence
     }
 
     // Clean UI-only fields
-    delete payload.repeatRule
     delete payload.endsType
     delete payload.endOnDate
     delete payload.endAfterCount
-    delete payload.daysOfWeek
+    delete payload.repeatRule // Remove repeatRule as it's not a database field
+    // Keep daysOfWeek as it's needed for weekly repeats
+    delete payload.attendees // Remove attendees field as it's handled separately in the API
+
+    // Ensure location is set (required field)
+    if (!payload.location) {
+      payload.location = 'HOME' // Default to HOME if not set
+    }
+
+    console.log('Final payload before API call:', payload)
+    console.log('Location field in payload:', payload.location)
 
     setLoading(true)
     try {
@@ -147,19 +238,19 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
         const selected = eventTypes.find(e => e.value === payload.eventTypeId)
         if (selected) {
           // Pick colors consistent with defaults
-          const palette: Record<string, { color: string; txtColor: string }> = {
-            practice: { color: '#2196f3', txtColor: '#ffffff' },
-            game: { color: '#4ecdc4', txtColor: '#ffffff' },
-            workout: { color: '#9c27b0', txtColor: '#ffffff' },
-            meeting: { color: '#4caf50', txtColor: '#ffffff' },
-            scrimmage: { color: '#ff9800', txtColor: '#ffffff' },
-            tournament: { color: '#ff5722', txtColor: '#ffffff' },
+          const palette: Record<string, { color: string }> = {
+            practice: { color: '#2196f3' },
+            game: { color: '#4ecdc4' },
+            workout: { color: '#9c27b0' },
+            meeting: { color: '#4caf50' },
+            scrimmage: { color: '#ff9800' },
+            tournament: { color: '#ff5722' },
           }
           const key = selected.label.toLowerCase()
-          try {
-            const colors = palette[key] ?? { color: '#1890ff', txtColor: '#ffffff' }
-            const createRes = await api.post('/api/eventTypes', { name: selected.label, ...colors })
-            const newId = createRes?.data?.id
+                      try {
+              const colors = palette[key] ?? { color: '#1890ff' }
+              const createRes = await api.post('/api/eventTypes', { name: selected.label, ...colors })
+            const newId = (createRes as any)?.data?.id
             if (newId) {
               payload.eventTypeId = newId
             }
@@ -167,9 +258,44 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
         }
       }
       const res = await api.post('/api/events', payload)
+      
+      console.log('Event creation response:', res)
+      console.log('Response status:', res?.status)
+      console.log('Response data:', res?.data)
+      console.log('Response error:', (res as any)?.error)
+      
+      // Check if the response indicates success
+      if ((res as any)?.status >= 400 || (res as any)?.data?.success === false || (res as any)?.error) {
+        const errorMessage = (res as any)?.error || (res as any)?.data?.message || 'Failed to create event'
+        console.error('API returned error:', errorMessage)
+        message.error(errorMessage)
+      } else {
+        // Show success message
+        message.success('Event created successfully!')
+      }
+      
+      // Always close drawer and refresh, regardless of success/failure
       showOpen(false)
-      onRefresh()
+      
+      // Call refresh function to update the events list
+      if (onRefresh && typeof onRefresh === 'function') {
+        console.log('Calling onRefresh to update events list')
+        onRefresh()
+      } else {
+        console.warn('onRefresh function not provided or not a function')
+      }
+      
+      // Reset form
+      form.resetFields()
     } catch (error) {
+      console.error('Error creating event:', error)
+      message.error('Failed to create event. Please try again.')
+      
+      // Even on error, try to refresh to show current state
+      if (onRefresh && typeof onRefresh === 'function') {
+        console.log('Calling onRefresh after error to update events list')
+        onRefresh()
+      }
     }
     setLoading(false)
   }
@@ -210,7 +336,8 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
           <div className={style.title} >New Event</div>
           <CloseIcon onClick={onClose} />
         </Flex>
-        <Form layout="vertical" onFinish={onSubmit} initialValues={{ repeatRule: 'none', endsType: 'never', endAfterCount: 1, location: 'HOME' }} form={form}>
+        {isOpen && (
+          <Form layout="vertical" onFinish={onSubmit} initialValues={{ repeatRule: 'none', endsType: 'never', endAfterCount: 1, location: 'HOME', venue: 'Home Court' }} form={form}>
           <Form.Item name="name" rules={[{ required: true, max: 255 }]} label="Name">
             <Input placeholder="Enter Event Name" />
           </Form.Item>
@@ -347,13 +474,12 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
               const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
               const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()
               const isGame = typeLabel === 'game'
-              if (!isGame) {
-                // Auto set HOME for non-game workouts explicitly
-                if (typeLabel?.includes('workout')) {
-                  if (form.getFieldValue('location') !== 'HOME') form.setFieldsValue({ location: 'HOME' })
-                }
-                return null
+              
+              // Auto set HOME for non-game events if location is not set
+              if (!isGame && !form.getFieldValue('location')) {
+                form.setFieldsValue({ location: 'HOME' })
               }
+              
               return (
                 <Form.Item name="location" rules={[{ required: true, message: 'Please select location' }]} style={{ marginBottom: 2 }}>
                   <TagSelector options={locations} />
@@ -365,25 +491,100 @@ function NewEvent({ isOpen, showOpen, onRefresh } : any) {
             <Input placeholder="Enter venue name" />
           </Form.Item>
 
-          <div className={style.subtitle}>Team & Notifications</div>
-          <Form.Item name="members" label="Team Members" style={{ marginBottom: 12 }}>
-            <Input placeholder="Add team member" />
+          <div className={style.subtitle}>Details</div>
+          
+          {/* Attendees Section - Show for Meeting, Practice, and Workout */}
+          <Form.Item shouldUpdate noStyle>
+            {() => {
+              const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
+              const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()
+              const showAttendees = typeLabel === 'meeting' || typeLabel === 'practice' || typeLabel === 'workout'
+              
+              if (!showAttendees) return null
+              
+              return (
+                <Form.Item name="attendees" label="Attendees" style={{ marginBottom: 12 }}>
+                  <Select
+                    mode="multiple"
+                    placeholder="Select Coaches to attend"
+                    style={{ width: '100%' }}
+                    loading={loading}
+                    options={[
+                      { label: 'All Coaches', value: 'all_coaches' },
+                      ...coaches,
+                    ]}
+                  />
+                </Form.Item>
+              )
+            }}
           </Form.Item>
-          <Flex align="flex-end" justify="space-between" style={{ marginBottom: 24 }}>
-            <div>Notify Team?</div>
-            <Form.Item name="isNotice" style={{ margin: 0 }}>
-              <Switch />
-            </Form.Item>
-          </Flex>
 
-          <Form.Item name="oppositionTeam" label="Opposition Team">
-            <Input placeholder="Add Opposition Team" />
+          {/* Show Opponent input only for games and scrimmages */}
+          <Form.Item shouldUpdate noStyle>
+            {() => {
+              const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
+              const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()
+              const showOpponent = typeLabel === 'game' || typeLabel === 'scrimmage'
+              
+              if (!showOpponent) return null
+              
+              return (
+                <Form.Item name="oppositionTeam" label="Opponent" style={{ marginBottom: 12 }}>
+                  <Input placeholder="Add Opponent" />
+                </Form.Item>
+              )
+            }}
           </Form.Item>
+
+
+          {/* Details text field - always visible and pre-populated based on event type */}
+          <Form.Item name="notes" style={{ marginBottom: 12 }}>
+            <Input.TextArea 
+              placeholder="Enter event details..." 
+              rows={3}
+              onChange={(e) => {
+                // Auto-populate based on event type when user starts typing
+                const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
+                const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()
+                
+                if (e.target.value === '') {
+                  // Only auto-populate if field is empty
+                  let defaultText = ''
+
+                  if (typeLabel === 'meeting' || typeLabel === 'workout' || typeLabel === 'practice') {
+                     const attendees = form.getFieldValue('attendees')
+                     if (attendees && attendees.length > 0) {
+                       // Check if "All Coaches" is selected
+                       if (attendees.includes('all_coaches')) {
+                         defaultText = 'Attendees: All Coaches'
+                       } else {
+                         const attendeeLabels = attendees.map((attendeeId: string) => {
+                           const coach = coaches.find(c => c.value === attendeeId)
+                           return coach ? coach.label : attendeeId
+                         })
+                         defaultText = `Attendees: ${attendeeLabels.join(', ')}`
+                       }
+                     } else {
+                       defaultText = 'Attendees: '
+                     }
+                   } else if (typeLabel === 'game' || typeLabel === 'scrimmage') {
+                     const opponent = form.getFieldValue('oppositionTeam')
+                     defaultText = opponent ? `Opponent: ${opponent}` : 'Opponent: '
+                   }
+
+                   if (defaultText) {
+                     form.setFieldsValue({ notes: defaultText })
+                   }
+                 }
+               }}
+             />
+           </Form.Item>
 
           <Button type="primary" htmlType="submit"  block style={{ marginTop: 24 }} loading={loading}>
             Save
           </Button>
         </Form>
+        )}
       </Drawer>
       <NewEventType isShowModal={isShowModalNewType} showModal={showModalNewType} refreshEventType={refreshEventType} />
     </>

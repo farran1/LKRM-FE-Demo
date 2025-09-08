@@ -2,10 +2,10 @@ import { Metadata } from 'next'
 import Page from './event-detail'
 import { Suspense } from 'react'
 import { cookies } from 'next/headers';
-import { apiMetadata } from '@/services/api';
+import api from '@/services/api';
 import { AxiosError } from 'axios';
 
-async function fetchEvent(eventId: number): Promise<any> {
+async function fetchEvent(eventId: number | string): Promise<any> {
   // For static export, return mock data instead of making API calls
   if (process.env.NODE_ENV === 'production' || process.env.NEXT_PHASE === 'phase-production-build') {
     return {
@@ -35,12 +35,10 @@ async function fetchEvent(eventId: number): Promise<any> {
 
   const cookieStore = await cookies();
   try {
-    const res = await apiMetadata.get(`/api/events/${eventId}`, {
-      headers: {
-        Cookie: cookieStore.toString(),
-      },
-    });
-    return res.data.event
+    // Extract original event ID from composite IDs like "17-0"
+    const originalEventId = String(eventId).split('-')[0]
+    const res = await api.get(`/api/events/${originalEventId}`);
+    return (res as any).data.event
   } catch(error) {
     if (error instanceof AxiosError) {
       console.log('Axios error:', error.response?.status, error.response?.data);
@@ -53,7 +51,7 @@ async function fetchEvent(eventId: number): Promise<any> {
 }
 
 type Props = {
-  params: Promise<{ id: number }>
+  params: Promise<{ id: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 

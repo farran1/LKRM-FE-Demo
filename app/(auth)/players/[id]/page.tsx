@@ -10,7 +10,7 @@ const metadata: Metadata = {
 }
 
 type Props = {
-  params: Promise<{ id: number }>
+  params: Promise<{ id: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
@@ -31,13 +31,37 @@ export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
   const { id } = await params
+  
+  try {
+    // Fetch player data for the title
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/players/${id}`)
+    if (response.ok) {
+      const data = await response.json()
+      const player = data.player
+      const playerName = player?.first_name && player?.last_name 
+        ? `${player.first_name} ${player.last_name}`
+        : player?.name || 'Player'
+      
+      return {
+        title: `${playerName} | LKRM`,
+        description: `Player profile for ${playerName}`,
+        openGraph: {
+          title: `${playerName} | LKRM`,
+          description: `Player profile for ${playerName}`,
+        },
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching player for metadata:', error)
+  }
 
+  // Fallback metadata
   return {
-    title: 'Player',
-    description: 'Player detail',
+    title: 'Player | LKRM',
+    description: 'Player profile',
     openGraph: {
-      title: 'Player',
-      description: 'Player detail',
+      title: 'Player | LKRM',
+      description: 'Player profile',
     },
   }
 }
@@ -46,7 +70,7 @@ export default async function({ params }: Props) {
   const { id } = await params
   return (
     <Suspense>
-      <Page playerId={id}/>
+      <Page playerId={parseInt(id as string)}/>
     </Suspense>
   )
 }

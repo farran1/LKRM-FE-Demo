@@ -24,8 +24,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     set({ token: undefined, user: undefined });
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
+    // Note: This store is deprecated in favor of Supabase auth
+    // The actual logout should be handled by the AuthProvider
   },
 }));

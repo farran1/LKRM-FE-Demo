@@ -1,6 +1,6 @@
 // DEV-ONLY: Enhanced statistics page styles with comprehensive features
 .container {
-  padding: 24px;
+  padding: 16px;
   background: #f5f5f5;
   min-height: 100vh;
 
@@ -1686,6 +1686,90 @@
   overflow-x: auto;
   background: #102840 !important;
   box-sizing: border-box;
+  
+  // Force horizontal scrolling when sidebar is open
+  &.scroll-on-large-score {
+    overflow-x: auto !important;
+    scrollbar-width: thin;
+    scrollbar-color: #4a5568 #2d3748;
+    
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #2d3748;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #4a5568;
+      border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-thumb:hover {
+      background: #718096;
+    }
+    
+    // Add a subtle border to indicate scrollable area
+    border: 1px solid #4a5568;
+    border-radius: 4px;
+    
+    // Style the scroll indicator title
+    .ant-card-head {
+      background: #1a365d !important;
+      border-bottom: 1px solid #4a5568 !important;
+      
+      .ant-card-head-title {
+        color: #a0aec0 !important;
+        font-size: 0.8rem !important;
+        text-align: center !important;
+        font-style: italic !important;
+      }
+    }
+    
+    // Force the inner content to not wrap
+    .centerContent {
+      min-width: 1200px !important;
+      width: max-content !important;
+      
+      .scoreboardInner {
+        min-width: 1200px !important;
+        width: max-content !important;
+        
+        > .ant-row {
+          min-width: 1200px !important;
+          width: max-content !important;
+          flex-wrap: nowrap !important;
+          
+          > .ant-col {
+            flex-shrink: 0 !important;
+            min-width: auto !important;
+            max-width: none !important;
+          }
+          
+          // Set specific minimum widths for each column
+          > .ant-col:first-child,
+          > .ant-col:nth-child(2),
+          > .ant-col:nth-child(3),
+          > .ant-col:nth-child(5) {
+            min-width: 110px !important;
+            flex: 0 0 110px !important;
+          }
+          
+          > .ant-col:nth-child(4) {
+            min-width: 300px !important;
+            flex: 0 0 300px !important;
+          }
+          
+          // Right grid column (last child)
+          > .ant-col:last-child {
+            min-width: 180px !important;
+            flex: 0 0 180px !important;
+          }
+        }
+      }
+    }
+  }
   .ant-card-body {
     padding: 0 !important;
     margin: 0 !important;
@@ -1702,6 +1786,7 @@
       width: 100%;
       min-width: 0;
       flex: 1 1 0;
+      
       > .ant-row {
         width: 100%;
         min-width: 0;
@@ -1712,6 +1797,7 @@
         gap: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
+        
       }
       > .ant-row > .ant-col {
         display: flex;
@@ -1725,6 +1811,7 @@
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
+        
       }
       > .ant-row > .ant-col:first-child,
       > .ant-row > .ant-col:nth-child(2),
@@ -1734,6 +1821,7 @@
         min-width: 20px !important;
         max-width: 32px !important;
         flex: 0 0 22px !important;
+        
       }
       > .ant-row > .ant-col:nth-child(4) {
         flex: 1 1 0;
@@ -1745,6 +1833,7 @@
         text-overflow: ellipsis;
         padding: 0 !important;
         margin: 0 !important;
+        
       }
     }
   }
@@ -1752,13 +1841,14 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: repeat(2, auto);
-    gap: 5px 5px !important; /* vertical gap 7px, horizontal gap 12px */
+    gap: 8px 12px !important; /* vertical gap 8px, horizontal gap 12px to match left side */
     min-width: 90px;
     max-width: 180px;
     width: 100%;
     white-space: nowrap;
     flex-shrink: 0;
     align-items: start;
+    
     .ant-btn {
       min-width: 60px !important;
       max-width: 110px !important;
@@ -1821,6 +1911,56 @@
 .settingsModal .ant-col-12 {
   margin-bottom: 12px;
 } 
+
+// Team Comparison Table Styles
+.teamComparisonCard {
+  background: linear-gradient(135deg, #17375c 0%, #1e425c 100%);
+  color: white;
+  border: none;
+  margin-bottom: 16px;
+
+  .ant-card-head {
+    background: linear-gradient(135deg, #17375c 0%, #1e425c 100%);
+    color: white;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .ant-card-head-title {
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .ant-card-body {
+    padding: 16px;
+  }
+
+  table {
+    width: 100%;
+    table-layout: fixed; /* ensure equal column distribution */
+    th, td {
+      border: none;
+      padding: 12px 8px;
+      text-align: center;
+      vertical-align: middle;
+      width: 33.3333%;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-weight: 600;
+      border-radius: 4px;
+    }
+
+    tbody tr {
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+    }
+  }
+}
 
 @media (max-width: 700px) {
   .settingGroup {

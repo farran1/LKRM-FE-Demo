@@ -10,10 +10,11 @@ import { stringify } from 'querystring'
 import { useRouter, useSearchParams } from 'next/navigation'
 import convertSearchParams, { formatPayload } from '@/utils/app'
 import dayjs from 'dayjs'
+import { safeMapData } from '@/utils/api-helpers'
 
 function Filter({ isOpen, showOpen, onFilter } : any) {
   const [loading, setLoading] = useState(false)
-  const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
+  const [positions, setPositions] = useState<Array<{ label: string; value: number }>>([])
   const [form] = Form.useForm()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -24,10 +25,43 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
 
   async function getPositions() {
     setLoading(true)
-    const res = await api.get('/api/positions')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
-      setPositions(types)
+    try {
+      const res = await api.get('/api/positions')
+      console.log('Positions API response:', res) // Debug log
+      
+      // Check if we have data in the expected format
+      if ((res as any)?.data?.data && Array.isArray((res as any).data.data)) {
+        const positionOptions = (res as any).data.data.map((item: any) => ({
+          label: item.name, 
+          value: item.id
+        }))
+        setPositions(positionOptions)
+      } else if ((res as any)?.data && Array.isArray((res as any).data)) {
+        // Alternative response format
+        const positionOptions = (res as any).data.map((item: any) => ({
+          label: item.name, 
+          value: item.id
+        }))
+        setPositions(positionOptions)
+      } else {
+        // Fallback to hardcoded positions if API doesn't return expected format
+        console.warn('API response format unexpected, using fallback positions')
+        const fallbackPositions = [
+          { label: 'Center', value: 1 },
+          { label: 'Guard', value: 2 },
+          { label: 'Forward', value: 3 }
+        ]
+        setPositions(fallbackPositions)
+      }
+    } catch (error) {
+      console.error('Error fetching positions:', error)
+      // Fallback to hardcoded positions on error
+      const fallbackPositions = [
+        { label: 'Center', value: 1 },
+        { label: 'Guard', value: 2 },
+        { label: 'Forward', value: 3 }
+      ]
+      setPositions(fallbackPositions)
     }
     setLoading(false)
   }
@@ -86,8 +120,8 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
       </Flex>
       <Form layout="vertical" onFinish={onSubmit} form={form}>
         <Form.Item label="Position" name="positionIds">
-          <Select placeholder="Select Event Type" mode="multiple" allowClear>
-            {positions.map((item: any) => (<Select.Option value={item.value}>{item.label}</Select.Option>))}
+          <Select placeholder="Select Position" mode="multiple" allowClear loading={loading}>
+            {positions.map((item: any) => (<Select.Option key={item.value} value={item.value}>{item.label}</Select.Option>))}
           </Select>
         </Form.Item>
         <Form.Item label="Jersey #" name="jersey">

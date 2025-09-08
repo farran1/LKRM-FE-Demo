@@ -54,7 +54,7 @@ export const menus = [
     label: 'Performance',
     children: [
       { key: '/stats-dashboard', icon: <ChartIcon />, label: <Link href="/stats-dashboard">Statistics</Link> },
-      { key: '/live-stat-tracker', icon: <PlayIcon />, label: <Link href="/live-stat-tracker">Live Stat Tracker</Link> },
+      { key: '/live-stat-tracker', icon: <PlayIcon />, label: <Link href="/live-stat-tracker">Live Stats Tracker</Link> },
     ],
   },
   {

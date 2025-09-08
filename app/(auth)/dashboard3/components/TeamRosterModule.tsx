@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function TeamRosterModule() {
@@ -8,39 +8,61 @@ export default function TeamRosterModule() {
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [allPlayers, setAllPlayers] = useState<any[]>([]);
   const playersPerPage = 8; // Back to 8 for 2x4 grid
 
-  // Filter options
+  // Filter options - match actual database position abbreviations
   const filterOptions = [
     'All',
-    'PG', // Point Guard
-    'SG', // Shooting Guard
-    'SF', // Small Forward
-    'PF', // Power Forward
-    'C'   // Center
+    'C',   // Center
+    'G',   // Guard
+    'F'    // Forward
   ];
 
-  // Mock player data - extended to show pagination
-  const allPlayers = [
-    { id: 1, name: 'Marcus Johnson', jersey: '23', position: 'PG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 2, name: 'Tyler Williams', jersey: '10', position: 'SG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 3, name: 'Jordan Davis', jersey: '15', position: 'SF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 4, name: 'Alex Thompson', jersey: '4', position: 'PF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 5, name: 'DeShawn Wilson', jersey: '32', position: 'C', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 6, name: 'Carlos Rodriguez', jersey: '7', position: 'SG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 7, name: 'Jamal Mitchell', jersey: '21', position: 'SF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 8, name: 'Kevin Brown', jersey: '11', position: 'PG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 9, name: 'Isaiah Robinson', jersey: '33', position: 'C', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 10, name: 'Anthony White', jersey: '24', position: 'SF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 11, name: 'Darius Green', jersey: '8', position: 'SG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 12, name: 'Xavier Carter', jersey: '14', position: 'PF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 13, name: 'Malik Thompson', jersey: '5', position: 'PG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 14, name: 'Terrell Adams', jersey: '22', position: 'SF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 15, name: 'Brandon Lee', jersey: '31', position: 'C', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 16, name: 'Jaylen Parker', jersey: '3', position: 'SG', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 17, name: 'Cameron Ford', jersey: '25', position: 'PF', avatar: '/imgs/avatar-placeholder.jpg' },
-    { id: 18, name: 'Donovan Hayes', jersey: '18', position: 'SF', avatar: '/imgs/avatar-placeholder.jpg' }
-  ];
+  useEffect(() => {
+    fetchTeamRoster();
+  }, []);
+
+  const fetchTeamRoster = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch players from API
+      const playersRes = await fetch('/api/players');
+      
+      if (!playersRes.ok) {
+        throw new Error('Failed to fetch team roster');
+      }
+
+      const playersData = await playersRes.json();
+      console.log('Players API response:', playersData);
+      // The API returns the players array directly, not wrapped in a data property
+      const players = Array.isArray(playersData) ? playersData : (playersData.data || []);
+      console.log('Processed players array:', players);
+      
+      // Transform player data to match our interface
+      const transformedPlayers = players.map((player: any) => ({
+        id: player.id,
+        name: player.name || `${player.first_name || ''} ${player.last_name || ''}`.trim(),
+        jersey: player.jersey_number || player.jersey || '',
+        position: player.position?.abbreviation || player.position?.name || 'Unknown', // Use abbreviation for filtering
+        positionName: player.position?.name || 'Unknown', // Keep full name for display
+        avatar: '/imgs/avatar-placeholder.jpg'
+      }));
+
+      console.log('Transformed players:', transformedPlayers);
+      setAllPlayers(transformedPlayers);
+    } catch (err) {
+      console.error('Error fetching team roster:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load team roster');
+      setAllPlayers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter players based on selected filter
   const filteredPlayers = selectedFilter === 'All' 
@@ -81,6 +103,56 @@ export default function TeamRosterModule() {
     // The existing route structure uses /players/[id] format
     router.push(`/players/${player.id}`);
   };
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          background: '#17375c', // Match sidebar/header blue
+          borderRadius: '16px',
+          padding: '20px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          width: '100%',
+          height: '100%',
+          minHeight: '320px',
+          maxHeight: '400px',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#fff' }}>
+          Loading team roster...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          background: '#17375c', // Match sidebar/header blue
+          borderRadius: '16px',
+          padding: '20px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          width: '100%',
+          height: '100%',
+          minHeight: '320px',
+          maxHeight: '400px',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#f5222d' }}>
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -224,7 +296,10 @@ export default function TeamRosterModule() {
                       }
                     }}
                   >
-                    {option === 'All' ? 'All Players' : option}
+                    {option === 'All' ? 'All Players' :
+                     option === 'C' ? 'Center' :
+                     option === 'G' ? 'Guard' :
+                     option === 'F' ? 'Forward' : option}
                   </button>
                 ))}
               </div>
@@ -323,113 +398,125 @@ export default function TeamRosterModule() {
           boxSizing: 'border-box'
         }}
       >
-        {currentPlayers.map((player) => (
-          <div
-            key={player.id}
-            onClick={() => handlePlayerClick(player)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              borderRadius: '28px', // Pill shape - large border radius
-              padding: '6px 8px 6px 6px', // Reduced padding to fit better
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px', // Reduced gap
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              minHeight: '44px', // Slightly reduced height
-              width: '100%',
-              boxSizing: 'border-box',
-              overflow: 'hidden' // Prevent content overflow
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
-              e.currentTarget.style.transform = 'translateY(0px)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            {/* Avatar */}
+        {currentPlayers.length === 0 ? (
+          <div style={{
+            gridColumn: '1 / -1',
+            color: '#fff',
+            textAlign: 'center',
+            opacity: 0.7,
+            padding: '32px 0'
+          }}>
+            No players found.
+          </div>
+        ) : (
+          currentPlayers.map((player) => (
             <div
+              key={player.id}
+              onClick={() => handlePlayerClick(player)}
               style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #1D75D0 0%, #4ecdc4 100%)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '28px', // Pill shape - large border radius
+                padding: '6px 8px 6px 6px', // Reduced padding to fit better
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#ffffff',
-                border: '2px solid rgba(255, 255, 255, 0.2)'
+                gap: '6px', // Reduced gap
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                minHeight: '44px', // Slightly reduced height
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden' // Prevent content overflow
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                e.currentTarget.style.transform = 'translateY(0px)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              {player.name.split(' ').map(n => n[0]).join('')}
-            </div>
+              {/* Avatar */}
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #1D75D0 0%, #4ecdc4 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  border: '2px solid rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                {player.name.split(' ').map((n: string) => n[0]).join('')}
+              </div>
 
-            {/* Player Info */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-                flex: 1,
-                minWidth: 0 // Allow text to truncate
-              }}
-            >
-              {/* Name */}
+              {/* Player Info */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  flex: 1,
+                  minWidth: 0 // Allow text to truncate
+                }}
+              >
+                {/* Name */}
+                <div
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    lineHeight: '14px',
+                    color: '#ffffff',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {player.name}
+                </div>
+                
+                {/* Position */}
+                <div
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: 400,
+                    fontSize: '10px',
+                    lineHeight: '12px',
+                    color: 'rgba(255, 255, 255, 0.7)'
+                  }}
+                >
+                  {player.positionName}
+                </div>
+              </div>
+
+              {/* Jersey Number */}
               <div
                 style={{
                   fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: '12px',
                   lineHeight: '14px',
-                  color: '#ffffff',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
+                  color: '#B58842',
+                  flexShrink: 0,
+                  minWidth: '20px',
+                  textAlign: 'right'
                 }}
               >
-                {player.name}
-              </div>
-              
-              {/* Position */}
-              <div
-                style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 400,
-                  fontSize: '10px',
-                  lineHeight: '12px',
-                  color: 'rgba(255, 255, 255, 0.7)'
-                }}
-              >
-                {player.position}
+                {player.jersey}
               </div>
             </div>
-
-            {/* Jersey Number */}
-            <div
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 700,
-                fontSize: '12px',
-                lineHeight: '14px',
-                color: '#B58842',
-                flexShrink: 0,
-                minWidth: '20px',
-                textAlign: 'right'
-              }}
-            >
-              {player.jersey}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
 

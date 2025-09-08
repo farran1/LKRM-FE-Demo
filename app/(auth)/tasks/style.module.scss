@@ -4,6 +4,8 @@
   line-height: 1.7rem;
 }
 .container {
+  padding-top: 2px;
+  
   .search {
     border: unset;
     width: 281px;
@@ -48,7 +50,7 @@
   align-items: center;
   font-size: 20px;
   font-weight: 500;
-  gap: 10px;
+  gap: 4px;
 }
 .btnMonth {
   cursor: pointer;

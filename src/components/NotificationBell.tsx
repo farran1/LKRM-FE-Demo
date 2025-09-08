@@ -1,381 +1,265 @@
-'use client';
+import React, { useState, useEffect } from 'react'
+import { Badge, Dropdown, List, Button, Typography, Space, Avatar } from 'antd'
+import { BellOutlined, UserOutlined, CheckOutlined } from '@ant-design/icons'
+import api from '@/services/api'
 
-import React, { useState, useEffect } from 'react';
-import { 
-  getNotifications, 
-  getUnreadNotificationCount, 
-  markNotificationAsRead,
-  Notification 
-} from '@/utils/mentions';
+const { Text } = Typography
 
-interface NotificationBellProps {
-  style?: React.CSSProperties;
+interface Notification {
+  id: number
+  type?: 'mention' | 'generic'
+  noteId: number
+  mentionedBy: {
+    id: string
+    name: string
+    email: string
+    initials: string
+  }
+  note?: {
+    id: number
+    content: string
+    color: string
+    created_at: string
+  }
+  isRead: boolean
+  createdAt: string
+  readAt?: string
 }
 
-export default function NotificationBell({ style }: NotificationBellProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+export default function NotificationBell() {
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
-  // Load notifications and count
   useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  // Refresh notifications every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(loadNotifications, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadNotifications = () => {
-    const allNotifications = getNotifications();
-    setNotifications(allNotifications);
-    setUnreadCount(getUnreadNotificationCount());
-  };
-
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.read) {
-      markNotificationAsRead(notification.id);
-      loadNotifications();
+    // Ask for desktop notification permission once
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {})
+      }
     }
-    // Here you could navigate to the context (task, note, etc.)
-    console.log('Navigate to:', notification.context, notification.contextId);
-  };
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    loadNotifications()
+  }, [])
 
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  };
+  const loadNotifications = async () => {
+    setLoading(true)
+    try {
+      const response = await api.get('/api/notifications')
+      const allNotifications = (response as any).data?.notifications || []
+      setNotifications(allNotifications)
+      setUnreadCount(allNotifications.filter((n: Notification) => !n.isRead).length)
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'mention':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M16 7.85C16 6.83 15.17 6 14.15 6C13.65 6 13.2 6.2 12.86 6.55L11.24 8.17L9.62 6.55C9.27 6.2 8.82 6 8.32 6C7.3 6 6.47 6.83 6.47 7.85C6.47 8.35 6.67 8.8 7.02 9.15L10.59 12.72C11.37 13.5 12.63 13.5 13.41 12.72L16.98 9.15C17.33 8.8 17.53 8.35 17.53 7.85H16Z" fill="#B58842"/>
-          </svg>
-        );
-      case 'assignment':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M14 2H6C4.89 2 4 2.89 4 4V20C4 21.11 4.89 22 6 22H18C19.11 22 20 21.11 20 20V8L14 2Z" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <polyline points="14,2 14,8 20,8" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="16" y1="13" x2="8" y2="13" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="16" y1="17" x2="8" y2="17" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <polyline points="10,9 9,10 7,8" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
-      case 'deadline':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="#FF9800" strokeWidth="2"/>
-            <polyline points="12,6 12,12 16,14" stroke="#FF9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
-      case 'priority':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#F44336"/>
-          </svg>
-        );
-      case 'completion':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M22 11.08V12C21.9988 14.1564 21.3005 16.2547 20.0093 17.9818C18.7182 19.7088 16.9033 20.9725 14.8354 21.5839C12.7674 22.1953 10.5573 22.1219 8.53447 21.3746C6.51168 20.6273 4.78465 19.2461 3.61096 17.4371C2.43727 15.628 1.87979 13.4905 2.02168 11.3363C2.16356 9.18203 2.99721 7.13214 4.39828 5.49883C5.79935 3.86553 7.69279 2.72636 9.79619 2.24223C11.8996 1.75809 14.1003 1.95185 16.07 2.79L18 1" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <polyline points="22,4 12,14.01 9,11.01" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
-      default:
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="#6B7280" strokeWidth="2"/>
-            <line x1="12" y1="8" x2="12" y2="12" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="12" y1="16" x2="12.01" y2="16" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
+      // Show a desktop notification for new unread items (simple heuristic)
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        const newest = allNotifications.find((n: Notification) => !n.isRead)
+        if (newest) {
+          const body = newest.note?.content || (newest.type === 'mention' ? 'You were mentioned' : 'You have a new assignment/reminder')
+          try {
+            new Notification('LKRM Notification', { body })
+          } catch {}
+        }
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error)
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
-  const getNotificationMessage = (notification: Notification) => {
-    switch (notification.type) {
-      case 'mention':
-        return `mentioned you ${notification.context}`;
-      case 'assignment':
-        return `assigned you a task`;
-      case 'deadline':
-        return `Task due soon`;
-      case 'priority':
-        return notification.context; // Already formatted like "changed task priority to high"
-      case 'completion':
-        return `completed a task`;
-      default:
-        return notification.context;
+  const markAsRead = async (notificationIds: number[]) => {
+    try {
+      if (notificationIds.length === 1) {
+        await api.put(`/api/notifications/${notificationIds[0]}/read`)
+      } else {
+        await api.put('/api/notifications', {
+          notificationIds,
+          markAsRead: true
+        })
+      }
+      
+      setNotifications(prev => 
+        prev.map(notification => 
+          notificationIds.includes(notification.id)
+            ? { ...notification, isRead: true, readAt: new Date().toISOString() }
+            : notification
+        )
+      )
+      setUnreadCount(prev => Math.max(0, prev - notificationIds.length))
+    } catch (error) {
+      console.error('Error marking notifications as read:', error)
     }
-  };
+  }
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'high': return '#F44336';
-      case 'medium': return '#FF9800';
-      case 'low': return '#4CAF50';
-      default: return '#B58842';
+  const markAllAsRead = () => {
+    const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id)
+    if (unreadIds.length > 0) {
+      markAsRead(unreadIds)
     }
-  };
+  }
 
-  return (
-    <div style={{ position: 'relative', ...style }}>
-      {/* Bell Icon */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          background: 'none',
-          border: 'none',
-          borderRadius: '8px',
-          width: '32px',
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'background-color 0.2s ease',
-          color: '#ffffff',
-          position: 'relative'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
-        }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M13.73 21A2 2 0 0 1 10.27 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        
-        {/* Notification Badge */}
-        {unreadCount > 0 && (
-          <div
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date()
+    const date = new Date(dateString)
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+    
+    if (diffInMinutes < 1) return 'Just now'
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+    
+    const diffInHours = Math.floor(diffInMinutes / 60)
+    if (diffInHours < 24) return `${diffInHours}h ago`
+    
+    const diffInDays = Math.floor(diffInHours / 24)
+    return `${diffInDays}d ago`
+  }
+
+  const truncateContent = (content: string, maxLength: number = 50) => {
+    if (content.length <= maxLength) return content
+    return content.substring(0, maxLength) + '...'
+  }
+
+  const notificationItems = notifications.map((notification) => (
+    <List.Item
+      key={notification.id}
             style={{
-              position: 'absolute',
-              top: '2px',
-              right: '2px',
-              background: '#B58842',
-              color: '#ffffff',
-              borderRadius: '50%',
-              width: '16px',
-              height: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: 700,
-              fontFamily: 'Inter, sans-serif'
+        padding: '12px 16px',
+        backgroundColor: notification.isRead ? 'transparent' : '#f0f8ff',
+        borderLeft: notification.isRead ? 'none' : '3px solid #1890ff'
+      }}
+      actions={[
+        !notification.isRead && (
+          <Button
+            type="text"
+            size="small"
+            icon={<CheckOutlined />}
+            onClick={() => markAsRead([notification.id])}
+            style={{ color: '#1890ff' }}
+          >
+            Mark Read
+          </Button>
+        )
+      ].filter(Boolean)}
+    >
+      <List.Item.Meta
+        avatar={
+          <Avatar
+            size="small"
+            style={{
+              backgroundColor: notification.mentionedBy.initials ? '#1890ff' : '#ccc',
+              fontSize: '10px'
             }}
           >
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </div>
-        )}
-      </button>
-
-      {/* Notifications Dropdown */}
-      {isOpen && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            right: '0',
-            marginTop: '8px',
-            background: '#17375c',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '12px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
-            zIndex: 1000,
-            minWidth: '350px',
-            maxHeight: '400px',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: '16px 20px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#ffffff'
-              }}
-            >
-              Notifications
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.7)',
-                cursor: 'pointer',
-                padding: '4px'
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Notifications List */}
-          <div
-            style={{
-              maxHeight: '320px',
-              overflow: 'auto',
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#1e425c #17375c'
-            }}
-          >
-            {notifications.length === 0 ? (
+            {notification.mentionedBy.initials || <UserOutlined />}
+          </Avatar>
+        }
+        title={
+          <Space>
+            <Text strong style={{ fontSize: '12px' }}>
+              {notification.mentionedBy.name}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '11px' }}>
+              {notification.type === 'mention' ? 'mentioned you' : 'updated your assignments'}
+            </Text>
+          </Space>
+        }
+        description={
+          <div>
+            {notification.note ? (
               <div
                 style={{
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: '14px'
+                  fontSize: '11px',
+                  color: '#666',
+                  marginBottom: '4px',
+                  padding: '4px 8px',
+                  backgroundColor: notification.note.color,
+                  borderRadius: '4px',
+                  border: '1px solid #e8e8e8'
                 }}
               >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ marginBottom: '8px' }}>
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M13.73 21A2 2 0 0 1 10.27 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <div>No notifications yet</div>
+                {truncateContent(notification.note.content)}
               </div>
             ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  style={{
-                    padding: '16px 20px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s ease',
-                    backgroundColor: notification.read ? 'transparent' : 'rgba(181, 136, 66, 0.1)',
-                    display: 'flex',
-                    gap: '12px',
-                    alignItems: 'flex-start'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = notification.read ? 'transparent' : 'rgba(181, 136, 66, 0.1)';
-                  }}
-                >
-                  {/* Notification Icon */}
-                  <div
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: `rgba(${notification.type === 'mention' ? '181, 136, 66' : 
-                        notification.type === 'assignment' ? '76, 175, 80' :
-                        notification.type === 'deadline' ? '255, 152, 0' :
-                        notification.type === 'priority' ? '244, 67, 54' :
-                        notification.type === 'completion' ? '76, 175, 80' : '107, 114, 128'}, 0.2)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}
-                  >
-                    {getNotificationIcon(notification.type)}
-                  </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: '14px',
-                        fontWeight: notification.read ? 400 : 600,
-                        color: '#ffffff',
-                        marginBottom: '4px',
-                        lineHeight: '1.4'
-                      }}
-                    >
-                      <span style={{ color: getPriorityColor(notification.priority) }}>{notification.fromUserName}</span> {getNotificationMessage(notification)}
-                      {notification.priority && (
-                        <span style={{ 
-                          fontSize: '11px',
-                          color: getPriorityColor(notification.priority),
-                          marginLeft: '4px',
-                          fontWeight: 600
-                        }}>
-                          [{notification.priority.toUpperCase()}]
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: '13px',
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        marginBottom: '6px',
-                        lineHeight: '1.3'
-                      }}
-                    >
-                      "{notification.content}"
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}
-                    >
-                      {formatTimestamp(notification.timestamp)}
-                    </div>
-                  </div>
-
-                  {/* Unread indicator */}
-                  {!notification.read && (
-                    <div
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#B58842',
-                        flexShrink: 0,
-                        marginTop: '4px'
-                      }}
-                    />
-                  )}
-                </div>
-              ))
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                You were assigned a task or added to an event
+              </div>
             )}
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              {formatTimeAgo(notification.createdAt)}
+            </Text>
           </div>
+        }
+      />
+    </List.Item>
+  ))
+
+  const dropdownContent = (
+    <div style={{ width: '320px', maxHeight: '400px', background: '#17375c', border: '1px solid #2a4a6b', borderRadius: 8, boxShadow: '0 10px 25px rgba(0,0,0,0.35)' }}>
+      <div
+        style={{
+          padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          color: '#ffffff'
+        }}
+      >
+        <Text strong style={{ color: '#ffffff' }}>Notifications</Text>
+        {unreadCount > 0 && (
+          <Button
+            type="link"
+            size="small"
+            onClick={markAllAsRead}
+            style={{ padding: 0, height: 'auto', color: '#4ecdc4' }}
+          >
+            Mark all read
+          </Button>
+        )}
+      </div>
+      
+      {notifications.length === 0 ? (
+        <div
+          style={{
+            padding: '24px',
+            textAlign: 'center',
+            color: 'rgba(255,255,255,0.7)'
+          }}
+        >
+          <BellOutlined style={{ fontSize: '24px', marginBottom: '8px', color: '#ffffff' }} />
+          <div>No notifications yet</div>
         </div>
+      ) : (
+        <List
+          dataSource={notificationItems}
+          renderItem={(item) => item}
+          style={{ maxHeight: '300px', overflowY: 'auto', background: 'transparent', color: '#ffffff' }}
+        />
       )}
     </div>
-  );
+  )
+
+  return (
+    <Dropdown
+      menu={{ items: [] }}
+      trigger={['click']}
+      placement="bottomRight"
+      popupRender={() => dropdownContent}
+    >
+      <Badge count={unreadCount} size="small">
+        <Button
+          type="text"
+          icon={<BellOutlined />}
+          style={{
+            color: '#ffffff',
+            fontSize: '16px',
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        />
+      </Badge>
+    </Dropdown>
+  )
 } 

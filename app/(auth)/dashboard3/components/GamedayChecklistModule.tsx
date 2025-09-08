@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import GamedayStatusModal from './GamedayStatusModal';
 import EventDetailModal from './EventDetailModal';
-import TaskMentionInput from './TaskMentionInput';
+import NewTask from '../../tasks/components/new-task';
 import api from '@/services/api';
 
 // SVG Icons for status buttons
@@ -56,35 +56,84 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
     completed: 0
   });
 
-  const eventId = 1; // Eagles vs Hawks game event ID
+  const [eventId, setEventId] = useState<number | null>(null);
 
-  // Mock event details - structured like real event data
-  const mockEventData = {
-    id: 1,
-    name: "Eagles vs Hawks",
-    venue: "Lincoln High School Gymnasium",
-    startTime: "2025-03-15T19:00:00Z",
-    isRepeat: false,
-    eventType: {
-      name: "Game",
-      color: "#4ecdc4",
-      txtColor: "#ffffff"
+  // Fetch real event details from API
+  const [eventData, setEventData] = useState<any>(null);
+  const [eventLoading, setEventLoading] = useState(true);
+
+  // Fetch the next upcoming game event
+  useEffect(() => {
+    fetchNextGameEvent();
+  }, []);
+
+  const fetchNextGameEvent = async () => {
+    try {
+      setEventLoading(true);
+      // Fetch the next upcoming game event (filter strictly to Game type)
+      const nowIso = new Date().toISOString();
+      const eventsRes = await api.get(`/api/events?eventTypeIds=1&startDate=${encodeURIComponent(nowIso)}&perPage=1&sortBy=startTime&sortOrder=asc`);
+      const events = (eventsRes?.data as any)?.data || [];
+      
+      if (events.length > 0) {
+        const nextGame = events[0];
+        setEventId(nextGame.id);
+        setEventData({
+          id: nextGame.id,
+          name: nextGame.name,
+          venue: nextGame.venue,
+          startTime: nextGame.startTime,
+          isRepeat: nextGame.isRepeat || false,
+          eventType: nextGame.eventType || {
+            name: "Game",
+            color: "#4ecdc4",
+            txtColor: "#ffffff"
+          }
+        });
+      } else {
+        // No upcoming games found
+        setEventId(null);
+        setEventData(null);
+      }
+    } catch (error) {
+      console.error('Error fetching next game event:', error);
+      setEventId(null);
+      setEventData(null);
+    } finally {
+      setEventLoading(false);
     }
   };
 
-  const eventDetails = {
-    opponent: "vs Hawks",
-    date: "Mar 15, 2025",
-    time: "7:00 PM",
-    location: "Lincoln High School Gymnasium"
+  const eventDetails = eventData ? {
+    opponent: eventData.name.includes(' vs ') ? `vs ${eventData.name.split(' vs ')[1]}` : eventData.name,
+    date: new Date(eventData.startTime).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    }),
+    time: new Date(eventData.startTime).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    }),
+    location: eventData.venue
+  } : {
+    opponent: "No Upcoming Games",
+    date: "TBD",
+    time: "TBD",
+    location: "TBD"
   };
 
   // Fetch status counts for the specific event
   useEffect(() => {
-    fetchStatusCounts();
-  }, []);
+    if (eventId) {
+      fetchStatusCounts();
+    }
+  }, [eventId]);
 
   const fetchStatusCounts = async () => {
+    if (!eventId) return;
+    
     try {
       // Fetch tasks for each status for this specific event
       const [todoRes, inProgressRes, doneRes] = await Promise.all([
@@ -94,17 +143,16 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
       ]);
 
       setStatusCounts({
-        notStarted: todoRes?.data?.data?.length || 0,
-        inProgress: inProgressRes?.data?.data?.length || 0,
-        completed: doneRes?.data?.data?.length || 0
+        notStarted: (todoRes?.data as any)?.data?.length || 0,
+        inProgress: (inProgressRes?.data as any)?.data?.length || 0,
+        completed: (doneRes?.data as any)?.data?.length || 0
       });
     } catch (error) {
       console.error('Error fetching status counts:', error);
-      // Fallback to match new demo data structure
       setStatusCounts({
-        notStarted: 2,  // 2 TODO tasks for event 1
-        inProgress: 1,  // 1 IN_PROGRESS task for event 1
-        completed: 12   // 12 DONE tasks for event 1
+        notStarted: 0,
+        inProgress: 0,
+        completed: 0
       });
     }
   };
@@ -169,7 +217,11 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
       return;
     }
     // Navigate to tasks filtered by this event
-    router.push(`/tasks?eventId=${eventId}`);
+    if (eventId) {
+      router.push(`/tasks?eventId=${eventId}`);
+    } else {
+      router.push('/tasks');
+    }
   };
 
   // Handle add button click - open new task popup
@@ -179,30 +231,9 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
   };
 
   // Handle task creation refresh - update status counts
-  const handleRefreshTask = () => {
+  const handleTaskRefresh = () => {
+    console.log('Task created, refreshing gameday checklist...');
     fetchStatusCounts(); // Refresh the counts after task creation
-  };
-
-  // Handle task creation
-  const handleTaskCreate = (task: {
-    title: string;
-    description: string;
-    mentions: any[];
-    assignedTo?: string;
-    priority: 'high' | 'medium' | 'low';
-    dueDate?: string;
-    event?: string;
-  }) => {
-    console.log('New task created:', task);
-    setIsShowNewTask(false);
-    handleRefreshTask(); // Refresh the counts after task creation
-    // Here you would typically save the task to your backend
-    // For now, we'll just log it and close the modal
-  };
-
-  // Handle task creation cancel
-  const handleTaskCancel = () => {
-    setIsShowNewTask(false);
   };
 
   return (
@@ -293,7 +324,7 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M6 2V10M2 6H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            Add Item
+            Add Task
           </button>
         </div>
 
@@ -452,7 +483,7 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
           statusName={selectedStatus.name}
           statusId={selectedStatus.id}
           statusColor={selectedStatus.color}
-          eventId={eventId}
+          eventId={eventId ?? undefined}
         />
       )}
 
@@ -460,16 +491,18 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
       <EventDetailModal
         isShowModal={isEventModalOpen}
         onClose={handleEventModalClose}
-        event={mockEventData}
+        event={eventData}
       />
 
-      {/* New Task Popup */}
-      {isShowNewTask && (
-        <TaskMentionInput 
-          onTaskCreate={handleTaskCreate}
-          onCancel={handleTaskCancel}
-        />
-      )}
+      {/* New Task Drawer */}
+      <NewTask 
+        isOpen={isShowNewTask} 
+        showOpen={setIsShowNewTask} 
+        onRefresh={handleTaskRefresh}
+        defaultValues={{
+          eventId: eventId ?? undefined // Pre-populate with the current event ID if available
+        }}
+      />
     </>
   );
 } 

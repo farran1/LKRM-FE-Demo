@@ -34,7 +34,54 @@ function Tasks() {
   const searchParams = useSearchParams()
   const queryParams = convertSearchParams(searchParams)
   const API_KEY = `/api/tasks?${stringify(queryParams)}`
-  const {data: dataSource, isLoading, isValidating, mutate} = useSWR(API_KEY)
+  const {data: response, isLoading, isValidating, mutate} = useSWR(API_KEY)
+  
+  // Extract tasks from the API response
+  const dataSource = response?.tasks || []
+  
+  // Transform data for Kanban view
+  const kanbanDataSource = useMemo(() => {
+    if (!dataSource || dataSource.length === 0) {
+      return {
+        todos: [],
+        inprogresses: [],
+        dones: [],
+        archives: []
+      }
+    }
+    
+    // Group tasks by status
+    const grouped = {
+      todos: [] as any[],
+      inprogresses: [] as any[],
+      dones: [] as any[],
+      archives: [] as any[]
+    }
+    
+    dataSource.forEach((task: any) => {
+      const status = task.status?.toUpperCase() || 'TODO'
+      if (status === 'TODO') {
+        grouped.todos.push(task)
+      } else if (status === 'IN_PROGRESS') {
+        grouped.inprogresses.push(task)
+      } else if (status === 'DONE') {
+        grouped.dones.push(task)
+      } else if (status === 'ARCHIVE') {
+        grouped.archives.push(task)
+      }
+    })
+    
+    return grouped
+  }, [dataSource])
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('API Response:', response)
+    console.log('Extracted tasks:', dataSource)
+    console.log('Tasks count:', dataSource?.length || 0)
+    console.log('Kanban data source:', kanbanDataSource)
+  }, [response, dataSource, kanbanDataSource])
+  
   const [isOpenFilter, showFilter] = useState(false)
   const [isShowNewTask, showNewTask] = useState(false)
   const [isShowMentionTask, setIsShowMentionTask] = useState(false)
@@ -105,18 +152,15 @@ function Tasks() {
     {
       title: 'Assignee',
       render: (data: any) => {
-        if (!data.playerTasks || !data.playerTasks.length) return ''
-        if (data.playerTasks.length <= 3) {
-          return data.playerTasks.map((item: any) => '👤 ' + (item?.player?.name || 'Unknown Player')).join(', ')
-        }
-        return data.playerTasks.slice(0, 3).map((item: any) => '👤 ' + (item?.player?.name || 'Unknown Player')).join(', ') + '...'
+        if (!data.users || !data.users.username) return 'Unknown user'
+        return `👤 ${data.users.username}`
       }
     },
     {
       title: 'Event',
       render: (data: any) => {
-        if (!data.event || !data.event.name) return 'No event'
-        return data.event.name
+        if (!data.events || !data.events.name) return 'No event'
+        return data.events.name
       }
     },
     {
@@ -128,16 +172,16 @@ function Tasks() {
     {
       title: renderHeader('Priority Level', 'priority'),
       render: (data: any) => {
-        if (!data.priority || !data.priority.name) {
+        if (!data.task_priorities || !data.task_priorities.name) {
           return <span className={classNames(style.priority, style['no-priority'])}>No priority</span>
         }
-        return <span className={classNames(style.priority, style[data.priority.name])}>{data.priority.name}</span>
+        return <span className={classNames(style.priority, style[data.task_priorities.name.toLowerCase()])}>{data.task_priorities.name}</span>
       }
     },
     {
       title: renderHeader('Due Date', 'dueDate'),
       render: (data: any) => {
-        if (!data.dueDate) return ''
+        if (!data.dueDate) return 'No due date'
         return moment(data.dueDate).format('MMMM D, YYYY')
       }
     },
@@ -149,6 +193,16 @@ function Tasks() {
 
   const openFilter = () => {
     showFilter(true)
+  }
+
+  const handleSearch = () => {
+    queryParams.name = searchkey
+    const newQuery = stringify(queryParams)
+    router.push(`?${newQuery}`)
+  }
+
+  const onChangeSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKey(e.target.value)
   }
 
   const handlePrevMonth = () => {
@@ -197,33 +251,8 @@ function Tasks() {
   }
 
   const openNewTask = (defaultValues = {}) => {
-    setIsShowMentionTask(true)
+    showNewTask(true)
     setTaskDefaultVals(defaultValues)
-  }
-
-  const handleSearch = async () => {
-    // if (!searchkey.trim()) {
-    //   notification.error({
-    //     message: null, // suppress default title
-    //     description: 'Please enter a search keyword',
-    //     style: {
-    //       backgroundColor: '#2c1618',
-    //       border: '1px solid #5b2526',
-    //       borderRadius: 8,
-    //       padding: '8px 16px 16px'
-    //     },
-    //     closeIcon: false
-    //   })
-    //   return
-    // }
-
-    queryParams.name = searchkey
-    const newQuery = stringify(queryParams)
-    router.push(`?${newQuery}`)
-  }
-
-  const onChangeSearch = (e: any) => {
-    setSearchKey(e.target.value)
   }
 
   const onCloseDetailModal = () => {
@@ -269,6 +298,29 @@ function Tasks() {
     setIsShowMentionTask(false);
   };
 
+  // Handle task status change from Kanban drag and drop
+  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task status');
+      }
+
+      // Refresh the task list to show the updated status
+      refreshTask();
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      // You could add a toast notification here to show the error
+    }
+  };
+
   return (
     <>
       <div className={style.container}>
@@ -287,7 +339,7 @@ function Tasks() {
           </Flex>
           <Button type="primary" icon={<PlusIcon />} onClick={openNewTask}>Create New Task</Button>
         </Flex>
-        <Flex justify="space-between" align="center" style={{ marginBottom: 20 }}>
+        <Flex justify="space-between" align="center" style={{ marginBottom: 10 }}>
           <Flex align="center" gap={24}>
             <Input
               prefix={<SearchIcon />}
@@ -309,7 +361,6 @@ function Tasks() {
           <Flex align='center' gap={10}>
             <Button type="primary" className={classNames({[style.filter]: !hasFilter})} icon={<FunnelIcon />} onClick={openFilter}>Filters</Button>
             <Button type="primary" className={classNames({[style.sort]: !isSort})} icon={<SortIcon />} onClick={toggleSort}>Sort</Button>
-            <Button type="primary" icon={<GearIcon />}></Button>
           </Flex>
         </Flex>
         {viewMode === 'list' &&
@@ -319,19 +370,39 @@ function Tasks() {
             dataSource={dataSource}
             columns={columns}
             loading={isLoading || isValidating}
+            rowKey="id"
           />
         }
         {viewMode === 'calendar' &&
-          <CalendarView dataSource={dataSource} currentDate={currentDate} />
+          <CalendarView 
+            dataSource={dataSource} 
+            currentDate={currentDate}
+            showEventDetail={(task: any) => {
+              setSelectedTask(task)
+              showDetailModal(true)
+            }}
+            addTask={(defaultValues: any) => {
+              setTaskDefaultVals(defaultValues)
+              showNewTask(true)
+            }}
+          />
         }
         {viewMode === 'progress' &&
-          <KanbanView dataSource={dataSource} addTask={openNewTask} />
+          <KanbanView 
+            dataSource={kanbanDataSource} 
+            addTask={openNewTask} 
+            onTaskStatusChange={handleTaskStatusChange}
+            showEventDetail={(task: any) => {
+              setSelectedTask(task)
+              showDetailModal(true)
+            }}
+          />
         }
       </div>
-      <Filter isOpen={isOpenFilter} showOpen={showFilter} />
-      <NewTask isOpen={isShowNewTask} showOpen={showNewTask} onRefresh={refreshTask} defaultValues={taskDefaultVals} />
-      <DetailModal isShowModal={isShowDetailModal} onClose={onCloseDetailModal} task={selectedTask} openEdit={openEditTask} />
-      <EditTask task={selectedTask} isOpen={isShowEditTask} showOpen={showEditTask} onRefresh={refreshTask} />
+      {isOpenFilter && <Filter isOpen={isOpenFilter} showOpen={showFilter} />}
+      {isShowNewTask && <NewTask isOpen={isShowNewTask} showOpen={showNewTask} onRefresh={refreshTask} defaultValues={taskDefaultVals} />}
+      {isShowDetailModal && <DetailModal isShowModal={isShowDetailModal} onClose={onCloseDetailModal} task={selectedTask} openEdit={openEditTask} />}
+      {isShowEditTask && <EditTask task={selectedTask} isOpen={isShowEditTask} showOpen={showEditTask} onRefresh={refreshTask} />}
     </>
   )
 }

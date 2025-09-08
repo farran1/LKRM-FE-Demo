@@ -1,180 +1,231 @@
- .pageRoot {
-   padding: 16px 12px 24px 0;
-   min-height: 100vh;
-   background: #202c3e;
- }
- 
- .toolbar {
-   display: flex;
-   align-items: center;
-   justify-content: space-between;
+.pageRoot {
+  padding: 0 12px 24px 0;
+  min-height: 100vh;
+  border-radius: 16px 16px 0 0; /* rounded top corners */
+  margin-bottom: 24px; /* add bottom margin */
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-end;
   gap: 16px;
-  margin: 8px auto 20px auto;
-   max-width: 1400px;
- }
- 
- .titleRow {
-   display: flex;
-   align-items: center;
-   gap: 8px;
- }
- 
- .pageTitle {
-   color: #ffffff;
-   font-size: 32px;
-   font-weight: 600;
-   margin: 0;
- }
- 
- .filterBtn {
-   background: rgba(255,255,255,0.1);
-   color: #fff;
-   border: none;
- }
- 
- .actionsRow {
-   display: flex;
-   align-items: center;
-   gap: 12px;
- }
- 
- .search {
-   width: 280px;
-   background: rgba(255,255,255,0.1);
-   color: #fff;
-   border-radius: 8px;
- }
- 
- .primaryBtn {
-   background: #1d75d0;
-   border-color: #1d75d0;
- }
- 
- .sectionCard {
-   background: rgba(7,56,83,0.4);
-   border-radius: 16px;
-  padding: 24px;
-   max-width: 1400px;
-  margin: 0 auto 20px auto;
- }
- 
- .sectionHeader {
-   color: #fff;
-   font-size: 24px;
-   font-weight: 600;
-   margin-bottom: 16px;
-   h2 { margin: 0; font-weight: 600; font-size: 24px; }
- }
- 
-.rowContainer { margin-top: 12px; }
- .grid3 {
-   display: grid;
-   grid-template-columns: repeat(3, 1fr);
-   gap: 16px;
- }
- 
-.budgetCard {
-  background: rgba(0,32,50,0.6);
-   border-radius: 16px;
-   padding: 16px;
-   color: #fff;
-   display: flex;
-   flex-direction: column;
-   gap: 12px;
-  text-decoration: none;
- }
- 
- .cardHeader { display: flex; flex-direction: column; gap: 6px; }
- .cardTitle { font-size: 20px; font-weight: 600; }
- .cardSub { color: rgba(255,255,255,0.9); font-size: 16px; }
- 
- .rowBetween { display: flex; align-items: center; justify-content: space-between; color: #fff; font-weight: 500; }
- 
- .progressTrack {
-   background: #e0e0e2;
-   height: 10px;
-  width: 100%;
-   border-radius: 8px;
-   overflow: hidden;
- }
- 
- .progressFill { height: 100%; border-radius: 8px; }
- 
- .viewAllRow { display: flex; justify-content: flex-start; margin-top: 8px; }
- .linkBtn { background: transparent; color: rgba(255,255,255,0.7); border: none; padding: 8px 12px; cursor: pointer; }
- 
- .masterBudget {
-   background: #002032;
-   border-radius: 16px;
-  padding: 24px;
-   color: #fff;
-   display: flex;
-   flex-direction: column;
-  gap: 14px;
- }
- .masterHead { display: flex; align-items: center; gap: 20px; justify-content: space-between; flex-wrap: wrap; }
- .masterTitle { font-size: 20px; font-weight: 600; }
-.masterMeta { display: flex; align-items: center; gap: 10px; }
- .masterActions { margin-top: 8px; }
-.ghostBtn {
-  background: transparent;
-  color: #ffffff;
-  border-color: #ffffff;
 }
-.ghostBtn:hover,
-.ghostBtn:focus {
+
+.pageTitle {
   color: #ffffff;
-  border-color: #ffffff;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.7rem;
+  margin: 0;
+}
+
+.filterBtn {
   background: rgba(255,255,255,0.1);
+  color: #fff;
+  border: none;
+  height: 32px;
+  padding: 4px 12px;
+  border-radius: 6px;
 }
- 
- .grid2x2 {
-   display: grid;
-   grid-template-columns: 1fr;
-   gap: 12px;
-   margin-top: 12px;
- }
- 
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: white;
+  width: 300px;
+  margin-bottom: 0px;
+  
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  &:focus {
+    border-color: #1890ff;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  }
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.primaryBtn {
+  background: #1890ff;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background: #40a9ff;
+  }
+}
+
+.sectionCard {
+  background: rgba(7, 56, 83, 0.8);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(29, 117, 208, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.sectionHeader {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  
+  h2 { 
+    margin: 0; 
+    font-weight: 600; 
+    font-size: 24px; 
+    color: #fff;
+  }
+}
+
 .bucketGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-top: 12px;
+  margin-bottom: 24px;
 }
+
 .bucketCard {
-  background: rgba(3,42,63,0.6);
+  background: rgba(0,32,50,0.6);
   border-radius: 16px;
   padding: 16px;
   color: #fff;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  border: 1px solid rgba(29,117,208,0.2);
+  
+  :global(.ant-card-body) {
+    padding: 0;
+  }
 }
-.inlineStats { display: flex; gap: 24px; color: rgba(255,255,255,0.9); }
 
-.listRow {
-  background: rgba(0,32,50,0.6);
-  border-radius: 16px;
-  padding: 24px;
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardTitle {
+  font-size: 20px;
+  font-weight: 600;
   color: #fff;
+  margin: 0;
+}
+
+.cardSub {
+  color: rgba(255,255,255,0.9);
+  font-size: 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-top: 12px;
 }
-.listRowBody { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-.listRowHead { display: flex; gap: 16px; align-items: center; }
-.rightActions { flex: none; }
-.nestedBuckets { padding: 12px 4px 0 4px; }
- 
- @media (max-width: 1200px) {
-   .grid3 { grid-template-columns: repeat(2, 1fr); }
-  .bucketGrid { grid-template-columns: repeat(2, 1fr); }
- }
- @media (max-width: 768px) {
-   .grid3 { grid-template-columns: 1fr; }
-  .bucketGrid { grid-template-columns: 1fr; }
- }
+
+.inlineStats {
+  display: flex;
+  gap: 24px;
+  color: rgba(255,255,255,0.9);
+  font-size: 14px;
+  
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+.progressTrack {
+  background: rgba(255,255,255,0.2);
+  height: 8px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.viewAllRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.linkBtn {
+  background: transparent;
+  color: #cfe6ff;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 16px;
+  height: auto;
+  
+  &:hover {
+    color: #ffffff;
+    background: rgba(29,117,208,0.2);
+  }
+}
+
+@media (max-width: 1200px) {
+  .bucketGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .titleRow {
+    justify-content: space-between;
+  }
+  
+  .actionsRow {
+    justify-content: space-between;
+  }
+  
+  .search {
+    width: 200px;
+  }
+  
+  .bucketGrid {
+    grid-template-columns: 1fr;
+  }
+}
  
 

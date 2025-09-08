@@ -1,19 +1,14 @@
 import { App, Button, Drawer, Flex, Form, Input, Select } from 'antd'
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import style from './style.module.scss'
 import CloseIcon from '@/components/icon/close.svg'
 import api from '@/services/api'
-import DefaultAvatar from '@/components/icon/avatar.svg'
 
 function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
   const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
   const { message } = App.useApp()
   const [form] = Form.useForm()
-
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
 
   useEffect(() => {
@@ -23,15 +18,20 @@ function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
   useEffect(() => {
     if (!player || !form) return
 
+    // Set form values to match the new structure
     form.setFieldsValue({
-      ...player,
+      firstName: player.first_name || '',
+      lastName: player.last_name || '',
+      positionId: player.positionId,
+      jersey: player.jersey_number || player.jersey || '',
+      schoolYear: player.school_year || ''
     })
   }, [player, form])
 
   async function getPositions() {
     const res = await api.get('/api/positions')
-    if (res?.data?.data.length > 0) {
-      const types = res?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
+    if ((res as any)?.data?.data?.length > 0) {
+      const types = (res as any)?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
       setPositions(types)
     }
   }
@@ -43,51 +43,47 @@ function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
   }
 
   const onSubmit = async (payload: any) => {
-    const formData = new FormData()
-    if (file) {
-      formData.append('avatar', file)
-    }
-    for (let key in payload) {
-      formData.append(key, payload[key])
-    }
     setLoading(true)
     try {
-      const res = await api.put('/api/players/' + player.id, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      onClose()
-      onRefresh()
-    } catch (error) {
+      // Prepare player data to match the new structure
+      const playerData = {
+        name: `${payload.firstName} ${payload.lastName}`.trim(),
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        position_id: payload.positionId,
+        jersey_number: payload.jersey,
+        school_year: payload.schoolYear
+      }
+
+      console.log('Updating player with data:', playerData)
+      const res = await api.put('/api/players/' + player.id, playerData)
+      
+      if (res.status === 200) {
+        message.success('Player updated successfully!')
+        onClose()
+        onRefresh()
+      } else {
+        message.error('Failed to update player. Please try again.')
+      }
+    } catch (error: any) {
+      console.error('Error updating player:', error)
+      if (error.response?.data?.message) {
+        message.error(`Update failed: ${error.response.data.message}`)
+      } else {
+        message.error('Failed to update player. Please try again.')
+      }
     }
     setLoading(false)
   }
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    if (selected && selected.type.startsWith('image/')) {
-      setFile(selected)
-      setPreviewUrl(URL.createObjectURL(selected))
-    } else {
-      message.error('Please select an image file')
-    }
-  }
-
   const reset = () => {
     form.setFieldsValue({
-      ...player
+      firstName: player?.first_name || '',
+      lastName: player?.last_name || '',
+      positionId: player?.positionId,
+      jersey: player?.jersey_number || player?.jersey || '',
+      schoolYear: player?.school_year || ''
     })
-  }
-
-  const renderAvatar = () => {
-    if (previewUrl) return <img src={previewUrl} alt="avatar" />
-    if (player?.avatar) return <img src={player.avatar} alt="avatar" />
-    return <DefaultAvatar />
   }
 
   return (
@@ -108,51 +104,33 @@ function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
           <CloseIcon onClick={onClose} />
         </Flex>
         <Form layout="vertical" form={form} onFinish={onSubmit}>
-          <Flex style={{ marginBottom: 24, flexDirection: 'column' }} align='center' >
-            <div className={style.avatar}>
-              {renderAvatar()}
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-            <Button onClick={handleAvatarClick} style={{ marginTop: 16 }}>Update Profile Photo</Button>
-          </Flex>
-
-          <div style={{ marginBottom: 16 }}>Basic Information</div>
-          <Form.Item name="name" rules={[{ required: true, max: 255 }]} label="Name">
-            <Input placeholder="Enter Name" />
+          <div style={{ marginBottom: 16 }}>Player Information</div>
+          
+          <Form.Item name="firstName" rules={[{ required: true, message: 'Please enter first name' }]} label="First Name">
+            <Input placeholder="Enter First Name" />
           </Form.Item>
-          <Form.Item name="positionId" rules={[{ required: true }]} label="Position">
-            <Select>
-              {positions.map((item: any) => <Select.Option value={item.value}>{item.label}</Select.Option>)}
+          
+          <Form.Item name="lastName" rules={[{ required: true, message: 'Please enter last name' }]} label="Last Name">
+            <Input placeholder="Enter Last Name" />
+          </Form.Item>
+          
+          <Form.Item name="positionId" rules={[{ required: true, message: 'Please select a position' }]} label="Position">
+            <Select placeholder="Select Position" loading={loading}>
+              {positions.map((item: any) => <Select.Option key={item.value} value={item.value}>{item.label}</Select.Option>)}
             </Select>
           </Form.Item>
+          
           <Form.Item name="jersey" rules={[{ required: true, max: 50, message: 'Please enter Jersey Number' }]} label="Jersey #">
             <Input placeholder="Enter Jersey #" />
           </Form.Item>
-          <Form.Item name="phoneNumber" rules={[{ required: true }]} label="Phone Number">
-            <Input placeholder="Enter Phone Number" />
-          </Form.Item>
-          <Form.Item name="height" label="Height"
-            rules={[
-              { required: true },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (value === undefined) {
-                    return Promise.resolve();
-                  }
-                  if (value > 200) {
-                    return Promise.reject(new Error('Height must be at most 200"'));
-                  }
-                  return Promise.resolve();
-                },
-              }),
-            ]}>
-            <Input type="number" placeholder="Enter Height" />
+          
+          <Form.Item name="schoolYear" rules={[{ required: true, message: 'Please select school year' }]} label="School Year">
+            <Select placeholder="Select School Year">
+              <Select.Option key="freshman" value="freshman">Freshman</Select.Option>
+              <Select.Option key="sophomore" value="sophomore">Sophomore</Select.Option>
+              <Select.Option key="junior" value="junior">Junior</Select.Option>
+              <Select.Option key="senior" value="senior">Senior</Select.Option>
+            </Select>
           </Form.Item>
           <Flex style={{ marginTop: 60 }} gap={8}>
             <Button block onClick={reset}>
