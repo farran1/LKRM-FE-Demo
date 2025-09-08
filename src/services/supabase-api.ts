@@ -259,7 +259,7 @@ export class SupabaseAPI {
 
 		try {
 			console.log('SupabaseAPI.createEventWithUser - Attempting to insert into events table...')
-			const { data, error } = await supabase
+			const { data, error } = await (supabase as any)
 				.from('events')
 				.insert(transformedData)
 				.select(`
@@ -472,7 +472,7 @@ export class SupabaseAPI {
 
 		try {
 			console.log('SupabaseAPI.createEvent - Attempting to insert into events table...')
-			const { data, error } = await supabase
+			const { data, error } = await (supabase as any)
 				.from('events')
 				.insert(transformedData)
 				.select(`
@@ -693,7 +693,7 @@ export class SupabaseAPI {
 		}
 
 		// Update the task
-		const { data: task, error: taskError } = await supabase
+		const { data: task, error: taskError } = await (supabase as any)
 			.from('tasks')
 			.update(mappedTaskData)
 			.eq('userId', id)
