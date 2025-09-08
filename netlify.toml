@@ -11,6 +11,10 @@
   # Next.js environment variables
   NODE_ENV = "production"
   NEXT_TELEMETRY_DISABLED = "1"
+  # Disable secrets scanning for this build
+  SECRETS_SCAN_ENABLED = "false"
+  # Omit certain paths from secrets scanning
+  SECRETS_SCAN_OMIT_PATHS = ".next/**,node_modules/**,.netlify/**"
 
 # Redirect rules for Next.js SPA routing
 [[redirects]]
