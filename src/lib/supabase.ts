@@ -22,7 +22,13 @@ export const supabase = typeof window !== 'undefined'
 		auth: { 
 			autoRefreshToken: true,
 			persistSession: false 
-		} 
+		},
+		// Add global configuration to avoid Edge Runtime issues
+		global: {
+			headers: {
+				'X-Client-Info': 'lkrm-app'
+			}
+		}
 	})
 
 export const createServerClient = () => {

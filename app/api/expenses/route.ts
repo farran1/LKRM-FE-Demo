@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, createServerClient } from '@/lib/supabase'
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
+// Force Node.js runtime to avoid Edge Runtime issues with Supabase
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

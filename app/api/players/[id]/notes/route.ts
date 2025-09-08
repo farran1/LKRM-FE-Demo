@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAPI } from '../../../../../src/services/supabase-api'
 
+// Force Node.js runtime to avoid Edge Runtime issues with Supabase
+export const runtime = 'nodejs'
+
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }

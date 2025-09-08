@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// Force Node.js runtime to avoid Edge Runtime issues with Supabase
+export const runtime = 'nodejs'
+
 export async function GET() {
   try {
     const { data, error } = await (supabase as any)

@@ -7,11 +7,17 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['antd', '@ant-design/icons'],
   },
   
+  // External packages for server components
+  serverExternalPackages: ['@supabase/supabase-js'],
+  
   // Image optimization
   images: {
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
+  
+  // Disable telemetry for production builds
+  // telemetry: false, // This is not a valid Next.js config option
   
   // Compression
   compress: true,
