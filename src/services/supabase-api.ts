@@ -39,7 +39,7 @@ export class SupabaseAPI {
 			console.error('Supabase getEvents - authentication error:', authError)
 		}
 		
-		let query = client
+		let query = (client as any)
 			.from('events')
 			.select(`
 				*,
@@ -190,7 +190,7 @@ export class SupabaseAPI {
 	}
 
 	async getEvent(id: number) {
-		const { data, error } = await this.getClient()
+		const { data, error } = await (this.getClient() as any)
 			.from('events')
 			.select(`
 				*,
@@ -299,7 +299,7 @@ export class SupabaseAPI {
 
 	async deleteEvent(id: number) {
 		const client = this.getClient()
-		const { data, error } = await client
+		const { data, error } = await (client as any)
 			.from('events')
 			.delete()
 			.eq('id', id)
@@ -511,7 +511,7 @@ export class SupabaseAPI {
 	}
 
 	async updateEvent(id: number, eventData: Tables['events']['Update']) {
-		const { data, error } = await this.getClient()
+		const { data, error } = await (this.getClient() as any)
 			.from('events')
 			.update({
 				...eventData,
@@ -546,7 +546,7 @@ export class SupabaseAPI {
 	}) {
 		console.log('Supabase getTasks called with params:', params)
 		
-		let query = this.getClient()
+		let query = (this.getClient() as any)
 			.from('tasks')
 			.select(`
 				*,
@@ -661,7 +661,7 @@ export class SupabaseAPI {
 		console.log('Mapped task data:', JSON.stringify(mappedTaskData, null, 2))
 
 		// Create the task
-		const { data: task, error: taskError } = await this.getClient()
+		const { data: task, error: taskError } = await (this.getClient() as any)
 			.from('tasks')
 			.insert(mappedTaskData)
 			.select()
@@ -708,7 +708,7 @@ export class SupabaseAPI {
 	}
 
 	async getTaskById(id: number) {
-		const { data, error } = await this.getClient()
+		const { data, error } = await (this.getClient() as any)
 			.from('tasks')
 			.select(`
 				*,
