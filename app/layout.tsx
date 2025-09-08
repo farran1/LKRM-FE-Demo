@@ -1,4 +1,3 @@
-'use client'
 import '../src/styles/globals.scss';
 import React from 'react';
 import AntdWrapper from '@/components/antd-wrapper';
