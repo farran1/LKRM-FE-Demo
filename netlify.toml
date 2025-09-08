@@ -4,11 +4,10 @@
   
   # Publish directory (Next.js output)
   publish = ".next"
-  
-  # Node.js version
-  environment = { NODE_VERSION = "22" }
 
 [build.environment]
+  # Node.js version
+  NODE_VERSION = "22"
   # Next.js environment variables
   NODE_ENV = "production"
   NEXT_TELEMETRY_DISABLED = "1"
