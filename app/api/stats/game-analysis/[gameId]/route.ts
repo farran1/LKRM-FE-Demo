@@ -199,7 +199,7 @@ export async function GET(
     const ftPct = teamTotals.freeThrowsAttempted > 0 ? 
       Math.round((teamTotals.freeThrowsMade / teamTotals.freeThrowsAttempted) * 1000) / 10 : 0;
 
-    // Format player stats with safe defaults
+    // Format player stats with safe defaults - Box Score format
     const playerStats = (gameStats || []).map(stat => {
       const player = players[stat.playerId] || {};
       const position = positions[player.positionId] || {};
@@ -211,6 +211,20 @@ export async function GET(
         number: player.jersey || 'N/A',
         minutes: stat.minutesPlayed || 0,
         points: stat.points || 0,
+        // Box score format - flattened structure
+        rebounds: (stat.offensiveRebounds || 0) + (stat.defensiveRebounds || 0),
+        assists: stat.assists || 0,
+        steals: stat.steals || 0,
+        blocks: stat.blocks || 0,
+        turnovers: stat.turnovers || 0,
+        fouls: stat.fouls || 0,
+        plusMinus: stat.plusMinus || 0,
+        // Field goal stats for efficiency calculation
+        fgMade: stat.fieldGoalsMade || 0,
+        fgAttempted: stat.fieldGoalsAttempted || 0,
+        ftMade: stat.freeThrowsMade || 0,
+        ftAttempted: stat.freeThrowsAttempted || 0,
+        // Keep nested structure for compatibility
         fieldGoals: {
           made: stat.fieldGoalsMade || 0,
           attempted: stat.fieldGoalsAttempted || 0
@@ -222,17 +236,7 @@ export async function GET(
         freeThrows: {
           made: stat.freeThrowsMade || 0,
           attempted: stat.freeThrowsAttempted || 0
-        },
-        rebounds: {
-          offensive: stat.offensiveRebounds || 0,
-          defensive: stat.defensiveRebounds || 0
-        },
-        assists: stat.assists || 0,
-        steals: stat.steals || 0,
-        blocks: stat.blocks || 0,
-        turnovers: stat.turnovers || 0,
-        fouls: stat.fouls || 0,
-        plusMinus: stat.plusMinus || 0
+        }
       };
     });
 
@@ -240,51 +244,74 @@ export async function GET(
     playerStats.sort((a, b) => b.points - a.points);
 
     // Generate mock play-by-play data
-    const playByPlay = generateMockPlayByPlay(gameStats || [], game);
+    const playByPlay = await generateRealPlayByPlay(supabase, gameId);
 
     // Calculate standout information
     const standoutInfo = calculateStandoutInfo(playerStats, teamTotals);
 
     // Generate lineup comparison data
-    const lineupComparison = generateLineupComparison(gameStats || []);
+    // Lineup comparison - commented out
+    // const lineupComparison = generateLineupComparison(gameStats || []);
+    const lineupComparison = null; // Lineup comparison disabled
     
-    // Update lineup comparison with actual player names
-    if (lineupComparison.starters) {
-      lineupComparison.starters = lineupComparison.starters.map((starter, index) => {
-        const stat = gameStats?.filter(s => (s.minutesPlayed || 0) > 20)[index];
-        if (stat && stat.playerId) {
-          const player = players[stat.playerId];
-          return {
-            ...starter,
-            name: player?.name || 'Unknown Player'
-          };
-        }
-        return starter;
-      });
-    }
+    // Update lineup comparison with actual player names - commented out
+    // if (lineupComparison.starters) {
+    //   lineupComparison.starters = lineupComparison.starters.map((starter, index) => {
+    //     const stat = gameStats?.filter(s => (s.minutesPlayed || 0) > 20)[index];
+    //     if (stat && stat.playerId) {
+    //       const player = players[stat.playerId];
+    //       return {
+    //         ...starter,
+    //         name: player?.name || 'Unknown Player'
+    //       };
+    //     }
+    //     return starter;
+    //   });
+    // }
     
-    if (lineupComparison.bench) {
-      lineupComparison.bench = lineupComparison.bench.map((benchPlayer, index) => {
-        const stat = gameStats?.filter(s => (s.minutesPlayed || 0) <= 20)[index];
-        if (stat && stat.playerId) {
-          const player = players[stat.playerId];
-          return {
-            ...benchPlayer,
-            name: player?.name || 'Unknown Player'
-          };
-        }
-        return benchPlayer;
-      });
-    }
+    // if (lineupComparison.bench) {
+    //   lineupComparison.bench = lineupComparison.bench.map((benchPlayer, index) => {
+    //     const stat = gameStats?.filter(s => (s.minutesPlayed || 0) <= 20)[index];
+    //     if (stat && stat.playerId) {
+    //       const player = players[stat.playerId];
+    //       return {
+    //         ...benchPlayer,
+    //         name: player?.name || 'Unknown Player'
+    //       };
+    //     }
+    //     return benchPlayer;
+    //   });
+    // }
 
     // Calculate advanced metrics
     const advancedMetrics = calculateAdvancedMetrics(playerStats, teamTotals, gameStats || []);
 
-    // Generate quarter breakdown (mock data for now)
-    const quarterBreakdown = generateQuarterBreakdown(gameStats || [], game);
+    // Derive opponent stats (best-effort from game scores; other fields default to 0)
+    let opponentPoints = 0;
+    if (typeof game.homeScore === 'number' && typeof game.awayScore === 'number') {
+      // If our computed team points equals one of the stored scores, use the other as opponent
+      if (teamTotals.points === game.homeScore) opponentPoints = game.awayScore;
+      else if (teamTotals.points === game.awayScore) opponentPoints = game.homeScore;
+      else opponentPoints = Math.max(game.homeScore, game.awayScore); // fallback
+    }
+    const opponentStats = {
+      points: opponentPoints || 0,
+      fieldGoals: { made: 0, attempted: 0, percentage: 0 },
+      threePointers: { made: 0, attempted: 0, percentage: 0 },
+      freeThrows: { made: 0, attempted: 0, percentage: 0 },
+      rebounds: { offensive: 0, defensive: 0, total: 0 },
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0
+    };
 
-    // Generate strategic insights
-    const strategicInsights = generateStrategicInsights(playerStats, gameStats || [], teamTotals);
+    // Generate quarter breakdown (mock data for now)
+    const quarterBreakdown = await generateQuarterBreakdown(supabase, gameId);
+
+    // Generate strategic insights - commented out
+    // const strategicInsights = generateStrategicInsights(playerStats, gameStats || [], teamTotals);
+    const strategicInsights = null; // Strategic insights disabled
 
     const gameAnalysisData = {
       gameInfo: {
@@ -332,7 +359,8 @@ export async function GET(
       lineupComparison: lineupComparison,
       advancedMetrics: advancedMetrics,
       quarterBreakdown: quarterBreakdown,
-      strategicInsights: strategicInsights
+      strategicInsights: strategicInsights,
+      opponentStats: opponentStats
     };
 
     console.log('Successfully generated game analysis data');
@@ -356,31 +384,209 @@ export async function GET(
 }
 
 // Helper function to generate mock play-by-play data
-function generateMockPlayByPlay(gameStats: any[], game: any) {
+// Generate real play-by-play data from live_game_events
+async function generateRealPlayByPlay(supabase: any, gameId: number) {
+  try {
+    // First, try to get live game events
+    const { data: liveEvents, error: liveError } = await supabase
+      .from('live_game_events')
+      .select(`
+        *,
+        players(name, jersey),
+        live_game_sessions!inner(
+          game_id
+        )
+      `)
+      .eq('live_game_sessions.game_id', gameId)
+      .order('quarter', { ascending: true })
+      .order('game_time', { ascending: true });
+
+    if (liveError) {
+      console.error('Error fetching live game events:', liveError);
+      return generateMockPlayByPlay([], {});
+    }
+
+    if (liveEvents && liveEvents.length > 0) {
+      return processLiveEvents(liveEvents);
+    }
+
+    // If no live events, try to generate from game stats
+    const { data: gameStats, error: statsError } = await supabase
+      .from('game_stats')
+      .select(`
+        *,
+        players(name, jersey)
+      `)
+      .eq('gameId', gameId);
+
+    if (statsError) {
+      console.error('Error fetching game stats:', statsError);
+      return generateMockPlayByPlay([], {});
+    }
+
+    if (gameStats && gameStats.length > 0) {
+      return generatePlayByPlayFromStats(gameStats);
+    }
+
+    // Fallback to mock data
+    return generateMockPlayByPlay([], {});
+  } catch (error) {
+    console.error('Error in generateRealPlayByPlay:', error);
+    return generateMockPlayByPlay([], {});
+  }
+}
+
+// Process live game events into play-by-play format
+function processLiveEvents(events: any[]) {
   const plays: any[] = [];
-  let currentScore = 0;
+  let teamScore = 0;
   let opponentScore = 0;
-  
-  // Generate plays based on actual game stats
-  gameStats.forEach((stat, index) => {
+
+  events.forEach((event) => {
+    const timeString = formatGameTime(event.game_time);
+    const playerName = event.players?.name || `Player ${event.players?.jersey || event.player_id}`;
+    const jersey = event.players?.jersey || '';
+    const playerDisplay = jersey ? `${playerName} (#${jersey})` : playerName;
+
+    let description = '';
+    let type = event.event_type;
+
+    switch (event.event_type) {
+      case 'points':
+        const points = event.event_value || 0;
+        if (event.is_opponent_event) {
+          opponentScore += points;
+          description = `Opponent ${playerDisplay} scored ${points} point${points > 1 ? 's' : ''}`;
+        } else {
+          teamScore += points;
+          description = `${playerDisplay} scored ${points} point${points > 1 ? 's' : ''}`;
+        }
+        break;
+      case 'rebound':
+        const rebounds = event.event_value || 1;
+        description = `${playerDisplay} grabbed ${rebounds} rebound${rebounds > 1 ? 's' : ''}`;
+        break;
+      case 'assist':
+        const assists = event.event_value || 1;
+        description = `${playerDisplay} recorded ${assists} assist${assists > 1 ? 's' : ''}`;
+        break;
+      case 'steal':
+        const steals = event.event_value || 1;
+        description = `${playerDisplay} made ${steals} steal${steals > 1 ? 's' : ''}`;
+        break;
+      case 'block':
+        const blocks = event.event_value || 1;
+        description = `${playerDisplay} blocked ${blocks} shot${blocks > 1 ? 's' : ''}`;
+        break;
+      case 'turnover':
+        const turnovers = event.event_value || 1;
+        description = `${playerDisplay} committed ${turnovers} turnover${turnovers > 1 ? 's' : ''}`;
+        break;
+      case 'foul':
+        const fouls = event.event_value || 1;
+        description = `${playerDisplay} committed ${fouls} foul${fouls > 1 ? 's' : ''}`;
+        break;
+      default:
+        description = `${playerDisplay} - ${event.event_type}`;
+    }
+
+    plays.push({
+      time: timeString,
+      quarter: event.quarter,
+      description: description,
+      score: `${teamScore}-${opponentScore}`,
+      type: type,
+      player: playerDisplay,
+      isOpponent: event.is_opponent_event || false
+    });
+  });
+
+  return plays;
+}
+
+// Generate play-by-play from game stats (fallback)
+function generatePlayByPlayFromStats(gameStats: any[]) {
+  const plays: any[] = [];
+  let teamScore = 0;
+  let opponentScore = 0;
+
+  gameStats.forEach((stat) => {
+    const playerName = stat.players?.name || `Player ${stat.players?.jersey || stat.player_id}`;
+    const jersey = stat.players?.jersey || '';
+    const playerDisplay = jersey ? `${playerName} (#${jersey})` : playerName;
+
+    // Generate scoring plays
     if (stat.points && stat.points > 0) {
-      currentScore += stat.points;
+      teamScore += stat.points;
       plays.push({
-        time: `${Math.floor(Math.random() * 12)}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
-        quarter: Math.floor(Math.random() * 4) + 1,
-        description: `Player scored ${stat.points} point${stat.points > 1 ? 's' : ''}`,
-        score: `${currentScore}-${opponentScore}`,
-        type: 'scoring'
+        time: formatGameTime(Math.floor(Math.random() * 720)), // Random time in quarter
+        quarter: stat.quarter || Math.floor(Math.random() * 4) + 1,
+        description: `${playerDisplay} scored ${stat.points} point${stat.points > 1 ? 's' : ''}`,
+        score: `${teamScore}-${opponentScore}`,
+        type: 'scoring',
+        player: playerDisplay,
+        isOpponent: false
       });
     }
-    
+
+    // Generate other stat plays
     if (stat.assists && stat.assists > 0) {
       plays.push({
-        time: `${Math.floor(Math.random() * 12)}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
-        quarter: Math.floor(Math.random() * 4) + 1,
-        description: `Player recorded an assist`,
-        score: `${currentScore}-${opponentScore}`,
-        type: 'assist'
+        time: formatGameTime(Math.floor(Math.random() * 720)),
+        quarter: stat.quarter || Math.floor(Math.random() * 4) + 1,
+        description: `${playerDisplay} recorded ${stat.assists} assist${stat.assists > 1 ? 's' : ''}`,
+        score: `${teamScore}-${opponentScore}`,
+        type: 'assist',
+        player: playerDisplay,
+        isOpponent: false
+      });
+    }
+
+    if (stat.rebounds && stat.rebounds > 0) {
+      plays.push({
+        time: formatGameTime(Math.floor(Math.random() * 720)),
+        quarter: stat.quarter || Math.floor(Math.random() * 4) + 1,
+        description: `${playerDisplay} grabbed ${stat.rebounds} rebound${stat.rebounds > 1 ? 's' : ''}`,
+        score: `${teamScore}-${opponentScore}`,
+        type: 'rebound',
+        player: playerDisplay,
+        isOpponent: false
+      });
+    }
+
+    if (stat.steals && stat.steals > 0) {
+      plays.push({
+        time: formatGameTime(Math.floor(Math.random() * 720)),
+        quarter: stat.quarter || Math.floor(Math.random() * 4) + 1,
+        description: `${playerDisplay} made ${stat.steals} steal${stat.steals > 1 ? 's' : ''}`,
+        score: `${teamScore}-${opponentScore}`,
+        type: 'steal',
+        player: playerDisplay,
+        isOpponent: false
+      });
+    }
+
+    if (stat.blocks && stat.blocks > 0) {
+      plays.push({
+        time: formatGameTime(Math.floor(Math.random() * 720)),
+        quarter: stat.quarter || Math.floor(Math.random() * 4) + 1,
+        description: `${playerDisplay} blocked ${stat.blocks} shot${stat.blocks > 1 ? 's' : ''}`,
+        score: `${teamScore}-${opponentScore}`,
+        type: 'block',
+        player: playerDisplay,
+        isOpponent: false
+      });
+    }
+
+    if (stat.turnovers && stat.turnovers > 0) {
+      plays.push({
+        time: formatGameTime(Math.floor(Math.random() * 720)),
+        quarter: stat.quarter || Math.floor(Math.random() * 4) + 1,
+        description: `${playerDisplay} committed ${stat.turnovers} turnover${stat.turnovers > 1 ? 's' : ''}`,
+        score: `${teamScore}-${opponentScore}`,
+        type: 'turnover',
+        player: playerDisplay,
+        isOpponent: false
       });
     }
   });
@@ -394,13 +600,114 @@ function generateMockPlayByPlay(gameStats: any[], game: any) {
   return plays;
 }
 
-// Helper function to calculate standout information
+// Format game time from seconds to MM:SS
+function formatGameTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+// Mock play-by-play fallback
+function generateMockPlayByPlay(gameStats: any[], game: any) {
+  const plays: any[] = [];
+  let currentScore = 0;
+  let opponentScore = 0;
+  
+  // Sample player names for more realistic play-by-play
+  const playerNames = [
+    'Marcus Johnson', 'Alex Thompson', 'Jordan Smith', 'Chris Davis', 'Mike Wilson',
+    'Tyler Brown', 'Ryan Miller', 'Kevin Garcia', 'Jake Martinez', 'Sam Anderson'
+  ];
+  
+  // Generate plays for each quarter
+  for (let quarter = 1; quarter <= 4; quarter++) {
+    const quarterPlays = [];
+    
+    // Generate 8-12 plays per quarter
+    const playsInQuarter = Math.floor(Math.random() * 5) + 8;
+    
+    for (let i = 0; i < playsInQuarter; i++) {
+      const timeInQuarter = 12 - (i * (12 / playsInQuarter)) + Math.random() * 2;
+      const minutes = Math.floor(timeInQuarter);
+      const seconds = Math.floor((timeInQuarter - minutes) * 60);
+      const timeString = `${minutes}:${String(seconds).padStart(2, '0')}`;
+      
+      const playerName = playerNames[Math.floor(Math.random() * playerNames.length)];
+      const isTeamPlay = Math.random() > 0.3; // 70% team plays, 30% opponent plays
+      
+      const playTypes = ['points', 'assist', 'rebound', 'steal', 'block', 'turnover', 'foul'];
+      const playType = playTypes[Math.floor(Math.random() * playTypes.length)];
+      
+      let description = '';
+      let points = 0;
+      
+      switch (playType) {
+        case 'points':
+          points = Math.random() > 0.7 ? 3 : (Math.random() > 0.5 ? 2 : 1);
+          if (isTeamPlay) {
+            currentScore += points;
+            description = `${playerName} scored ${points} point${points > 1 ? 's' : ''}`;
+          } else {
+            opponentScore += points;
+            description = `Opponent ${playerName} scored ${points} point${points > 1 ? 's' : ''}`;
+          }
+          break;
+        case 'assist':
+          description = isTeamPlay ? `${playerName} recorded an assist` : `Opponent ${playerName} recorded an assist`;
+          break;
+        case 'rebound':
+          description = isTeamPlay ? `${playerName} grabbed a rebound` : `Opponent ${playerName} grabbed a rebound`;
+          break;
+        case 'steal':
+          description = isTeamPlay ? `${playerName} made a steal` : `Opponent ${playerName} made a steal`;
+          break;
+        case 'block':
+          description = isTeamPlay ? `${playerName} blocked a shot` : `Opponent ${playerName} blocked a shot`;
+          break;
+        case 'turnover':
+          description = isTeamPlay ? `${playerName} committed a turnover` : `Opponent ${playerName} committed a turnover`;
+          break;
+        case 'foul':
+          description = isTeamPlay ? `${playerName} committed a foul` : `Opponent ${playerName} committed a foul`;
+          break;
+      }
+      
+      quarterPlays.push({
+        time: timeString,
+        quarter: quarter,
+        description: description,
+        score: `${currentScore}-${opponentScore}`,
+        type: playType,
+        player: playerName,
+        isOpponent: !isTeamPlay
+      });
+    }
+    
+    // Sort quarter plays by time (descending)
+    quarterPlays.sort((a, b) => b.time.localeCompare(a.time));
+    plays.push(...quarterPlays);
+  }
+
+  // Sort all plays by quarter and time
+  plays.sort((a, b) => {
+    if (a.quarter !== b.quarter) return a.quarter - b.quarter;
+    return b.time.localeCompare(a.time); // Most recent first
+  });
+
+  return plays;
+}
+
+// Helper function to calculate LKRM Leaders information
 function calculateStandoutInfo(playerStats: any[], teamTotals: any) {
   if (!playerStats || playerStats.length === 0) {
     return {
       topScorer: { name: 'None', points: 0 },
       topRebounder: { name: 'None', rebounds: 0 },
       topAssister: { name: 'None', assists: 0 },
+      mostSteals: { name: 'None', steals: 0 },
+      highestFgPoints: { name: 'None', fgPoints: 0 },
+      highest3ptPoints: { name: 'None', threePointPoints: 0 },
+      highestFtPoints: { name: 'None', ftPoints: 0 },
       teamEfficiency: 0
     };
   }
@@ -410,14 +717,33 @@ function calculateStandoutInfo(playerStats: any[], teamTotals: any) {
   );
   
   const topRebounder = playerStats.reduce((max, player) => 
-    (player.rebounds.offensive + player.rebounds.defensive) > max.rebounds ? 
-    { rebounds: player.rebounds.offensive + player.rebounds.defensive, name: player.name } : max, 
+    player.rebounds > max.rebounds ? 
+    { rebounds: player.rebounds, name: player.name } : max, 
     { rebounds: 0, name: 'None' }
   );
   
   const topAssister = playerStats.reduce((max, player) => 
     player.assists > max.assists ? player : max, { assists: 0, name: 'None' }
   );
+
+  const mostSteals = playerStats.reduce((max, player) => 
+    player.steals > max.steals ? player : max, { steals: 0, name: 'None' }
+  );
+
+  const highestFgPoints = playerStats.reduce((max, player) => {
+    const fgPoints = (player.fgMade || 0) * 2;
+    return fgPoints > max.fgPoints ? { fgPoints, name: player.name } : max;
+  }, { fgPoints: 0, name: 'None' });
+
+  const highest3ptPoints = playerStats.reduce((max, player) => {
+    const threePointPoints = (player.threePointers?.made || 0) * 3;
+    return threePointPoints > max.threePointPoints ? { threePointPoints, name: player.name } : max;
+  }, { threePointPoints: 0, name: 'None' });
+
+  const highestFtPoints = playerStats.reduce((max, player) => {
+    const ftPoints = player.ftMade || 0;
+    return ftPoints > max.ftPoints ? { ftPoints, name: player.name } : max;
+  }, { ftPoints: 0, name: 'None' });
 
   return {
     topScorer: {
@@ -431,6 +757,22 @@ function calculateStandoutInfo(playerStats: any[], teamTotals: any) {
     topAssister: {
       name: topAssister.name,
       assists: topAssister.assists
+    },
+    mostSteals: {
+      name: mostSteals.name,
+      steals: mostSteals.steals
+    },
+    highestFgPoints: {
+      name: highestFgPoints.name,
+      fgPoints: highestFgPoints.fgPoints
+    },
+    highest3ptPoints: {
+      name: highest3ptPoints.name,
+      threePointPoints: highest3ptPoints.threePointPoints
+    },
+    highestFtPoints: {
+      name: highestFtPoints.name,
+      ftPoints: highestFtPoints.ftPoints
     },
     teamEfficiency: teamTotals.fieldGoalsAttempted > 0 ? 
       Math.round((teamTotals.points / teamTotals.fieldGoalsAttempted) * 100) / 100 : 0
@@ -600,9 +942,8 @@ function calculatePositionMetrics(playerStats: any[]) {
   return positions;
 }
 
-// NEW: Generate quarter breakdown
-function generateQuarterBreakdown(gameStats: any[], game: any) {
-  // Generate mock quarter data
+// Mock quarter data fallback
+function generateMockQuarterData() {
   const quarterData = [1, 2, 3, 4].map(quarter => ({
     quarter: quarter,
     points: Math.floor(Math.random() * 20) + 10,
@@ -610,6 +951,7 @@ function generateQuarterBreakdown(gameStats: any[], game: any) {
     turnovers: Math.floor(Math.random() * 4) + 1,
     fouls: Math.floor(Math.random() * 3) + 1,
     rebounds: Math.floor(Math.random() * 8) + 4,
+    timeouts: Math.floor(Math.random() * 3), // 0-2 timeouts per quarter (realistic range)
     momentum: Math.random() > 0.5 ? 'positive' : 'negative'
   }));
 
@@ -634,6 +976,94 @@ function generateQuarterBreakdown(gameStats: any[], game: any) {
       strongestQuarter: quarterData.reduce((max, q) => q.points > max.points ? q : max).quarter,
       weakestQuarter: quarterData.reduce((min, q) => q.points < min.points ? q : min).quarter,
       consistency: Math.round((1 - (Math.max(...quarterData.map(q => q.points)) - Math.min(...quarterData.map(q => q.points))) / Math.max(...quarterData.map(q => q.points))) * 100)
+    }
+  };
+}
+
+// NEW: Generate quarter breakdown
+async function generateQuarterBreakdown(supabase: any, gameId: number) {
+  // Fetch real quarter data from game_quarter_totals table
+  const { data: quarterTotals, error: quarterError } = await supabase
+    .from('game_quarter_totals')
+    .select('*')
+    .eq('gameid', gameId)  // Note: column name is lowercase 'gameid'
+    .order('quarter', { ascending: true });
+
+  if (quarterError) {
+    console.error('Error fetching quarter totals:', quarterError);
+    // Fallback to mock data if quarter totals don't exist
+    return generateMockQuarterData();
+  }
+
+  // If no quarter data exists, generate mock data
+  if (!quarterTotals || quarterTotals.length === 0) {
+    console.log('No quarter totals found, generating mock data');
+    return generateMockQuarterData();
+  }
+
+  // Process real quarter data
+  const quarterData = quarterTotals.map((quarter: any) => {
+    // Note: Field goal percentage calculation would need fgm/fga data which isn't in this table
+    // For now, we'll use a placeholder or calculate from other available data
+    const fgPct = 0; // Placeholder since fgm/fga not available in this table structure
+    return {
+      quarter: quarter.quarter,
+      points: quarter.points || 0,
+      fgPct: fgPct,
+      turnovers: quarter.tov || 0,
+      fouls: quarter.pf || 0,
+      rebounds: quarter.reb || 0,
+      assists: quarter.ast || 0,
+      steals: quarter.stl || 0,
+      blocks: quarter.blk || 0,
+      timeouts: quarter.timeouts || 0, // Now using real timeouts data from database
+      momentum: 'neutral' // Will be calculated based on performance
+    };
+  });
+
+  // Fill in missing quarters with zeros
+  for (let i = 1; i <= 4; i++) {
+    if (!quarterData.find((q: any) => q.quarter === i)) {
+      quarterData.push({
+        quarter: i,
+        points: 0,
+        fgPct: 0,
+        turnovers: 0,
+        fouls: 0,
+        rebounds: 0,
+        assists: 0,
+        steals: 0,
+        blocks: 0,
+        timeouts: 0,
+        momentum: 'neutral'
+      });
+    }
+  }
+
+  // Sort by quarter
+  quarterData.sort((a: any, b: any) => a.quarter - b.quarter);
+
+  // Calculate half performance
+  const firstHalf = {
+    points: quarterData[0].points + quarterData[1].points,
+    fgPct: Math.round(((quarterData[0].fgPct + quarterData[1].fgPct) / 2) * 100) / 100,
+    turnovers: quarterData[0].turnovers + quarterData[1].turnovers
+  };
+
+  const secondHalf = {
+    points: quarterData[2].points + quarterData[3].points,
+    fgPct: Math.round(((quarterData[2].fgPct + quarterData[3].fgPct) / 2) * 100) / 100,
+    turnovers: quarterData[2].turnovers + quarterData[3].turnovers
+  };
+
+  return {
+    quarters: quarterData,
+    firstHalf: firstHalf,
+    secondHalf: secondHalf,
+    analysis: {
+      strongestQuarter: quarterData.reduce((max: any, q: any) => q.points > max.points ? q : max).quarter,
+      weakestQuarter: quarterData.reduce((min: any, q: any) => q.points < min.points ? q : min).quarter,
+      consistency: Math.round((1 - (Math.max(...quarterData.map((q: any) => q.points)) - Math.min(...quarterData.map((q: any) => q.points))) / Math.max(...quarterData.map((q: any) => q.points))) * 100)
     }
   };
 }

@@ -528,14 +528,14 @@ export default function RecentActivityModule() {
               background: 'rgba(181, 136, 66, 0.9)',
               border: 'none',
               borderRadius: '20px',
-              padding: '4px 12px',
+              padding: '6px 12px',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
               color: '#ffffff',
-              fontSize: '11px',
+              fontSize: '12px',
               fontFamily: 'Inter, sans-serif',
               fontWeight: 500
             }}

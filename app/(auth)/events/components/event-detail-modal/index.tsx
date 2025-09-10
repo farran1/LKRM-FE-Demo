@@ -17,6 +17,8 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
   const [playerLoading, setPlayerLoading] = useState(false)
   const [players, setPlayers] = useState<Array<{id: number, name: string, position: string}>>([]);
   const [tasks, setTasks] = useState<Array<any>>([])
+  const [expenses, setExpenses] = useState<Array<any>>([])
+  const [expensesLoading, setExpensesLoading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -29,8 +31,9 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
     if (type === 'meeting' || type === 'practice' || type === 'workout') {
       fetchPlayer()
     }
-    // always fetch tasks linked to this event
+    // always fetch tasks and expenses linked to this event
     fetchTasks()
+    fetchExpenses()
   }, [event])
 
   // const fetchDetail = async () => {
@@ -62,9 +65,24 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
     }
   }
 
-  const openEventLanding = () => {
-    router.push('/events/' + event.id)
+  const fetchExpenses = async () => {
+    setExpensesLoading(true)
+    try {
+      // Use originalEventId for recurring instances, otherwise use the regular id
+      const eventId = event.originalEventId || event.id
+      const res = await api.get(`/api/events/${eventId}/expenses`)
+      const expensesData = (res as any)?.data?.data || []
+      setExpenses(Array.isArray(expensesData) ? expensesData : [])
+    } catch (e) {
+      setExpenses([])
+    }
+    setExpensesLoading(false)
   }
+
+  // COMMENTED OUT: Full screen event detail pages are temporarily disabled
+  // const openEventLanding = () => {
+  //   router.push('/events/' + event.id)
+  // }
 
   return (
     <Modal
@@ -114,14 +132,10 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
               </div>
             )}
             <div className={style.line}></div>
-            <div className={style.sectionBudget}>
-              <div className={style.title}>Budget</div>
-              <div className={style.card}>No Expected Spends</div>
-            </div>
             <div className={style.sectionTask}>
               <div className={style.title}>Tasks</div>
               {tasks.length === 0 && <div className={style.card}>No Tasks Linked</div>}
-              {tasks.map((t) => (
+              {tasks.slice(0, 3).map((t) => (
                 <div key={t.userId || t.id} className={style.task}>
                   <Flex align='center'>
                     <TaskIcon />
@@ -132,14 +146,63 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
                   </Flex>
                 </div>
               ))}
+              {tasks.length > 3 && (
+                <div 
+                  className={style.card} 
+                  style={{ 
+                    textAlign: 'center', 
+                    opacity: 0.8, 
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                  onClick={() => router.push(`/tasks?eventId=${event.id}`)}
+                >
+                  & {tasks.length - 3} more...
+                </div>
+              )}
             </div>
             <div className={style.sectionExpenses}>
               <div className={style.title}>Expenses</div>
-              <div className={style.card}>No Expenses Linked</div>
+              {expensesLoading ? (
+                <div className={style.card}>Loading...</div>
+              ) : expenses.length === 0 ? (
+                <div className={style.card}>No Expenses Linked</div>
+              ) : (
+                <>
+                  {expenses.slice(0, 3).map((expense) => (
+                    <div key={expense.id} className={style.task}>
+                      <Flex align='center'>
+                        <TaskIcon />
+                        <div>
+                          <div className={style.title}>{expense.merchant}</div>
+                          <div className={style.value}>
+                            ${expense.amount} • {new Date(expense.date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </Flex>
+                    </div>
+                  ))}
+                  {expenses.length > 3 && (
+                    <div 
+                      className={style.card} 
+                      style={{ 
+                        textAlign: 'center', 
+                        opacity: 0.8, 
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                      onClick={() => router.push(`/expenses?eventId=${event.id}`)}
+                    >
+                      & {expenses.length - 3} more...
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <Button type="primary" block onClick={openEventLanding}>
+            {/* COMMENTED OUT: Full screen event detail pages are temporarily disabled */}
+            {/* <Button type="primary" block onClick={openEventLanding}>
               View Full Screen
-            </Button>
+            </Button> */}
           </div>
         </>
       }

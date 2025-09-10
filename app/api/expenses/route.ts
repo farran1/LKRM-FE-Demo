@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const budgetId = searchParams.get('budgetId')
+    const eventId = searchParams.get('eventId')
 
     let query = (supabase as any).from('expenses').select(`
       id,
@@ -29,6 +30,10 @@ export async function GET(request: NextRequest) {
 
     if (budgetId) {
       query = query.eq('budgetId', Number(budgetId))
+    }
+
+    if (eventId) {
+      query = query.eq('eventId', Number(eventId))
     }
 
     // Order newest first

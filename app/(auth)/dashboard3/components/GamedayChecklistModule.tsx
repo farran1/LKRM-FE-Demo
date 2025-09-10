@@ -70,9 +70,9 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
   const fetchNextGameEvent = async () => {
     try {
       setEventLoading(true);
-      // Fetch the next upcoming game event (filter strictly to Game type)
+      // Fetch the next upcoming game event (filter to Game and Scrimmage types)
       const nowIso = new Date().toISOString();
-      const eventsRes = await api.get(`/api/events?eventTypeIds=1&startDate=${encodeURIComponent(nowIso)}&perPage=1&sortBy=startTime&sortOrder=asc`);
+      const eventsRes = await api.get(`/api/events?eventTypeIds=3,5&startDate=${encodeURIComponent(nowIso)}&perPage=1&sortBy=startTime&sortOrder=asc`);
       const events = (eventsRes?.data as any)?.data || [];
       
       if (events.length > 0) {
@@ -143,9 +143,9 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
       ]);
 
       setStatusCounts({
-        notStarted: (todoRes?.data as any)?.data?.length || 0,
-        inProgress: (inProgressRes?.data as any)?.data?.length || 0,
-        completed: (doneRes?.data as any)?.data?.length || 0
+        notStarted: (todoRes?.data as any)?.tasks?.length || 0,
+        inProgress: (inProgressRes?.data as any)?.tasks?.length || 0,
+        completed: (doneRes?.data as any)?.tasks?.length || 0
       });
     } catch (error) {
       console.error('Error fetching status counts:', error);
@@ -181,6 +181,7 @@ export default function GamedayChecklistModule({ sidebarCollapsed = false }: Gam
       icon: <CompletedIcon />
     }
   ];
+
 
   // Handle status button clicks - open modal
   const handleStatusClick = (statusId: string, statusLabel: string, statusColor: string) => {

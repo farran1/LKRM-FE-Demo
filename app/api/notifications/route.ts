@@ -32,11 +32,6 @@ export async function GET(request: NextRequest) {
           content,
           color,
           created_at
-        ),
-        auth.users!mention_notifications_mentioned_by_fkey(
-          id,
-          email,
-          raw_user_meta_data
         )
       `)
       .eq('user_id', user.id)
@@ -55,20 +50,19 @@ export async function GET(request: NextRequest) {
 
     // Transform the data
     const transformedNotifications = (notifications || []).map((notification: any) => {
-      const mentionedBy = notification.auth?.users || {}
-      const metadata = mentionedBy.raw_user_meta_data || {}
-      const fullName = metadata.full_name || metadata.name || mentionedBy.email?.split('@')[0] || 'Unknown'
+      // For now, we'll use placeholder data since we can't access auth.users directly
+      const mentionedBy = {
+        id: notification.mentioned_by || 'unknown',
+        name: 'Coach',
+        email: 'coach@example.com',
+        initials: 'C'
+      }
 
       return {
         id: notification.id,
         type: notification.note_id ? 'mention' : 'generic',
         noteId: notification.note_id,
-        mentionedBy: {
-          id: mentionedBy.id,
-          name: fullName,
-          email: mentionedBy.email,
-          initials: fullName ? fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'U'
-        },
+        mentionedBy: mentionedBy,
         note: notification.quick_notes,
         isRead: notification.is_read,
         createdAt: notification.created_at,

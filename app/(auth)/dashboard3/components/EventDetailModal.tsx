@@ -43,6 +43,10 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
   const [loading, setLoading] = useState(false);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [expensesLoading, setExpensesLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -50,6 +54,8 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
       return;
     }
     fetchPlayer();
+    fetchTasks();
+    fetchExpenses();
   }, [event]);
 
   // Don't render if no event is selected
@@ -70,9 +76,37 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
     setPlayerLoading(false);
   };
 
-  const openEventLanding = () => {
-    router.push('/events/' + event.id);
+  const fetchTasks = async () => {
+    setTasksLoading(true);
+    try {
+      const res = await api.get(`/api/tasks?eventId=${event.id}`);
+      const tasksData = (res as any)?.data?.tasks || (res as any)?.data || [];
+      setTasks(Array.isArray(tasksData) ? tasksData : []);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      setTasks([]);
+    }
+    setTasksLoading(false);
   };
+
+
+  const fetchExpenses = async () => {
+    setExpensesLoading(true);
+    try {
+      const res = await api.get(`/api/events/${event.id}/expenses`);
+      const expensesData = (res as any)?.data?.data || [];
+      setExpenses(Array.isArray(expensesData) ? expensesData : []);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+      setExpenses([]);
+    }
+    setExpensesLoading(false);
+  };
+
+  // COMMENTED OUT: Full screen event detail pages are temporarily disabled
+  // const openEventLanding = () => {
+  //   router.push('/events/' + event.id);
+  // };
 
   // Ensure players is always an array for safety
   const safePlayers = Array.isArray(players) ? players : [];
@@ -214,23 +248,6 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                   marginBottom: '12px',
                   color: '#ffffff'
                 }}>
-                  Budget
-                </div>
-                <div style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)', 
-                  padding: '8px 12px', 
-                  borderRadius: '8px',
-                  color: '#ffffff',
-                  marginBottom: 16
-                }}>
-                  Empty
-                </div>
-                <div style={{ 
-                  fontSize: '20px', 
-                  fontWeight: 600, 
-                  marginBottom: '12px',
-                  color: '#ffffff'
-                }}>
                   Task
                 </div>
                 <div style={{ 
@@ -240,7 +257,32 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                   color: '#ffffff',
                   marginBottom: 16
                 }}>
-                  Empty
+                  {tasksLoading ? 'Loading...' : tasks.length === 0 ? 'No Linked Tasks' : (
+                    <div>
+                      {tasks.slice(0, 3).map((task, index) => (
+                        <div key={task.id || index} style={{ marginBottom: index < Math.min(tasks.length, 3) - 1 ? '8px' : '0' }}>
+                          <div style={{ fontSize: '14px', fontWeight: 500 }}>{task.name}</div>
+                          {task.description && (
+                            <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '2px' }}>{task.description}</div>
+                          )}
+                        </div>
+                      ))}
+                      {tasks.length > 3 && (
+                        <div 
+                          style={{ 
+                            marginTop: '8px', 
+                            fontSize: '12px', 
+                            opacity: 0.8, 
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                          onClick={() => router.push(`/tasks?eventId=${event.id}`)}
+                        >
+                          & {tasks.length - 3} more...
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ 
                   fontSize: '20px', 
@@ -257,12 +299,41 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
                   color: '#ffffff',
                   marginBottom: 32
                 }}>
-                  Empty
+                  {expensesLoading ? 'Loading...' : expenses.length === 0 ? 'No Linked Expenses' : (
+                    <div>
+                      {expenses.slice(0, 3).map((expense, index) => (
+                        <div key={expense.id || index} style={{ marginBottom: index < Math.min(expenses.length, 3) - 1 ? '8px' : '0' }}>
+                          <div style={{ fontSize: '14px', fontWeight: 500 }}>{expense.merchant}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '2px' }}>
+                            ${expense.amount} • {new Date(expense.date).toLocaleDateString()}
+                          </div>
+                          {expense.description && (
+                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '2px' }}>{expense.description}</div>
+                          )}
+                        </div>
+                      ))}
+                      {expenses.length > 3 && (
+                        <div 
+                          style={{ 
+                            marginTop: '8px', 
+                            fontSize: '12px', 
+                            opacity: 0.8, 
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                          onClick={() => router.push(`/expenses?eventId=${event.id}`)}
+                        >
+                          & {expenses.length - 3} more...
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </Col>
           </Row>
-          <Button 
+          {/* COMMENTED OUT: Full screen event detail pages are temporarily disabled */}
+          {/* <Button 
             type="primary" 
             block 
             onClick={openEventLanding}
@@ -275,7 +346,7 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit }: EventDetail
             }}
           >
             View Full Screen
-          </Button>
+          </Button> */}
         </>
       )}
     </Modal>

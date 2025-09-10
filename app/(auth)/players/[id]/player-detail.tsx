@@ -3,16 +3,11 @@
 import api from '@/services/api'
 import { memo, useEffect, useState } from 'react'
 import style from './style.module.scss'
-import { Button, Card, Col, Flex, Input, Row, Skeleton } from 'antd'
+import { Button, Card, Col, Flex, Row, Skeleton, Select, DatePicker, Divider, Alert, Table } from 'antd'
 import ArrowIcon from '@/components/icon/arrow_left.svg'
 import { useRouter } from 'next/navigation'
-import UploadIcon from '@/components/icon/arrow-up-tray.svg'
-import SearchIcon from '@/components/icon/search.svg'
-import ArrowRiseIcon from '@/components/icon/ArrowRise.svg'
-import ArrowFallIcon from '@/components/icon/ArrowFall.svg'
-import OffensiveStatsLine from '@/components/offensive-stats-line'
-import LineChart from './components/line-chart'
-import BarChart from './components/bar-chart'
+ 
+ 
 import DefaultAvatar from '@/components/icon/avatar.svg'
 import AddIcon from '@/components/icon/plus-circle.svg'
 import Setting from './components/setting'
@@ -33,41 +28,44 @@ function Detail({
   const [isShowAddNote, showAddNote] = useState(false)
   const [isShowAddGoal, showAddGoal] = useState(false)
 
-  const ComingSoonOverlay = () => (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(23, 55, 92, 0.55)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
-        borderRadius: 8,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2,
-      }}
-    >
-      <div
-        style={{
-          padding: '12px 18px',
-          borderRadius: 12,
-          border: '1px solid rgba(255,255,255,0.25)',
-          background: 'rgba(0,0,0,0.25)',
-          color: '#fff',
-          fontWeight: 600,
-          letterSpacing: 0.3,
-        }}
-      >
-        Player Stat Profile View Coming Soon...
-      </div>
-    </div>
-  )
+  // const ComingSoonOverlay = () => (
+  //   <div
+  //     style={{
+  //       position: 'absolute',
+  //       inset: 0,
+  //       background: 'rgba(23, 55, 92, 0.55)',
+  //       backdropFilter: 'blur(4px)',
+  //       WebkitBackdropFilter: 'blur(4px)',
+  //       borderRadius: 8,
+  //       display: 'flex',
+  //       alignItems: 'center',
+  //       justifyContent: 'center',
+  //       zIndex: 2,
+  //     }}
+  //   >
+  //     <div
+  //       style={{
+  //         padding: '12px 18px',
+  //         borderRadius: 12,
+  //         border: '1px solid rgba(255,255,255,0.25)',
+  //         background: 'rgba(0,0,0,0.25)',
+  //         color: '#fff',
+  //         fontWeight: 600,
+  //         letterSpacing: 0.3,
+  //       }}
+  //     >
+  //       Player Stat Profile View Coming Soon...
+  //     </div>
+  //   </div>
+  // )
 
   const [loadingNote, setLoadingNote] = useState(true)
   const [notes, setNotes] = useState<Array<any>>([])
   const [loadingGoal, setLoadingGoal] = useState(true)
   const [goals, setGoals] = useState<Array<any>>([])
+  const [stats, setStats] = useState<any>(null)
+  const [timeRange, setTimeRange] = useState<'season' | 'last30days' | 'custom'>('season')
+  const [customRange, setCustomRange] = useState<[string, string] | null>(null)
 
   useEffect(() => {
     if (!playerId) {
@@ -77,7 +75,27 @@ function Detail({
     fetchDetail()
     fetchNotes()
     fetchGoals()
+    fetchStats()
   }, [playerId])
+  useEffect(() => {
+    if (!playerId) return
+    fetchStats()
+  }, [playerId, timeRange, customRange])
+
+  const fetchStats = async () => {
+    try {
+      const params: any = { season: '2024-25', timeRange, _: Date.now() }
+      if (timeRange === 'custom' && customRange) {
+        params.startDate = customRange[0]
+        params.endDate = customRange[1]
+      }
+      const res: any = await api.get(`/api/stats/player/${playerId}`, { params })
+      setStats(res.data)
+    } catch (e) {
+      console.error('Failed to load player stats', e)
+      setStats(null)
+    }
+  }
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -130,7 +148,11 @@ function Detail({
     router.back()
   }
 
-  const uploadStats = () => {
+  const onChangeTimeRange = (val: any) => {
+    setTimeRange(val)
+    if (val !== 'custom') {
+      setCustomRange(null)
+    }
   }
 
   const onEdit = () => {
@@ -162,8 +184,22 @@ function Detail({
           )}
         </Flex>
         <Flex align='center' gap={10}>
-          <Input prefix={<SearchIcon />} placeholder="Search" className={style.search} />
-          <Button type="primary" icon={<UploadIcon />} onClick={uploadStats}>Upload Player Stats</Button>
+          <Select
+            value={timeRange}
+            onChange={onChangeTimeRange}
+            options={[
+              { label: 'Season', value: 'season' },
+              { label: 'Last 30 days', value: 'last30days' },
+              { label: 'Custom Range', value: 'custom' },
+            ]}
+            style={{ width: 160 }}
+          />
+          {timeRange === 'custom' && (
+            <DatePicker.RangePicker onChange={(v:any)=>{
+              if (!v || v.length!==2) { setCustomRange(null); return }
+              setCustomRange([v[0].format('YYYY-MM-DD'), v[1].format('YYYY-MM-DD')])
+            }} />
+          )}
         </Flex>
       </Flex>
       <Flex>
@@ -173,8 +209,7 @@ function Detail({
               <Card className={style.stateGeneral}>
                 <div className={style.title}>Rebounds</div>
                 <Flex justify='space-between' align='center'>
-                  <div className={style.value}>100</div>
-                  <div className={style.percent}>+11.01% <ArrowRiseIcon /></div>
+                  <div className={style.value}>{stats?.rebounds ?? 0}</div>
                 </Flex>
               </Card>
             </Col>
@@ -182,8 +217,7 @@ function Detail({
               <Card className={style.stateGeneral}>
                 <div className={style.title}>Steals</div>
                 <Flex justify='space-between' align='center'>
-                  <div className={style.value}>120</div>
-                  <div className={style.percent}>-0.03% <ArrowFallIcon /></div>
+                  <div className={style.value}>{stats?.steals ?? 0}</div>
                 </Flex>
               </Card>
             </Col>
@@ -191,8 +225,7 @@ function Detail({
               <Card className={style.stateGeneral}>
                 <div className={style.title}>Blocks</div>
                 <Flex justify='space-between' align='center'>
-                  <div className={style.value}>400</div>
-                  <div className={style.percent}>+15.03% <ArrowRiseIcon /></div>
+                  <div className={style.value}>{stats?.blocks ?? 0}</div>
                 </Flex>
               </Card>
             </Col>
@@ -200,62 +233,64 @@ function Detail({
               <Card className={style.stateGeneral}>
                 <div className={style.title}>Fouls</div>
                 <Flex justify='space-between' align='center'>
-                  <div className={style.value}>30</div>
-                  <div className={style.percent}>+6.08% <ArrowRiseIcon /></div>
+                  <div className={style.value}>{stats?.fouls ?? 0}</div>
                 </Flex>
               </Card>
             </Col>
           </Row>
-          <Row gutter={[12, 12]} style={{ marginBottom: 12, maxHeight: 484 }}>
-            <Col xs={16}>
+          <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+            <Col xs={24}>
               <Card className={style.chart}>
-                <LineChart />
-              </Card>
-            </Col>
-            <Col xs={8}>
-              <Card className={style.offensiveStats}>
-                  <div className={style.title2}>Offensive Stats</div>
-                  <Row gutter={12} align='middle'>
-                    <Col span={10}>Points scored</Col>
-                    <Col span={6}>XXXXX</Col>
-                    <Col span={8}><OffensiveStatsLine /></Col>
-                  </Row>
-                  <Row gutter={12} align='middle'>
-                    <Col span={10}>Assists</Col>
-                    <Col span={6}>XXXXX</Col>
-                    <Col span={8}><OffensiveStatsLine /></Col>
-                  </Row>
-                  <Row gutter={12} align='middle'>
-                    <Col span={10}>FGM/FGA</Col>
-                    <Col span={6}>XXXXX</Col>
-                    <Col span={8}><OffensiveStatsLine /></Col>
-                  </Row>
-                  <Row gutter={12} align='middle'>
-                    <Col span={10}>TPM/TPA</Col>
-                    <Col span={6}>XXXXX</Col>
-                    <Col span={8}><OffensiveStatsLine /></Col>
-                  </Row>
-                  <Row gutter={12} align='middle'>
-                    <Col span={10}>FTM/FTA</Col>
-                    <Col span={6}>XXXXX</Col>
-                    <Col span={8}><OffensiveStatsLine /></Col>
-                  </Row>
-                  <Row gutter={12} align='middle'>
-                    <Col span={10}>Turnovers</Col>
-                    <Col span={6}>XXXXX</Col>
-                    <Col span={8}><OffensiveStatsLine /></Col>
-                  </Row>
+                <div className={style.title2}>Stat Summary</div>
+                <Divider style={{ margin: '12px 0' }} />
+                {stats && stats.games === 0 ? (
+                  <Alert type="info" message="No games in selected range" showIcon />
+                ) : (
+                <Row gutter={[12, 12]}>
+                  <Col xs={12} md={6}><strong>Games</strong><div>{stats?.games ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Points</strong><div>{stats?.points ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Assists</strong><div>{stats?.assists ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Rebounds</strong><div>{stats?.rebounds ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Steals</strong><div>{stats?.steals ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Blocks</strong><div>{stats?.blocks ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Fouls</strong><div>{stats?.fouls ?? 0}</div></Col>
+                  <Col xs={12} md={6}><strong>Turnovers</strong><div>{stats?.turnovers ?? 0}</div></Col>
+                  <Col xs={12} md={8}><strong>FG</strong><div>{stats ? `${stats.fg?.made||0}/${stats.fg?.att||0} (${stats.fg?.pct||0}%)` : '-'}</div></Col>
+                  <Col xs={12} md={8}><strong>3PT</strong><div>{stats ? `${stats.tp?.made||0}/${stats.tp?.att||0} (${stats.tp?.pct||0}%)` : '-'}</div></Col>
+                  <Col xs={12} md={8}><strong>FT</strong><div>{stats ? `${stats.ft?.made||0}/${stats.ft?.att||0} (${stats.ft?.pct||0}%)` : '-'}</div></Col>
+                </Row>
+                )}
               </Card>
             </Col>
           </Row>
           <Row style={{ marginBottom: 24 }}>
             <Col span={24}>
               <Card className={style.chart}>
-                <BarChart />
+                <div className={style.title2}>Per-Game Log</div>
+                <Divider style={{ margin: '12px 0' }} />
+                <Table
+                  size="small"
+                  pagination={{ pageSize: 10 }}
+                  rowKey={(r:any)=>`${r.gameId}-${r.date}`}
+                  dataSource={stats?.perGame || []}
+                  columns={[
+                    { title: 'Date', dataIndex: 'date' },
+                    { title: 'PTS', dataIndex: 'points' },
+                    { title: 'REB', dataIndex: 'rebounds' },
+                    { title: 'AST', dataIndex: 'assists' },
+                    { title: 'STL', dataIndex: 'steals' },
+                    { title: 'BLK', dataIndex: 'blocks' },
+                    { title: 'TOV', dataIndex: 'turnovers' },
+                    { title: 'FLS', dataIndex: 'fouls' },
+                    { title: 'FG', render: (r:any)=>`${r.fgMade}/${r.fgAtt}` },
+                    { title: '3PT', render: (r:any)=>`${r.tpMade}/${r.tpAtt}` },
+                    { title: 'FT', render: (r:any)=>`${r.ftMade}/${r.ftAtt}` },
+                  ]}
+                />
               </Card>
             </Col>
           </Row>
-          <ComingSoonOverlay />
+          {/* <ComingSoonOverlay /> */}
         </div>
         <div className={style.right}>
           <Card style={{ marginBottom: 12 }}>
@@ -298,8 +333,8 @@ function Detail({
                 <AddIcon className={style.addIcon} onClick={addNote} />
               </Flex>
               {loadingNote && <Skeleton />}
-              {!loadingNote && notes && notes.map((item: any) => (
-                <div className={style.note} key={item.id}>
+              {!loadingNote && notes && notes.map((item: any, idx: number) => (
+                <div className={style.note} key={`${item.id}-${item.created_at || item.createdAt || idx}`}>
                   <div>{item.note || item.note_text || 'No content'}</div>
                   <div className={style.author}>By Coach Andrew</div>
                 </div>
@@ -311,8 +346,8 @@ function Detail({
                 <AddIcon className={style.addIcon} onClick={addGoal} />
               </Flex>
               {loadingGoal && <Skeleton />}
-              {!loadingGoal && goals && goals.map((item: any) => (
-                <div className={style.goal} key={item.id}>
+              {!loadingGoal && goals && goals.map((item: any, idx: number) => (
+                <div className={style.goal} key={`${item.id}-${item.created_at || item.createdAt || idx}`}>
                   <div>{item.goal || item.goal_text || 'No content'}</div>
                   <div className={style.author}>By Coach Andrew</div>
                 </div>

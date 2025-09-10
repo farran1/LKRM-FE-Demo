@@ -22,7 +22,16 @@ export async function GET(request: NextRequest) {
     // Get all players
     const { data: players, error: playersError } = await supabase
       .from('players')
-      .select('*');
+      .select(`
+        id,
+        name,
+        first_name,
+        last_name,
+        positionId,
+        jersey,
+        jersey_number,
+        positions:positions(id,name,abbreviation)
+      `);
 
     if (playersError) {
       console.error('Error fetching players:', playersError);
@@ -32,12 +41,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Normalize player identity fields for downstream use
+    const normalizedPlayers = (players || []).map((p: any) => {
+      const displayName = p?.name || [p?.first_name, p?.last_name].filter(Boolean).join(' ').trim() || 'Unknown';
+      const positionText = p?.positions?.abbreviation || p?.positions?.name || null;
+      const jerseyNum = p?.jersey_number || p?.jersey || null;
+      return {
+        id: p.id,
+        name: displayName,
+        position: positionText,
+        number: jerseyNum,
+      };
+    });
+
     // Get all game stats for the season by joining with games table
     // First get games for the season
     let gamesQuery = supabase
       .from('games')
-      .select('id')
-      .eq('season', season);
+      .select('id, gameDate')
+      .eq('season', season)
+      .order('gameDate', { ascending: true });
 
     if (startDate) {
       gamesQuery = gamesQuery.gte('gameDate', startDate);
@@ -58,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     if (!games || games.length === 0) {
       // No games for this season, return empty player stats
-      const playerStats = players?.map(player => ({
+      const playerStats = normalizedPlayers.map(player => ({
         id: player.id,
         name: player.name,
         position: player.position,
@@ -72,13 +95,15 @@ export async function GET(request: NextRequest) {
         threePct: 0,
         ftPct: 0,
         trend: 'no_games'
-      })) || [];
+      }));
 
       return NextResponse.json(playerStats);
     }
 
     // Get game IDs for the season
-    const gameIds = games.map(game => game.id);
+    const gameIds = games.map((game: any) => game.id);
+    const gameDateById = new Map<number, string>();
+    (games || []).forEach((g: any) => gameDateById.set(g.id, g.gameDate));
 
     // Get all game stats for the games in this season
     const { data: gameStats, error: statsError } = await supabase
@@ -98,7 +123,7 @@ export async function GET(request: NextRequest) {
     const playerStatsMap = new Map();
 
     // Initialize player stats
-    players?.forEach(player => {
+    normalizedPlayers.forEach(player => {
       playerStatsMap.set(player.id, {
         id: player.id,
         name: player.name,
@@ -146,11 +171,39 @@ export async function GET(request: NextRequest) {
       const threePct = player.totalThreePointsAttempted > 0 ? Math.round((player.totalThreePointsMade / player.totalThreePointsAttempted) * 1000) / 10 : 0;
       const ftPct = player.totalFreeThrowsAttempted > 0 ? Math.round((player.totalFreeThrowsMade / player.totalFreeThrowsAttempted) * 1000) / 10 : 0;
 
-      // Simple trend calculation based on recent performance
-      const trend = player.games >= 5 ? 'steady' : 'improving';
+      // Build recent per-game points (chronological) from gameStats
+      const playerGames = (gameStats || [])
+        .filter((s: any) => s.playerId === player.id)
+        .map((s: any) => ({
+          gameId: s.gameId,
+          date: gameDateById.get(s.gameId) || null,
+          points: s.points || 0,
+        }))
+        .sort((a: any, b: any) => {
+          const ad = a.date ? new Date(a.date).getTime() : 0;
+          const bd = b.date ? new Date(b.date).getTime() : 0;
+          return ad - bd;
+        });
+      const recentPoints = playerGames.slice(-6).map(g => ({ date: g.date, points: g.points }));
+
+      // Trend from real data
+      let trend: 'rapidly_improving' | 'improving' | 'steady' | 'declining' | 'no_games' = 'no_games';
+      if (recentPoints.length >= 2) {
+        const first = recentPoints[0].points;
+        const last = recentPoints[recentPoints.length - 1].points;
+        const changePct = first > 0 ? ((last - first) / first) * 100 : (last > 0 ? 100 : 0);
+        if (changePct >= 15) trend = 'rapidly_improving';
+        else if (changePct >= 5) trend = 'improving';
+        else if (changePct <= -5) trend = 'declining';
+        else trend = 'steady';
+      }
 
       return {
-        ...player,
+        id: player.id,
+        name: player.name,
+        position: player.position,
+        number: player.number,
+        games: player.games,
         ppg,
         apg,
         rpg,
@@ -158,7 +211,8 @@ export async function GET(request: NextRequest) {
         fgPct,
         threePct,
         ftPct,
-        trend
+        trend,
+        recentPoints,
       };
     });
 

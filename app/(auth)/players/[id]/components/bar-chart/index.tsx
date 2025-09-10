@@ -14,16 +14,15 @@ import style from './style.module.scss'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-// Data for each month and its performance level
-const months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-];
-const values = [15, 30, 20, 34, 12, 22, 18, 29, 23, 35, 13, 25];
-const levels = [
-  'Low', 'High', 'Moderate', 'High', 'Low', 'Moderate',
-  'Moderate', 'High', 'Moderate', 'High', 'Low', 'High'
-];
+type PerfPoint = { label: string; value: number; level: 'High' | 'Moderate' | 'Low' }
+export interface PlayerBarChartProps {
+  performance?: PerfPoint[]
+}
+
+// Fallback data
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const values = [15,30,20,34,12,22,18,29,23,35,13,25]
+const levels: string[] = ['Low','High','Moderate','High','Low','Moderate','Moderate','High','Moderate','High','Low','High']
 
 // Color mapping
 const levelColors: Record<string, string> = {
@@ -32,23 +31,25 @@ const levelColors: Record<string, string> = {
   Low: '#e44a4a',
 };
 
-// Prepare background color array for bars
-const barColors = levels.map(level => levelColors[level]);
-
-const data = {
-  labels: months,
-  datasets: [
-    {
-      label: 'Performance',
-      data: values,
-      backgroundColor: barColors,
-      borderRadius: 8,
-      barPercentage: 0.6,
-      categoryPercentage: 0.6,
-      borderSkipped: false,
-    },
-  ],
-};
+const makeData = (perf: PerfPoint[] | undefined) => {
+  const labels = (perf && perf.length ? perf.map(p => p.label) : months)
+  const dataVals = (perf && perf.length ? perf.map(p => p.value) : values)
+  const barColors = (perf && perf.length ? perf.map(p => levelColors[p.level]) : (levels as any[]).map(l => levelColors[l]))
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Performance',
+        data: dataVals,
+        backgroundColor: barColors,
+        borderRadius: 8,
+        barPercentage: 0.6,
+        categoryPercentage: 0.6,
+        borderSkipped: false,
+      },
+    ],
+  }
+}
 
 const options: ChartOptions<'bar'> = {
   responsive: true,
@@ -81,7 +82,7 @@ const options: ChartOptions<'bar'> = {
   },
 };
 
-const BarChart = () => {
+const BarChart = ({ performance }: PlayerBarChartProps) => {
   return (
     <>
       <Flex justify='space-between' align='center' className={style.titleWrapper}>
@@ -92,7 +93,7 @@ const BarChart = () => {
           <div><span className={style.pointLow}></span> Low</div>
         </Flex>
       </Flex>
-      <Bar data={data} options={options} height={100} />
+      <Bar data={makeData(performance)} options={options} height={100} />
     </>
   )
 }

@@ -121,7 +121,7 @@ function Player() {
       }
     },
     {
-      title: renderHeader('Jersey #', 'jersey'),
+      title: renderHeader('#', 'jersey'),
       render: (data: any) => {
         // Use jersey_number if available, otherwise fall back to jersey
         return data?.jersey_number || data?.jersey || '-'
@@ -149,7 +149,13 @@ function Player() {
         if (notes.length === 0) return '-'
         
         const noteTexts = notes.map((note: any) => note.note || note.note_text || 'No content')
-        return noteTexts.join(' | ')
+        const fullText = noteTexts.join(' | ')
+        
+        // Truncate to 100 characters and add ellipses if longer
+        if (fullText.length > 35) {
+          return fullText.substring(0, 35) + '...'
+        }
+        return fullText
       }
     },
     {
@@ -160,7 +166,13 @@ function Player() {
         if (goals.length === 0) return '-'
         
         const goalTexts = goals.map((goal: any) => goal.goal || goal.goal_text || 'No content')
-        return goalTexts.join(' | ')
+        const fullText = goalTexts.join(' | ')
+        
+        // Truncate to 100 characters and add ellipses if longer
+        if (fullText.length > 35) {
+          return fullText.substring(0, 35) + '...'
+        }
+        return fullText
       }
     },
   ], [queryParams.sortBy, queryParams.sortDirection])

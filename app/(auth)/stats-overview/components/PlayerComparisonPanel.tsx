@@ -9,10 +9,10 @@ interface Player {
 }
 
 const columns = [
-  { title: "Player", dataIndex: "name", key: "name", ellipsis: true },
-  { title: "PTS", dataIndex: "pts", key: "pts", ellipsis: true },
-  { title: "REB", dataIndex: "reb", key: "reb", ellipsis: true },
-  { title: "AST", dataIndex: "ast", key: "ast", ellipsis: true },
+  { title: "Player", dataIndex: "name", key: "name" },
+  { title: "PTS", dataIndex: "pts", key: "pts" },
+  { title: "REB", dataIndex: "reb", key: "reb" },
+  { title: "AST", dataIndex: "ast", key: "ast" },
 ];
 
 const PlayerComparisonPanel: React.FC<{ players: Player[] }> = ({ players }) => (

@@ -13,9 +13,9 @@ interface Game {
 }
 
 const columns = [
-  { title: "Date", dataIndex: "date", key: "date", ellipsis: true },
-  { title: "Opponent", dataIndex: "opponent", key: "opponent", ellipsis: true },
-  { title: "Result", dataIndex: "result", key: "result", ellipsis: true },
+  { title: "Date", dataIndex: "date", key: "date" },
+  { title: "Opponent", dataIndex: "opponent", key: "opponent" },
+  { title: "Result", dataIndex: "result", key: "result" },
 ];
 
 interface GameStatsPanelProps {

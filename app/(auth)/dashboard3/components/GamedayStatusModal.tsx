@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Table, Tag, Button, Spin, Typography, Flex } from 'antd';
+import { Modal, Table, Tag, Button, Spin, Typography, Flex, Tooltip } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import api from '@/services/api';
 import moment from 'moment';
@@ -54,9 +54,9 @@ export default function GamedayStatusModal({
       });
       
       const res = await api.get(`/api/tasks?${params}`);
-      if ((res as any)?.data?.data) {
+      if ((res as any)?.data?.tasks) {
         // Validate and sanitize the data
-        const sanitizedTasks = (res as any).data.data.map((task: any) => ({
+        const sanitizedTasks = (res as any).data.tasks.map((task: any) => ({
           id: task.id || `task-${Date.now()}-${Math.random()}`,
           name: task.name || 'Untitled Task',
           description: task.description || '',
@@ -122,16 +122,21 @@ export default function GamedayStatusModal({
       width: '25%',
       render: (record: any) => {
         try {
+          const desc = record?.description || 'No description'
           return (
-            <Text 
-              style={{ 
-                color: 'rgba(255, 255, 255, 0.65)',
-                fontSize: '13px'
-              }}
-              ellipsis={{ tooltip: record?.description || 'No description' }}
-            >
-              {record?.description || 'No description'}
-            </Text>
+            <Tooltip title={desc}>
+              <div
+                style={{ 
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  fontSize: '13px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {desc}
+              </div>
+            </Tooltip>
           );
         } catch (error) {
           console.error('Error rendering description:', error);

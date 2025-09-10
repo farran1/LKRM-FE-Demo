@@ -7,8 +7,19 @@ const supabaseAPI = new SupabaseAPI()
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url)
-		const params = Object.fromEntries(searchParams.entries())
+		const params: any = Object.fromEntries(searchParams.entries())
 		console.log('API GET /events - params:', params)
+		
+		// Convert parameters to proper types
+		if (params.eventTypeIds) {
+			params.eventTypeIds = String(params.eventTypeIds).split(',').map((id: string) => parseInt(id.trim())).filter((id: number) => !isNaN(id))
+		}
+		if (params.page) {
+			params.page = parseInt(String(params.page))
+		}
+		if (params.perPage) {
+			params.perPage = parseInt(String(params.perPage))
+		}
 		
 		const res = await supabaseAPI.getEvents(params)
 		console.log('API GET /events - supabase result:', res)

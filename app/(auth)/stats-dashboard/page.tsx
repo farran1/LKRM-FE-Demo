@@ -908,7 +908,7 @@ export default function StatsDashboardPage() {
                 style={{ width: '100%' }}
                 options={playerStats ? playerStats.map((player: any) => ({
                   value: player.id,
-                  label: `${player.name} (${player.position})`
+                  label: `${player.name} - ${player?.number ? `#${player.number}` : '#--'} | ${player?.position||'Pos'}`
                 })) : []}
               />
             </div>
@@ -917,6 +917,11 @@ export default function StatsDashboardPage() {
               const player = playerStats.find((p: any) => p.id === selectedPlayer);
               
               if (!player) return null;
+
+              const series = Array.isArray(player?.recentPoints) ? player.recentPoints.map((p: any, idx: number) => ({ game: idx + 1, ppg: p.points })) : [];
+              const firstPts = series.length ? series[0].ppg : 0;
+              const lastPts = series.length ? series[series.length - 1].ppg : 0;
+              const changePct = firstPts > 0 ? Math.round(((lastPts - firstPts) / firstPts) * 100) : (lastPts > 0 ? 100 : 0);
               
               return (
                 <div>
@@ -1056,13 +1061,9 @@ export default function StatsDashboardPage() {
                         color: player?.trend === 'rapidly_improving' ? '#52c41a' : 
                                player?.trend === 'improving' ? '#1890ff' : 
                                player?.trend === 'steady' ? '#faad14' : '#ff4d4f',
-                        border: `1px solid ${player?.trend === 'rapidly_improving' ? 'rgba(82, 196, 26, 0.3)' : 
-                                         player?.trend === 'improving' ? 'rgba(24, 144, 255, 0.3)' : 
-                                         player?.trend === 'steady' ? 'rgba(250, 173, 20, 0.3)' : 'rgba(255, 77, 77, 0.3)'}`
+                        border: `1px solid ${player?.trend === 'rapidly_improving' ? 'rgba(82, 196, 26, 0.3)' : 'rgba(24, 144, 255, 0.3)'}`
                       }}>
-                        {player?.trend === 'rapidly_improving' ? '+15%' : 
-                         player?.trend === 'improving' ? '+8%' : 
-                         player?.trend === 'steady' ? '0%' : '-5%'}
+                        {changePct > 0 ? `+${changePct}%` : `${changePct}%`}
                       </div>
                     </div>
                     
@@ -1073,14 +1074,16 @@ export default function StatsDashboardPage() {
                       position: 'relative'
                     }}>
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={[
-                          { game: 1, ppg: (player?.ppg || 0) - 2 },
-                          { game: 2, ppg: (player?.ppg || 0) - 1 },
-                          { game: 3, ppg: player?.ppg || 0 },
-                          { game: 4, ppg: (player?.ppg || 0) + (player?.trend === 'rapidly_improving' ? 3 : player?.trend === 'improving' ? 1.5 : 0) },
-                          { game: 5, ppg: (player?.ppg || 0) + (player?.trend === 'rapidly_improving' ? 5 : player?.trend === 'improving' ? 2.5 : 0) },
-                          { game: 6, ppg: (player?.ppg || 0) + (player?.trend === 'rapidly_improving' ? 8 : player?.trend === 'improving' ? 4 : 0) }
-                        ]}>
+                        <AreaChart data={series.length ? series : [{ game: 1, ppg: player?.ppg || 0 }] }>
+                          <RechartsTooltip 
+                            formatter={(value: any) => [`${value} pts`, 'Points']}
+                            labelFormatter={(_lbl: any, payload: any) => {
+                              const g = payload && payload[0] && payload[0].payload ? payload[0].payload.game : 1;
+                              return `Game ${g}`;
+                            }}
+                            contentStyle={{ background: '#17375c', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '8px' }}
+                            labelStyle={{ color: '#b8c5d3' }}
+                          />
                           <Area 
                             type="monotone" 
                             dataKey="ppg" 
@@ -1091,6 +1094,8 @@ export default function StatsDashboardPage() {
                                   player?.trend === 'improving' ? 'rgba(24, 144, 255, 0.2)' : 
                                   player?.trend === 'steady' ? 'rgba(250, 173, 20, 0.2)' : 'rgba(255, 77, 77, 0.2)'}
                             strokeWidth={2}
+                            dot={{ r: 2 }}
+                            activeDot={{ r: 3 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>

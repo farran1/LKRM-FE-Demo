@@ -80,7 +80,20 @@ export async function GET(request: NextRequest) {
         .eq('session_key', sessionKey)
         .single()
 
-      if (error) throw error
+      if (error) {
+        // If session not found, return empty data instead of error
+        if (error.code === 'PGRST116') {
+          return NextResponse.json({ 
+            success: true, 
+            data: { 
+              id: null, 
+              session_key: sessionKey, 
+              live_game_events: [] 
+            } 
+          })
+        }
+        throw error
+      }
 
       return NextResponse.json({ success: true, data: session })
     }
@@ -130,11 +143,46 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'create-session':
-        // Create a new live game session
+        // First, check if a game already exists for this event
+        let gameId = null
+        const { data: existingGame, error: gameCheckError } = await supabase
+          .from('games')
+          .select('id')
+          .eq('eventId', data.eventId)
+          .single()
+
+        if (gameCheckError && gameCheckError.code !== 'PGRST116') {
+          throw gameCheckError
+        }
+
+        if (existingGame) {
+          gameId = existingGame.id
+        } else {
+          // Create a new game record
+          const { data: newGame, error: gameError } = await supabase
+            .from('games')
+            .insert({
+              eventId: data.eventId,
+              opponent: data.opponent || 'Live Game Opponent',
+              gameDate: data.gameDate || new Date().toISOString(),
+              season: data.season || '2024-25',
+              isPlayoffs: data.isPlayoffs || false,
+              createdBy: data.createdBy,
+              updatedBy: data.updatedBy || data.createdBy
+            })
+            .select('id')
+            .single()
+
+          if (gameError) throw gameError
+          gameId = newGame.id
+        }
+
+        // Create a new live game session with the game_id
         const { data: session, error: sessionError } = await supabase
           .from('live_game_sessions')
           .insert({
             event_id: data.eventId,
+            game_id: gameId,
             session_key: data.sessionKey,
             game_state: data.gameState,
             is_active: true,
@@ -169,10 +217,42 @@ export async function POST(request: NextRequest) {
 
       case 'record-event':
         // Record a game event
+        console.log('Recording event with data:', data)
+        
+        // First check if the table exists
+        const { data: tableCheck, error: tableError } = await supabase
+          .from('live_game_events')
+          .select('id')
+          .limit(1)
+
+        if (tableError) {
+          console.error('Table check error:', tableError)
+          return NextResponse.json({ 
+            success: false, 
+            error: `Table access error: ${tableError.message}` 
+          }, { status: 400 })
+        }
+
+        // Get the game_id from the session
+        const { data: sessionData, error: sessionLookupError } = await supabase
+          .from('live_game_sessions')
+          .select('game_id')
+          .eq('id', data.sessionId)
+          .single()
+
+        if (sessionLookupError) {
+          console.error('Session lookup error:', sessionLookupError)
+          return NextResponse.json({ 
+            success: false, 
+            error: `Session lookup error: ${sessionLookupError.message}` 
+          }, { status: 400 })
+        }
+        
         const { data: event, error: eventError } = await supabase
           .from('live_game_events')
           .insert({
             session_id: data.sessionId,
+            game_id: sessionData.game_id, // Include the game_id from the session
             player_id: data.playerId,
             event_type: data.eventType,
             event_value: data.eventValue,
@@ -185,8 +265,15 @@ export async function POST(request: NextRequest) {
           .select()
           .single()
 
-        if (eventError) throw eventError
+        if (eventError) {
+          console.error('Event insert error:', eventError)
+          return NextResponse.json({ 
+            success: false, 
+            error: `Event insert error: ${eventError.message}` 
+          }, { status: 400 })
+        }
 
+        console.log('Event recorded successfully:', event)
         return NextResponse.json({ success: true, data: event })
 
       case 'update-game-state':

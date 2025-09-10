@@ -105,11 +105,23 @@ class SimpleLiveStatTrackerService {
       throw new Error('No active game session')
     }
 
+    // Get the game_id from the current session
+    const { data: sessionData, error: sessionError } = await this.supabase
+      .from('live_game_sessions')
+      .select('game_id')
+      .eq('id', this.currentSessionId)
+      .single()
+
+    if (sessionError) {
+      throw new Error(`Failed to get session data: ${sessionError.message}`)
+    }
+
     // Insert event directly to database
     const { data: event, error } = await this.supabase
       .from('live_game_events')
       .insert({
         session_id: this.currentSessionId,
+        game_id: sessionData.game_id, // Include the game_id from the session
         player_id: playerId,
         event_type: eventType,
         event_value: eventValue,

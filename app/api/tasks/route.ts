@@ -14,10 +14,12 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const priorityId = searchParams.get('priorityId')
+    const eventId = searchParams.get('eventId')
+    const status = searchParams.get('status')
     const upcoming = searchParams.get('upcoming') === 'true'
     const perPage = searchParams.get('perPage') || '50'
 
-    // Build the query - get ALL team tasks
+    // Build the query - get ALL team tasks with assignee information
     let query = supabase
       .from('tasks')
       .select(`
@@ -31,15 +33,26 @@ export async function GET(request: NextRequest) {
       query = query
         .gte('dueDate', startDate)
         .lte('dueDate', endDate)
-    } else if (upcoming || (!startDate && !endDate)) {
-      // Default to upcoming tasks: due today or in the future
+    } else if (upcoming) {
+      // Only apply upcoming filter when explicitly requested
       const today = new Date().toISOString().slice(0, 10)
       query = query.gte('dueDate', today)
     }
+    // If no date filters are provided, show all tasks
 
     // Add priority filtering if provided
     if (priorityId) {
       query = query.eq('priorityId', priorityId)
+    }
+
+    // Add event filtering if provided
+    if (eventId) {
+      query = query.eq('eventId', eventId)
+    }
+
+    // Add status filtering if provided
+    if (status) {
+      query = query.eq('status', status)
     }
 
     // Ordering and limit: upcoming by dueDate asc, otherwise createdAt desc
@@ -57,18 +70,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
     }
 
+    console.log('Raw Supabase response:', JSON.stringify(tasks, null, 2))
+
     // Transform the data to match frontend expectations
-    const transformedTasks = tasks?.map(task => ({
-      ...task,
-      id: task.userId, // Map userId to id for frontend compatibility
-      // Keep assigneeId for display purposes
-      assignee: task.assigneeId || 'Unassigned',
-      // Create a users object for UI compatibility
-      users: task.assigneeId ? {
-        username: task.assigneeId,
-        email: task.assigneeId
-      } : null,
-    })) || []
+    const transformedTasks = tasks?.map(task => {
+      console.log('Processing task:', task);
+      console.log('Task task_priorities:', task.task_priorities);
+      console.log('Task events:', task.events);
+      
+      return {
+        ...task,
+        id: task.userId, // Map userId to id for frontend compatibility
+        // Enhanced assignee information
+        assignee: task.assigneeId || 'Unassigned',
+        // Create a users object for UI compatibility
+        users: task.assigneeId ? {
+          username: task.assigneeId,
+          email: task.assigneeId, // Use assigneeId as email for now
+          metadata: null
+        } : null,
+        // Ensure description is included
+        description: task.description || '',
+        // Ensure priority information is properly structured
+        task_priorities: task.task_priorities || null,
+        // Ensure events information is properly structured
+        events: task.events || null,
+      };
+    }) || []
+
+    console.log('Transformed tasks response:', JSON.stringify(transformedTasks, null, 2))
 
     return NextResponse.json({ 
       tasks: transformedTasks,

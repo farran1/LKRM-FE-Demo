@@ -62,8 +62,8 @@ export default function Next7DaysTasksModule({ sidebarCollapsed = false }: Next7
         throw new Error('Failed to fetch tasks');
       }
       
-      const tasks = await response.json();
-      const taskArray = Array.isArray(tasks) ? tasks : (tasks.data || []);
+      const payload = await response.json();
+      const taskArray = Array.isArray(payload?.tasks) ? payload.tasks : (Array.isArray(payload?.data) ? payload.data : []);
       
       // Filter tasks by due date and count by priority
       const next7DaysTasks = taskArray.filter((task: any) => {

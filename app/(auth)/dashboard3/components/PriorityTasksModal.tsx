@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Table, Tag, Button, Spin, Typography, Flex } from 'antd';
+import { Modal, Table, Tag, Button, Spin, Typography, Flex, Tooltip } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import api from '@/services/api';
 import moment from 'moment';
@@ -165,15 +165,19 @@ export default function PriorityTasksModal({
       key: 'description',
       width: '22%',
       render: (text: string) => (
-        <Text 
-          style={{ 
-            color: 'rgba(255, 255, 255, 0.65)',
-            fontSize: '13px'
-          }}
-          ellipsis={{ tooltip: text }}
-        >
-          {text || 'No description'}
-        </Text>
+        <Tooltip title={text || 'No description'}>
+          <div
+            style={{
+              color: 'rgba(255, 255, 255, 0.65)',
+              fontSize: '13px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {text || 'No description'}
+          </div>
+        </Tooltip>
       )
     }
   ];
