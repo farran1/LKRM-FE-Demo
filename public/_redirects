@@ -1,2 +1,6 @@
 # Netlify redirects for Next.js SPA routing
+# Redirect root domain to login page
+/    /login    302
+
+# Handle all other routes for SPA
 /*    /index.html   200

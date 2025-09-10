@@ -2,7 +2,7 @@
 
 import { Form, Input, Button, ConfigProvider, App } from 'antd'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import style from './style.module.scss'
 import Link from 'next/link'
 import Logo from '@/components/icon/logo.svg'
@@ -12,7 +12,28 @@ import { ROUTES } from '@/utils/routes'
 const Login = () => {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const { message } = App.useApp()
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          // User is already logged in, redirect to dashboard
+          router.push(ROUTES.dashboard)
+          return
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error)
+      } finally {
+        setCheckingAuth(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
 
   const onSubmit = async (payload: any) => {
     setLoading(true)
@@ -44,6 +65,25 @@ const Login = () => {
 
   const goWaitlist = () => {
     router.push('/waitlist')
+  }
+
+  // Show loading while checking authentication
+  if (checkingAuth) {
+    return (
+      <div className={style.container}>
+        <div className={style.background}>
+          <img src="/imgs/login_bg.jpg" alt="login_bg.jpg" loading="lazy" />
+        </div>
+        <div className={style.form_wrapper}>
+          <div className={style.form}>
+            <div className={style.logo}>
+              <Logo />
+              <div className={style.des}>Checking authentication...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
