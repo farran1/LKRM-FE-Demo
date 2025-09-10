@@ -2,7 +2,7 @@
 
 import { Form, Input, Button, ConfigProvider, App } from 'antd'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import style from '../login/style.module.scss'
 import Link from 'next/link'
 import Logo from '@/components/icon/logo.svg'
@@ -53,12 +53,20 @@ const Signup = () => {
     required: '${label} is required!'
   }
 
+  // Force enable scrolling on this page
+  useEffect(() => {
+    document.body.style.overflow = 'auto'
+    return () => {
+      document.body.style.overflow = 'hidden'
+    }
+  }, [])
+
   return (
-    <div className={style.container}>
+    <div className={style.container} style={{ overflow: 'auto' }}>
       <div className={style.background}>
         <img src="/imgs/login_bg.jpg" alt="login_bg.jpg" loading="lazy" />
       </div>
-      <div className={style.form_wrapper}>
+      <div className={style.form_wrapper} style={{ overflow: 'auto' }}>
         <div className={style.form}>
           <div className={style.logo}>
             <Logo />

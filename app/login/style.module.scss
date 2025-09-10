@@ -17,32 +17,29 @@
 .background {
   height: 100vh;
   position: fixed;
-  top: 0;
   left: 0;
-  z-index: -1;
+  top: 0;
+  width: 40%;
   img {
-    width: auto;
+    width: 100%;
     height: 100%;
+    object-fit: cover;
   }
 }
 .form_wrapper {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   flex: 1;
   background: linear-gradient(#022133, #025A8A);
   padding: 40px 20px;
+  margin-left: 40%;
   min-height: 100vh;
 }
 .form {
-  width: 80%;
+  width: 100%;
   max-width: 500px;
   min-width: 360px;
-  margin: 20px 0;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  backdrop-filter: blur(10px);
 }
 .logo {
   text-align: center;
