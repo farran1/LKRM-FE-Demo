@@ -1,6 +1,7 @@
 .container {
   display: flex;
   width: 100%;
+  min-height: 100vh;
   :global(.ant-input-outlined),
   :global(.ant-input-outlined:hover),
   :global(.ant-input-outlined:focus-within) {
@@ -15,6 +16,10 @@
 }
 .background {
   height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
   img {
     width: auto;
     height: 100%;
@@ -22,16 +27,22 @@
 }
 .form_wrapper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   flex: 1;
   background: linear-gradient(#022133, #025A8A);
+  padding: 40px 20px;
+  min-height: 100vh;
 }
 .form {
   width: 80%;
-  // margin: 197px auto 0;
   max-width: 500px;
   min-width: 360px;
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
 }
 .logo {
   text-align: center;
