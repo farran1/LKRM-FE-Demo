@@ -379,9 +379,26 @@ export default function StatsDashboardPage() {
     // Player Stats Section
     if (exportData.playerStats) {
       sections.push('PLAYER STATISTICS');
-      sections.push('Name,Position,Number,PPG,APG,RPG,SPG,FG%,3PT%,FT%,Games,Trend');
+      sections.push('Name,Position,Number,PPG,APG,RPG,SPG,EFF,FG%,3PT%,FT%,Games,Trend');
       exportData.playerStats.forEach((player: any) => {
-        sections.push(`${player?.name || 'Unknown'},${player?.position || 'Unknown'},${player?.number || 'N/A'},${player?.ppg || 0},${player?.apg || 0},${player?.rpg || 0},${player?.spg || 0},${player?.fgPct || 0}%,${player?.threePct || 0}%,${player?.ftPct || 0}%,${player?.games || 0},${player?.trend || 'Unknown'}`);
+        // Calculate EFF for export
+        const points = player.points || 0;
+        const rebounds = player.rebounds || 0;
+        const assists = player.assists || 0;
+        const steals = player.steals || 0;
+        const blocks = player.blocks || 0;
+        const turnovers = player.turnovers || 0;
+        const games = player.games || 1;
+        const fgMade = player.fgMade || 0;
+        const fgAttempted = player.fgAttempted || 0;
+        const ftMade = player.ftMade || 0;
+        const ftAttempted = player.ftAttempted || 0;
+        const missedFg = fgAttempted - fgMade;
+        const missedFt = ftAttempted - ftMade;
+        const efficiency = (points + rebounds + assists + steals + blocks - missedFg - missedFt - turnovers) / games;
+        const roundedEfficiency = Math.round(efficiency * 10) / 10;
+        
+        sections.push(`${player?.name || 'Unknown'},${player?.position || 'Unknown'},${player?.number || 'N/A'},${player?.ppg || 0},${player?.apg || 0},${player?.rpg || 0},${player?.spg || 0},${isNaN(roundedEfficiency) ? '0.0' : roundedEfficiency},${player?.fgPct || 0}%,${player?.threePct || 0}%,${player?.ftPct || 0}%,${player?.games || 0},${player?.trend || 'Unknown'}`);
       });
       sections.push('');
     }
@@ -827,6 +844,61 @@ export default function StatsDashboardPage() {
                      render={(value: number) => (
                        <span style={{ color: '#52c41a', fontWeight: '600' }}>{value}</span>
                      )}
+                   />
+                   <Table.Column 
+                     title={
+                       <Tooltip title="EFF = (PTS + REB + AST + STL + BLK - Missed FG - Missed FT - TO) / GP">
+                         <span style={{ color: '#fff' }}>EFF</span>
+                       </Tooltip>
+                     }
+                     key="efficiency"
+                     render={(text: any, record: any) => {
+                       // Calculate EFF rating: (PTS + REB + AST + STL + BLK - Missed FG - Missed FT - TO) / GP
+                       const points = record.points || 0;
+                       const rebounds = record.rebounds || 0;
+                       const assists = record.assists || 0;
+                       const steals = record.steals || 0;
+                       const blocks = record.blocks || 0;
+                       const turnovers = record.turnovers || 0;
+                       const games = record.games || 1; // Avoid division by zero
+                       
+                       // Calculate missed shots
+                       const fgMade = record.fgMade || 0;
+                       const fgAttempted = record.fgAttempted || 0;
+                       const ftMade = record.ftMade || 0;
+                       const ftAttempted = record.ftAttempted || 0;
+                       const missedFg = fgAttempted - fgMade;
+                       const missedFt = ftAttempted - ftMade;
+                       
+                       // EFF calculation
+                       const efficiency = (points + rebounds + assists + steals + blocks - missedFg - missedFt - turnovers) / games;
+                       const roundedEfficiency = Math.round(efficiency * 10) / 10; // Round to 1 decimal place
+                       
+                       return (
+                         <span style={{ color: '#ff7a00', fontWeight: '600' }}>
+                           {isNaN(roundedEfficiency) ? '0.0' : roundedEfficiency}
+                         </span>
+                       );
+                     }}
+                     sorter={(a: any, b: any) => {
+                       const calcEfficiency = (record: any) => {
+                         const points = record.points || 0;
+                         const rebounds = record.rebounds || 0;
+                         const assists = record.assists || 0;
+                         const steals = record.steals || 0;
+                         const blocks = record.blocks || 0;
+                         const turnovers = record.turnovers || 0;
+                         const games = record.games || 1;
+                         const fgMade = record.fgMade || 0;
+                         const fgAttempted = record.fgAttempted || 0;
+                         const ftMade = record.ftMade || 0;
+                         const ftAttempted = record.ftAttempted || 0;
+                         const missedFg = fgAttempted - fgMade;
+                         const missedFt = ftAttempted - ftMade;
+                         return (points + rebounds + assists + steals + blocks - missedFg - missedFt - turnovers) / games;
+                       };
+                       return calcEfficiency(b) - calcEfficiency(a);
+                     }}
                    />
                  </Table>
                </div>

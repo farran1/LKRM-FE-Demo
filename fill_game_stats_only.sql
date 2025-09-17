@@ -37,3 +37,6 @@ VALUES
 
 -- Success message
 SELECT 'Game stats data has been successfully loaded!' as message;
+
+
+

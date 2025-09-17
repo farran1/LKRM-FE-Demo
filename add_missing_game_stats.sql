@@ -54,3 +54,6 @@ WHERE NOT EXISTS (SELECT 1 FROM game_stats WHERE "gameId" = 18 AND "playerId" = 
 
 -- Success message
 SELECT 'Missing game stats have been successfully added!' as message;
+
+
+

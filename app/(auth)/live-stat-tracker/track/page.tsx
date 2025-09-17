@@ -215,7 +215,7 @@ export default function LiveStatTrackingPage() {
       const currentSessionKey = refinedLiveStatTrackerService.getCurrentSessionKey();
       if (currentSessionKey && eventId) {
         // Clear the current session data without saving
-        refinedLiveStatTrackerService.deleteGameData(eventId);
+        await refinedLiveStatTrackerService.deleteGameData(eventId);
         console.log('🗑️ Game data discarded successfully');
       }
     } catch (error) {

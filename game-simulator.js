@@ -376,3 +376,6 @@ console.log('  - gameSimulator.stop() - Stop simulation');
 console.log('  - quickTest.testSingleEvent("fg_made") - Test single event');
 console.log('  - quickTest.testAllEventTypes() - Test all event types');
 console.log('  - quickTest.testModalEvents() - Test modal events');
+
+
+

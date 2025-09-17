@@ -112,3 +112,6 @@ SELECT
     (SELECT COUNT(*) FROM player_goals WHERE player_id = p.id) as goals_count
 FROM players p 
 ORDER BY p.id;
+
+
+

@@ -213,6 +213,17 @@ export async function GET(request: NextRequest) {
         ftPct,
         trend,
         recentPoints,
+        // Add fields needed for EFF calculation
+        points: player.totalPoints,
+        rebounds: player.totalRebounds,
+        assists: player.totalAssists,
+        steals: player.totalSteals,
+        blocks: player.totalBlocks,
+        turnovers: player.totalTurnovers,
+        fgMade: player.totalFieldGoalsMade,
+        fgAttempted: player.totalFieldGoalsAttempted,
+        ftMade: player.totalFreeThrowsMade,
+        ftAttempted: player.totalFreeThrowsAttempted,
       };
     });
 

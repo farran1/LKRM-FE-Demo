@@ -122,3 +122,6 @@ runSimpleTest();
 
 // Export for manual use
 window.runSimpleClickTest = runSimpleTest;
+
+
+

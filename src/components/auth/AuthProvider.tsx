@@ -5,6 +5,7 @@ import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ROUTES } from '@/utils/routes'
+import { SupabaseAPI } from '@/services/supabase-api'
 
 interface AuthContextType {
   user: User | null
@@ -148,6 +149,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(session?.user ?? null)
         setLoading(false)
         
+        // Clear session cache to prevent stale auth calls
+        
+        // Clear SupabaseAPI user cache
+        const api = new SupabaseAPI()
+        api.clearUserCache()
+        
         // Clear session cookies
         try {
           await fetch('/auth/callback', {
@@ -223,6 +230,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     console.log('Signing out...')
+    // Clear session cache before signing out
+    
+    // Clear SupabaseAPI user cache
+    const api = new SupabaseAPI()
+    api.clearUserCache()
+    
     await supabase.auth.signOut()
   }
 

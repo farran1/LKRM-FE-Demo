@@ -47,3 +47,6 @@ VALUES
 (22, 'Develop three-point shot consistency', '2025-03-15', false, 'shooting', 1);
 
 SELECT 'Quick stats addition completed! All players now have comprehensive game statistics.' as status;
+
+
+

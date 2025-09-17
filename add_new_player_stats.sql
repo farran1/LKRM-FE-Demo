@@ -161,3 +161,6 @@ AND NOT EXISTS (
 
 -- Success message
 SELECT 'New player game stats have been successfully added!' as message;
+
+
+

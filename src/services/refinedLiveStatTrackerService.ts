@@ -908,36 +908,123 @@ class RefinedLiveStatTrackerService {
         return
       }
 
-      // Find and end all active sessions for this event
+      console.log(`🗑️ Starting comprehensive cleanup for event ${eventId}`)
+
+      // Find all sessions for this event (both active and inactive)
       const { data: sessions, error: sessionsError } = await this.supabase
         .from('live_game_sessions')
-        .select('id')
+        .select('id, game_id, session_key')
         .eq('event_id', eventId)
-        .eq('is_active', true)
 
       if (sessionsError) {
         console.error('Failed to find sessions to delete:', sessionsError)
         return
       }
 
-      // End all active sessions for this event
-      if (sessions && sessions.length > 0) {
-        const sessionIds = (sessions as any[]).map((s: any) => s.id)
-        
-        const { error: updateError } = await this.supabase
-          .from('live_game_sessions')
-          .update({ 
-            is_active: false, 
-            ended_at: new Date().toISOString() 
-          })
-          .in('id', sessionIds)
+      if (!sessions || sessions.length === 0) {
+        console.log('No sessions found for event', eventId)
+        return
+      }
 
-        if (updateError) {
-          console.error('Failed to end sessions:', updateError)
+      const sessionIds = sessions.map((s: any) => s.id)
+      const gameIds = sessions.map((s: any) => s.game_id).filter((id: any) => id !== null)
+      const sessionKeys = sessions.map((s: any) => s.session_key)
+
+      console.log(`Found ${sessionIds.length} sessions to clean up`)
+
+      // 1. Delete all live_game_events for these sessions
+      if (sessionIds.length > 0) {
+        const { error: eventsError } = await this.supabase
+          .from('live_game_events')
+          .delete()
+          .in('session_id', sessionIds)
+
+        if (eventsError) {
+          console.error('Failed to delete live game events:', eventsError)
         } else {
-          console.log(`Ended ${sessionIds.length} sessions for event ${eventId}`)
+          console.log('✅ Deleted live game events')
         }
       }
+
+      // 2. Delete all game_stats entries for these games (this removes the 0-value entries)
+      if (gameIds.length > 0) {
+        const { error: gameStatsError } = await this.supabase
+          .from('game_stats')
+          .delete()
+          .in('gameId', gameIds)
+
+        if (gameStatsError) {
+          console.error('Failed to delete game stats:', gameStatsError)
+        } else {
+          console.log('✅ Deleted game stats entries')
+        }
+      }
+
+      // 3. Delete game_quarter_totals for these games
+      if (gameIds.length > 0) {
+        const { error: quarterTotalsError } = await this.supabase
+          .from('game_quarter_totals')
+          .delete()
+          .in('gameid', gameIds)
+
+        if (quarterTotalsError) {
+          console.error('Failed to delete game quarter totals:', quarterTotalsError)
+        } else {
+          console.log('✅ Deleted game quarter totals')
+        }
+      }
+
+      // 4. Delete live_game_sync_status for these sessions
+      if (sessionIds.length > 0) {
+        const { error: syncStatusError } = await this.supabase
+          .from('live_game_sync_status')
+          .delete()
+          .in('session_id', sessionIds)
+
+        if (syncStatusError) {
+          console.error('Failed to delete sync status:', syncStatusError)
+        } else {
+          console.log('✅ Deleted sync status entries')
+        }
+      }
+
+      // 5. Delete the games table entries for these games
+      if (gameIds.length > 0) {
+        const { error: gamesDeleteError } = await this.supabase
+          .from('games')
+          .delete()
+          .in('id', gameIds)
+
+        if (gamesDeleteError) {
+          console.error('Failed to delete games:', gamesDeleteError)
+        } else {
+          console.log('✅ Deleted games entries')
+        }
+      }
+
+      // 6. Finally, delete the live_game_sessions themselves
+      const { error: sessionsDeleteError } = await this.supabase
+        .from('live_game_sessions')
+        .delete()
+        .eq('event_id', eventId)
+
+      if (sessionsDeleteError) {
+        console.error('Failed to delete live game sessions:', sessionsDeleteError)
+      } else {
+        console.log('✅ Deleted live game sessions')
+      }
+
+      // 7. Clear offline data for these session keys
+      sessionKeys.forEach((sessionKey: string) => {
+        try {
+          localStorage.removeItem(`basketballStatsOfflineData_${sessionKey}`)
+        } catch (error) {
+          console.error('Failed to clear offline data for session:', sessionKey, error)
+        }
+      })
+
+      console.log(`✅ Comprehensive cleanup completed for event ${eventId}`)
+
     } catch (error) {
       console.error('Failed to delete game data:', error)
     }
@@ -1683,8 +1770,21 @@ class RefinedLiveStatTrackerService {
       }
     }
 
-    // Upsert aggregated stats into game_stats table (insert or update)
-    const playerStats = Array.from(playerStatsMap.values())
+    // Filter out players with all 0 stats (no meaningful contribution)
+    const playerStats = Array.from(playerStatsMap.values()).filter(stats => {
+      return stats.points > 0 || 
+             stats.fieldGoalsAttempted > 0 || 
+             stats.threePointsAttempted > 0 || 
+             stats.freeThrowsAttempted > 0 || 
+             stats.rebounds > 0 || 
+             stats.assists > 0 || 
+             stats.steals > 0 || 
+             stats.blocks > 0 || 
+             stats.turnovers > 0 || 
+             stats.fouls > 0
+    })
+
+    // Only upsert if there are meaningful stats
     if (playerStats.length > 0) {
       const { error: upsertError } = await this.supabase
         .from('game_stats')
@@ -1697,6 +1797,10 @@ class RefinedLiveStatTrackerService {
         console.error('Failed to upsert game stats:', upsertError)
         throw new Error(`Failed to upsert game stats: ${upsertError.message}`)
       }
+      
+      console.log(`📊 Upserted ${playerStats.length} player stats (filtered out 0-value entries)`)
+    } else {
+      console.log('📊 No meaningful player stats to save (all players had 0 values)')
     }
 
     return playerStats

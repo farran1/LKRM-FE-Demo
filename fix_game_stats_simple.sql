@@ -23,3 +23,6 @@ VALUES
 
 -- Success message
 SELECT 'Missing game stats have been added! PPG should now show correctly.' as message;
+
+
+

@@ -21,7 +21,9 @@ export const supabase = typeof window !== 'undefined'
 	: createClient<Database>(url, anon, { 
 		auth: { 
 			autoRefreshToken: true,
-			persistSession: false 
+			persistSession: false,
+			// Add rate limiting configuration
+			flowType: 'pkce'
 		},
 		// Add global configuration to avoid Edge Runtime issues
 		global: {

@@ -4,6 +4,10 @@ import { Database } from '@/types/database'
 type Tables = Database['public']['Tables']
 
 export class SupabaseAPI {
+    // Cache for user authentication to prevent excessive auth calls
+    private userCache: { user: any; timestamp: number } | null = null
+    private readonly USER_CACHE_DURATION = 30000 // 30 seconds
+
     private getClient() {
         // Prefer server client if available, but gracefully fall back to anon client
         if (typeof window === 'undefined') {
@@ -15,6 +19,45 @@ export class SupabaseAPI {
             }
         }
         return supabase
+    }
+
+    // Get cached user or fetch new one
+    private async getCachedUser() {
+        const now = Date.now()
+        
+        // Return cached user if still valid
+        if (this.userCache && (now - this.userCache.timestamp) < this.USER_CACHE_DURATION) {
+            return this.userCache.user
+        }
+        
+        // Check if we have a session first to avoid unnecessary auth calls
+        const client = this.getClient()
+        const { data: { session } } = await client.auth.getSession()
+        
+        if (!session) {
+            console.warn('SupabaseAPI getCachedUser - no session available')
+            this.userCache = { user: null, timestamp: now }
+            return null
+        }
+        
+        // Only fetch user if we have a valid session
+        const { data: { user }, error } = await client.auth.getUser()
+        
+        if (error) {
+            console.warn('SupabaseAPI getCachedUser - auth error:', error)
+            this.userCache = { user: null, timestamp: now }
+            return null
+        }
+        
+        // Cache the user
+        this.userCache = { user, timestamp: now }
+        
+        return user
+    }
+
+    // Clear user cache (call when user logs out)
+    public clearUserCache() {
+        this.userCache = null
     }
 	// Events
 	async getEvents(params?: {
@@ -29,16 +72,9 @@ export class SupabaseAPI {
 	}) {
 		console.log('Supabase getEvents called with params:', params)
 		
-		// Check authentication
+		// For read-only operations, we don't need to check authentication
+		// This prevents unnecessary auth calls that cause rate limiting
 		const client = this.getClient()
-		const { data: { user }, error: authError } = await client.auth.getUser()
-		console.log('Supabase getEvents - auth user:', user)
-		console.log('Supabase getEvents - auth error:', authError)
-		
-		if (authError) {
-			console.error('Supabase getEvents - authentication error:', authError)
-		}
-		
 		let query = (client as any)
 			.from('events')
 			.select(`
@@ -422,7 +458,7 @@ export class SupabaseAPI {
 	}) {
 		console.log('SupabaseAPI.createEvent - Starting with eventData:', eventData)
 		
-		const { data: { user } } = await this.getClient().auth.getUser()
+		const user = await this.getCachedUser()
 		console.log('SupabaseAPI.createEvent - Auth user:', user)
 		
 		if (!user) throw new Error('Not authenticated')
@@ -622,7 +658,7 @@ export class SupabaseAPI {
 	}
 
 	async createTask(taskData: any & { playerIds?: number[] }) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		console.log('Creating task for user:', user.id)
@@ -899,7 +935,7 @@ export class SupabaseAPI {
 	}
 
 	async createPlayer(playerData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		// Clean the player data to only include valid fields that exist in the database
@@ -954,7 +990,7 @@ export class SupabaseAPI {
 	}
 
 	async updatePlayer(id: number, playerData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		// Clean the player data to match database schema
@@ -992,7 +1028,7 @@ export class SupabaseAPI {
 	}
 
 	async deletePlayer(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (this.getClient() as any)
@@ -1035,7 +1071,7 @@ export class SupabaseAPI {
 		playerId: number
 		noteText: string
 	}) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		console.log('Creating player note with data:', {
@@ -1088,7 +1124,7 @@ export class SupabaseAPI {
 	}
 
 	async deletePlayerNote(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1126,7 +1162,7 @@ export class SupabaseAPI {
 		playerId: number
 		goalText: string
 	}) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		console.log('Creating player goal with data:', {
@@ -1178,7 +1214,7 @@ export class SupabaseAPI {
 	}
 
 	async deletePlayerGoal(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1284,7 +1320,7 @@ export class SupabaseAPI {
 	}
 
 	async createPriority(priorityData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1305,7 +1341,7 @@ export class SupabaseAPI {
 
 	// Profile
 	async getProfile() {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1319,7 +1355,7 @@ export class SupabaseAPI {
 	}
 
 	async updateProfile(profileData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1338,7 +1374,7 @@ export class SupabaseAPI {
 
 	// Event Types
 	async createEventType(eventTypeData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1381,7 +1417,7 @@ export class SupabaseAPI {
 	}
 
 	async deleteTask(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser()
+		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
 		const { data, error } = await (supabase as any)
@@ -1411,7 +1447,7 @@ export class SupabaseAPI {
 	}
 
 	async createBudgetCategory(categoryData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const cleanCategoryData = {
@@ -1433,7 +1469,7 @@ export class SupabaseAPI {
 	}
 
 	async updateBudgetCategory(id: number, categoryData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const cleanCategoryData = {
@@ -1455,7 +1491,7 @@ export class SupabaseAPI {
 	}
 
 	async deleteBudgetCategory(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { error } = await (supabase as any)
@@ -1501,7 +1537,7 @@ export class SupabaseAPI {
 	}
 
 	async createBudget(budgetData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const cleanBudgetData = {
@@ -1527,7 +1563,7 @@ export class SupabaseAPI {
 	}
 
 	async updateBudget(id: number, budgetData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const cleanBudgetData = {
@@ -1553,7 +1589,7 @@ export class SupabaseAPI {
 	}
 
 	async deleteBudget(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { error } = await (supabase as any)
@@ -1601,7 +1637,7 @@ export class SupabaseAPI {
 	}
 
 	async createExpense(expenseData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const cleanExpenseData = {
@@ -1628,7 +1664,7 @@ export class SupabaseAPI {
 	}
 
 	async updateExpense(id: number, expenseData: any) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const cleanExpenseData = {
@@ -1655,7 +1691,7 @@ export class SupabaseAPI {
 	}
 
 	async deleteExpense(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { error } = await (supabase as any)
@@ -1669,7 +1705,7 @@ export class SupabaseAPI {
 
 	// Quick Notes Methods
 	async getQuickNotes() {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { data, error } = await (supabase as any)
@@ -1698,7 +1734,7 @@ export class SupabaseAPI {
 		is_pinned?: boolean;
 		mentions?: any[];
 	}) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { data: note, error: noteError } = await (supabase as any)
@@ -1749,7 +1785,7 @@ export class SupabaseAPI {
 		is_pinned?: boolean;
 		mentions?: any[];
 	}) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const updateData: any = {
@@ -1800,7 +1836,7 @@ export class SupabaseAPI {
 	}
 
 	async deleteQuickNote(id: number) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { error } = await (supabase as any)
@@ -1816,7 +1852,7 @@ export class SupabaseAPI {
 
 	// Coach Search Methods
 	async searchCoaches(query: string = '') {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { data: coaches, error } = await (supabase as any).auth.admin.listUsers({
@@ -1860,7 +1896,7 @@ export class SupabaseAPI {
 
 	// Notifications Methods
 	async getNotifications(unreadOnly: boolean = false) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		let query = (supabase as any)
@@ -1913,7 +1949,7 @@ export class SupabaseAPI {
 	}
 
 	async markNotificationsAsRead(notificationIds: number[]) {
-		const { data: { user } } = await (supabase as any).auth.getUser();
+		const user = await this.getCachedUser();
 		if (!user) throw new Error('Not authenticated');
 
 		const { error } = await (supabase as any)

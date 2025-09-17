@@ -217,3 +217,6 @@ window.testLiveStatTracker = {
 
 console.log('🧪 Test functions loaded. Use testLiveStatTracker.runAllTests() to run all tests.');
 console.log('🧪 Manual tests: testLiveStatTracker.manualTestPlayerClick(0) and testLiveStatTracker.manualTestActionClick("fg_made")');
+
+
+
