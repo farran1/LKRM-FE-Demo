@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, Descriptions, Button, Flex, Tag, Skeleton } from 'antd'
-import { FileTextOutlined } from '@ant-design/icons'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Card, Descriptions, Button, Flex, Tag, Skeleton, Modal } from 'antd'
+import { FileTextOutlined, DownloadOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons'
 import ArrowIcon from '@/components/icon/arrow_left.svg'
 import EditIcon from '@/components/icon/edit.svg'
 import style from '../style.module.scss'
@@ -16,6 +16,7 @@ import { auditLogger, AuditAction } from '@/lib/security/audit'
 function ReceiptDisplay({ filePath }: { filePath: string }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     const generateUrl = async () => {
@@ -43,6 +44,29 @@ function ReceiptDisplay({ filePath }: { filePath: string }) {
     generateUrl()
   }, [filePath])
 
+  const handleDownload = async () => {
+    if (!signedUrl) return
+    
+    try {
+      const response = await fetch(signedUrl)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      // Extract filename from filePath or use default
+      const filename = filePath.split('/').pop() || 'receipt'
+      link.download = filename
+      
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error downloading receipt:', error)
+    }
+  }
+
   if (loading) {
     return <div>Loading receipt...</div>
   }
@@ -54,31 +78,79 @@ function ReceiptDisplay({ filePath }: { filePath: string }) {
   const isImage = filePath.match(/\.(jpg|jpeg|png|gif)$/i)
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {isImage ? (
-        <img 
-          src={signedUrl} 
-          alt="Receipt" 
-          style={{ 
-            maxWidth: '200px', 
-            maxHeight: '150px', 
-            objectFit: 'cover',
-            borderRadius: '8px',
-            border: '1px solid #d9d9d9'
-          }} 
-          onError={(e) => {
-            console.error('Failed to load receipt image:', signedUrl)
-            e.currentTarget.style.display = 'none'
-          }}
-          onLoad={() => console.log('Receipt image loaded successfully:', signedUrl)}
-        />
-      ) : (
-        <FileTextOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-      )}
-      <a href={signedUrl} target="_blank" rel="noopener noreferrer" onClick={() => console.log('Opening receipt URL:', signedUrl)}>
-        View Receipt
-      </a>
-    </div>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {isImage ? (
+          <img 
+            src={signedUrl} 
+            alt="Receipt" 
+            style={{ 
+              maxWidth: '200px', 
+              maxHeight: '150px', 
+              objectFit: 'cover',
+              borderRadius: '8px',
+              border: '1px solid #d9d9d9',
+              cursor: 'pointer'
+            }} 
+            onClick={() => setShowModal(true)}
+            onError={(e) => {
+              console.error('Failed to load receipt image:', signedUrl)
+              e.currentTarget.style.display = 'none'
+            }}
+            onLoad={() => console.log('Receipt image loaded successfully:', signedUrl)}
+          />
+        ) : (
+          <FileTextOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+        )}
+        <Button 
+          type="link" 
+          icon={<EyeOutlined />}
+          onClick={() => setShowModal(true)}
+          style={{ padding: 0 }}
+        >
+          View Receipt
+        </Button>
+      </div>
+
+      <Modal
+        title="Receipt"
+        open={showModal}
+        onCancel={() => setShowModal(false)}
+        footer={[
+          <Button key="download" icon={<DownloadOutlined />} onClick={handleDownload}>
+            Download
+          </Button>
+        ]}
+        width={800}
+        centered
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          {isImage ? (
+            <img 
+              src={signedUrl} 
+              alt="Receipt" 
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '500px', 
+                objectFit: 'contain',
+                borderRadius: '8px',
+                border: '1px solid #d9d9d9'
+              }} 
+            />
+          ) : (
+            <div style={{ padding: '40px' }}>
+              <FileTextOutlined style={{ fontSize: '64px', color: '#1890ff', marginBottom: '16px' }} />
+              <div style={{ fontSize: '16px', color: '#666' }}>
+                This file type cannot be previewed
+              </div>
+              <div style={{ fontSize: '14px', color: '#999', marginTop: '8px' }}>
+                Click download to save the file
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+    </>
   )
 }
 
@@ -105,7 +177,14 @@ interface Expense {
 function ExpenseDetail({ expenseId }: { expenseId: string }) {
   const [expense, setExpense] = useState<Expense | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Get navigation context from URL parameters
+  const from = searchParams.get('from')
+  const budgetId = searchParams.get('budgetId')
 
   useEffect(() => {
     if (expenseId) {
@@ -137,12 +216,48 @@ function ExpenseDetail({ expenseId }: { expenseId: string }) {
   }
 
   const goBack = () => {
-    // Go back to main expenses list
-    router.push('/expenses')
+    // Navigate back based on where the user came from
+    if (from === 'budget' && budgetId) {
+      // Go back to the specific budget detail modal
+      router.push(`/budgets?openBudget=${budgetId}`)
+    } else if (from === 'expenses') {
+      // Go back to expenses list
+      router.push('/expenses')
+    } else {
+      // Default fallback - try browser back, then expenses list
+      if (window.history.length > 1) {
+        router.back()
+      } else {
+        router.push('/expenses')
+      }
+    }
   }
 
   const editExpense = () => {
     router.push(`/expenses/${expenseId}/edit`)
+  }
+
+  const handleDeleteExpense = async () => {
+    if (!expense) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/expenses/${expenseId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Navigate back to expenses list with refresh
+        router.push('/expenses?refresh=' + Date.now());
+      } else {
+        console.error('Failed to delete expense');
+      }
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
+    }
   }
 
 
@@ -186,9 +301,18 @@ function ExpenseDetail({ expenseId }: { expenseId: string }) {
           <ArrowIcon onClick={goBack} style={{ cursor: 'pointer' }} />
           <div className={style.title}>Expense Details</div>
         </Flex>
-        <Button icon={<EditIcon />} onClick={editExpense}>
-          Edit Expense
-        </Button>
+        <Flex gap={8}>
+          <Button icon={<EditIcon />} onClick={editExpense}>
+            Edit Expense
+          </Button>
+          <Button 
+            icon={<DeleteOutlined />} 
+            danger
+            onClick={() => setShowDeleteModal(true)}
+          >
+            Delete Expense
+          </Button>
+        </Flex>
       </Flex>
 
       <Card>
@@ -251,6 +375,21 @@ function ExpenseDetail({ expenseId }: { expenseId: string }) {
             )}
         </Descriptions>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        title="Delete Expense"
+        open={showDeleteModal}
+        onOk={handleDeleteExpense}
+        onCancel={() => setShowDeleteModal(false)}
+        confirmLoading={deleteLoading}
+        okText="Delete"
+        cancelText="Cancel"
+        okButtonProps={{ danger: true }}
+      >
+        <p>Are you sure you want to delete this expense?</p>
+        <p><strong>This action cannot be undone.</strong></p>
+      </Modal>
     </div>
   )
 }

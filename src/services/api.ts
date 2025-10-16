@@ -42,6 +42,38 @@ export const fetcher = async (url: string) => {
 }
 
 // Path router mapping '/api/*' calls to SupabaseAPI methods
+async function routePatch(path: string, data?: any) {
+	try {
+		// Get the current session to include auth headers
+		const { data: { session } } = await supabase.auth.getSession()
+		const headers: HeadersInit = {
+			'Content-Type': 'application/json',
+		}
+		
+		if (session?.access_token) {
+			headers['Authorization'] = `Bearer ${session.access_token}`
+		}
+		
+		// Call the actual API routes with auth headers
+		const response = await fetch(path, {
+			method: 'PATCH',
+			headers,
+			body: data ? JSON.stringify(data) : undefined
+		})
+		
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({}))
+			throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || 'Unknown error'}`)
+		}
+		
+		const responseData = await response.json()
+		return ok(responseData, response.status)
+	} catch (error) {
+		console.error('Route PATCH error:', error)
+		throw error
+	}
+}
+
 async function routeGet(path: string, params?: Record<string, any>) {
 	try {
 		if (path === '/api/eventTypes') {
@@ -82,20 +114,25 @@ async function routeGet(path: string, params?: Record<string, any>) {
 			const row = await supa.getPlayer(id)
 			return ok({ data: row })
 		}
-		// Player notes routes
-		const playerNotesMatch = path.match(/^\/api\/players\/(\d+)\/notes$/)
-		if (playerNotesMatch) {
-			const playerId = Number(playerNotesMatch[1])
-			const notes = await supa.getPlayerNotes(playerId)
-			return ok({ notes })
-		}
-		// Player goals routes
-		const playerGoalsMatch = path.match(/^\/api\/players\/(\d+)\/goals$/)
-		if (playerGoalsMatch) {
-			const playerId = Number(playerGoalsMatch[1])
-			const goals = await supa.getPlayerGoals(playerId)
-			return ok({ goals })
-		}
+        // Player notes/goals routes -> proxy to Next API (ensures server-side service client & RLS bypass)
+        const playerNotesMatch = path.match(/^\/api\/players\/(\d+)\/notes$/)
+        if (playerNotesMatch) {
+            const { data: { session } } = await supabase.auth.getSession()
+            const headers: HeadersInit = { 'Content-Type': 'application/json' }
+            if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+            const resp = await fetch(path, { method: 'GET', headers })
+            const json = await resp.json().catch(() => undefined)
+            return ok(json, resp.status)
+        }
+        const playerGoalsMatch = path.match(/^\/api\/(players\/(\d+)\/goals)$/)
+        if (playerGoalsMatch) {
+            const { data: { session } } = await supabase.auth.getSession()
+            const headers: HeadersInit = { 'Content-Type': 'application/json' }
+            if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+            const resp = await fetch(path, { method: 'GET', headers })
+            const json = await resp.json().catch(() => undefined)
+            return ok(json, resp.status)
+        }
 		// Player notes routes
 		if (path === '/api/player-notes') {
 			const playerId = params?.playerId
@@ -200,31 +237,49 @@ async function routePost(path: string, body?: any) {
 			const json = await resp.json().catch(() => undefined)
 			return ok(json, resp.status)
 		}
+		if (path === '/api/live-game-events') {
+			// Get the current session to include auth headers
+			const { data: { session } } = await supabase.auth.getSession()
+			const headers: HeadersInit = {
+				'Content-Type': 'application/json',
+			}
+			
+			if (session?.access_token) {
+				headers['Authorization'] = `Bearer ${session.access_token}`
+			}
+			
+			const resp = await fetch('/api/live-game-events', {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(body),
+			})
+			const json = await resp.json().catch(() => undefined)
+			return ok(json, resp.status)
+		}
 		// Player routes
 		if (path === '/api/players') {
 			const row = await supa.createPlayer(body)
 			return ok({ data: row }, 201)
 		}
-		// Player notes routes
-		const playerNotesPostMatch = path.match(/^\/api\/players\/(\d+)\/notes$/)
-		if (playerNotesPostMatch) {
-			const playerId = Number(playerNotesPostMatch[1])
-			const note = await supa.createPlayerNote({
-				playerId,
-				noteText: body.note || body.noteText
-			})
-			return ok({ note }, 201)
-		}
-		// Player goals routes
-		const playerGoalsPostMatch = path.match(/^\/api\/players\/(\d+)\/goals$/)
-		if (playerGoalsPostMatch) {
-			const playerId = Number(playerGoalsPostMatch[1])
-			const goal = await supa.createPlayerGoal({
-				playerId,
-				goalText: body.goal || body.goalText
-			})
-			return ok({ goal }, 201)
-		}
+        // Player notes/goals routes -> proxy to Next API (ensures server-side service client & RLS bypass)
+        const playerNotesPostMatch = path.match(/^\/api\/players\/(\d+)\/notes$/)
+        if (playerNotesPostMatch) {
+            const { data: { session } } = await supabase.auth.getSession()
+            const headers: HeadersInit = { 'Content-Type': 'application/json' }
+            if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+            const resp = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) })
+            const json = await resp.json().catch(() => undefined)
+            return ok(json, resp.status)
+        }
+        const playerGoalsPostMatch = path.match(/^\/api\/players\/(\d+)\/goals$/)
+        if (playerGoalsPostMatch) {
+            const { data: { session } } = await supabase.auth.getSession()
+            const headers: HeadersInit = { 'Content-Type': 'application/json' }
+            if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+            const resp = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) })
+            const json = await resp.json().catch(() => undefined)
+            return ok(json, resp.status)
+        }
 		// Player notes routes
 		if (path === '/api/player-notes') {
 			const row = await supa.createPlayerNote(body)
@@ -306,6 +361,27 @@ async function routePut(path: string, body?: any) {
 			const json = await resp.json().catch(() => undefined)
 			return ok(json, resp.status)
 		}
+		const liveGameEventMatch = path.match(/^\/api\/live-game-events\/(\d+)$/)
+		if (liveGameEventMatch) {
+			const eventId = Number(liveGameEventMatch[1])
+			// Get the current session to include auth headers
+			const { data: { session } } = await supabase.auth.getSession()
+			const headers: HeadersInit = {
+				'Content-Type': 'application/json',
+			}
+			
+			if (session?.access_token) {
+				headers['Authorization'] = `Bearer ${session.access_token}`
+			}
+			
+			const resp = await fetch(`/api/live-game-events/${eventId}`, {
+				method: 'PUT',
+				headers,
+				body: JSON.stringify(body),
+			})
+			const json = await resp.json().catch(() => undefined)
+			return ok(json, resp.status)
+		}
 		// Player routes
 		const playerMatch = path.match(/^\/api\/players\/(\d+)$/)
 		if (playerMatch) {
@@ -333,6 +409,50 @@ async function routePut(path: string, body?: any) {
 			const id = Number(taskMatch[1])
 			const row = await supa.updateTask(id, body)
 			return ok({ data: row })
+		}
+		// Games
+		const gameMatch = path.match(/^\/api\/games\/(\d+)$/)
+		if (gameMatch) {
+			const id = Number(gameMatch[1])
+			// Get the current session to include auth headers
+			const { data: { session } } = await supabase.auth.getSession()
+			const headers: HeadersInit = {
+				'Content-Type': 'application/json',
+			}
+			
+			if (session?.access_token) {
+				headers['Authorization'] = `Bearer ${session.access_token}`
+			}
+			
+			const resp = await fetch(`/api/games/${id}`, {
+				method: 'PUT',
+				headers,
+				body: JSON.stringify(body),
+			})
+			const json = await resp.json().catch(() => undefined)
+			return ok(json, resp.status)
+		}
+		// Game Stats
+		const gameStatsMatch = path.match(/^\/api\/game-stats\/(\d+)$/)
+		if (gameStatsMatch) {
+			const id = Number(gameStatsMatch[1])
+			// Get the current session to include auth headers
+			const { data: { session } } = await supabase.auth.getSession()
+			const headers: HeadersInit = {
+				'Content-Type': 'application/json',
+			}
+			
+			if (session?.access_token) {
+				headers['Authorization'] = `Bearer ${session.access_token}`
+			}
+			
+			const resp = await fetch(`/api/game-stats/${id}`, {
+				method: 'PUT',
+				headers,
+				body: JSON.stringify(body),
+			})
+			const json = await resp.json().catch(() => undefined)
+			return ok(json, resp.status)
 		}
 		
 		// Generic handler for all other API routes
@@ -369,6 +489,26 @@ async function routeDelete(path: string) {
 			const id = Number(match[1])
 			const row = await supa.deleteEventType(id)
 			return ok({ data: row })
+		}
+		const liveGameEventMatch = path.match(/^\/api\/live-game-events\/(\d+)$/)
+		if (liveGameEventMatch) {
+			const eventId = Number(liveGameEventMatch[1])
+			// Get the current session to include auth headers
+			const { data: { session } } = await supabase.auth.getSession()
+			const headers: HeadersInit = {
+				'Content-Type': 'application/json',
+			}
+			
+			if (session?.access_token) {
+				headers['Authorization'] = `Bearer ${session.access_token}`
+			}
+			
+			const resp = await fetch(`/api/live-game-events/${eventId}`, {
+				method: 'DELETE',
+				headers,
+			})
+			const json = await resp.json().catch(() => undefined)
+			return ok(json, resp.status)
 		}
 		// Player routes
 		const playerMatch = path.match(/^\/api\/players\/(\d+)$/)
@@ -437,6 +577,7 @@ const api = Object.assign(supa, {
 	get: (path: string, config?: { params?: Record<string, any> }) => routeGet(path, config?.params),
 	post: (path: string, data?: any) => routePost(path, data),
 	put: (path: string, data?: any) => routePut(path, data),
+	patch: (path: string, data?: any) => routePatch(path, data),
 	delete: (path: string) => routeDelete(path),
 })
 

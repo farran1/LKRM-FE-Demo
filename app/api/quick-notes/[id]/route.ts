@@ -1,34 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { createServerClientWithAuth } from '@/lib/supabase'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
+    const { client: supabase, user } = await createServerClientWithAuth(request)
     
-    // Create a Supabase client with the JWT token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    })
-    
-    // Verify the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -71,26 +51,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
+    const { client: supabase, user } = await createServerClientWithAuth(request)
     
-    // Create a Supabase client with the JWT token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    })
-    
-    // Verify the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -138,41 +101,19 @@ export async function PUT(
 
       // Add new mentions
       if (mentions.length > 0) {
-        // Prefer provided userId from the client; fallback to username mapping
-        let userMap: Map<string, string> | null = null
-        if (mentions.some((m: any) => !m.userId)) {
-          const { data: allUsers, error: usersError } = await supabase
-            .from('auth.users')
-            .select('id, email')
-          if (usersError) {
-            console.error('Error looking up mentioned users:', usersError)
-          }
-          userMap = new Map()
-          allUsers?.forEach(user => {
-            const username = (user.email || '').split('@')[0]
-            userMap!.set(username, user.id as any)
-          })
-        }
-
-        // Resolve mentions
+        // Only process mentions that have userId provided
         const validMentions = mentions.filter((mention: any) => {
-          if (mention.userId) return true
-          const username = String(mention.text || '').replace('@', '')
-          return userMap?.has(username)
+          return mention.userId
         })
 
         if (validMentions.length > 0) {
-          const mentionInserts = validMentions.map((mention: any) => {
-            const username = String(mention.text || '').replace('@', '')
-            const resolvedId = mention.userId || (userMap ? userMap.get(username) : null)
-            return {
-              note_id: noteId,
-              mentioned_user_id: resolvedId,
-              mention_text: mention.text,
-              start_position: mention.startPosition,
-              end_position: mention.endPosition
-            }
-          })
+          const mentionInserts = validMentions.map((mention: any) => ({
+            note_id: noteId,
+            mentioned_user_id: mention.userId,
+            mention_text: mention.text,
+            start_position: mention.startPosition,
+            end_position: mention.endPosition
+          }))
 
           const { error: mentionsError } = await supabase
             .from('coach_mentions')
@@ -183,15 +124,11 @@ export async function PUT(
           }
 
           // Create notifications for mentioned users
-          const notificationInserts = validMentions.map((mention: any) => {
-            const username = String(mention.text || '').replace('@', '')
-            const resolvedId = mention.userId || (userMap ? userMap.get(username) : null)
-            return {
-              user_id: resolvedId,
-              note_id: noteId,
-              mentioned_by: user.id
-            }
-          })
+          const notificationInserts = validMentions.map((mention: any) => ({
+            user_id: mention.userId,
+            note_id: noteId,
+            mentioned_by: user.id
+          }))
 
           await supabase
             .from('mention_notifications')
@@ -232,26 +169,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
+    const { client: supabase, user } = await createServerClientWithAuth(request)
     
-    // Create a Supabase client with the JWT token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    })
-    
-    // Verify the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

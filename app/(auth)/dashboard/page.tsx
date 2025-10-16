@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Next7DaysTasksModule from '../dashboard3/components/Next7DaysTasksModule';
-import GamedayChecklistModule from '../dashboard3/components/GamedayChecklistModule';
-import TeamRosterModule from '../dashboard3/components/TeamRosterModule';
-import StickyNotesModule from '../dashboard3/components/EnhancedStickyNotesModule';
-import RecentActivityModule from '../dashboard3/components/RecentActivityModule';
-import CalendarEventsModule from '../dashboard3/components/CalendarEventsModule';
-import TeamStatsModule from '../dashboard3/components/TeamStatsModule';
+import Next7DaysTasksModule from './components/Next7DaysTasksModule';
+import GamedayChecklistModule from './components/GamedayChecklistModule';
+import TeamRosterModule from './components/TeamRosterModule';
+import StickyNotesModule from './components/EnhancedStickyNotesModule';
+import RecentActivityModule from './components/RecentActivityModule';
+import CalendarEventsModule from './components/CalendarEventsModule';
+import TeamStatsModule from './components/TeamStatsModule';
+import { DashboardRefreshProvider } from '@/contexts/DashboardRefreshContext';
 
 export default function DashboardPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -45,64 +46,66 @@ export default function DashboardPage() {
   const columnGap = sidebarCollapsed ? '8px' : '12px';
 
   return (
-    <main style={{ 
-      padding: '0px 4px 4px 0', 
-      minHeight: '100vh', 
-      background: '#202c3e'
-    }}>
-      {/* Dashboard Grid Layout */}
-      <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 375px',
-        gap: '12px',
-        minHeight: '800px'
+    <DashboardRefreshProvider>
+      <main style={{ 
+        padding: '0px 4px 4px 0', 
+        minHeight: '100vh', 
+        background: '#202c3e'
       }}>
-        {/* Left Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: columnGap }}>
-          {/* Gameday Checklist */}
-          <div style={{ width: '100%' }}>
-            <GamedayChecklistModule sidebarCollapsed={sidebarCollapsed} />
+        {/* Dashboard Grid Layout */}
+        <div style={{
+          maxWidth: '1400px',
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 375px',
+          gap: '12px',
+          minHeight: '800px'
+        }}>
+          {/* Left Column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: columnGap }}>
+            {/* Gameday Checklist */}
+            <div style={{ width: '100%' }}>
+              <GamedayChecklistModule sidebarCollapsed={sidebarCollapsed} />
+            </div>
+            
+            {/* Next 7 Days Tasks */}
+            <div style={{ width: '100%' }}>
+              <Next7DaysTasksModule sidebarCollapsed={sidebarCollapsed} />
+            </div>
+            
+            {/* Team Stats */}
+            <div style={{ width: '100%' }}>
+              <TeamStatsModule />
+            </div>
           </div>
-          
-          {/* Next 7 Days Tasks */}
-          <div style={{ width: '100%' }}>
-            <Next7DaysTasksModule sidebarCollapsed={sidebarCollapsed} />
-          </div>
-          
-          {/* Team Stats */}
-          <div style={{ width: '100%' }}>
-            <TeamStatsModule />
-          </div>
-        </div>
 
-        {/* Middle Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: columnGap }}>
-          {/* Sticky Notes */}
-          <div style={{ width: '100%' }}>
-            <StickyNotesModule sidebarCollapsed={sidebarCollapsed} />
+          {/* Middle Column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: columnGap }}>
+            {/* Sticky Notes */}
+            <div style={{ width: '100%' }}>
+              <StickyNotesModule sidebarCollapsed={sidebarCollapsed} />
+            </div>
+            
+            {/* Recent Activity */}
+            <div style={{ width: '100%' }}>
+              <RecentActivityModule />
+            </div>
           </div>
-          
-          {/* Recent Activity */}
-          <div style={{ width: '100%' }}>
-            <RecentActivityModule />
-          </div>
-        </div>
 
-        {/* Right Column - Calendar Events + Team Roster */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: columnGap }}>
-          {/* Calendar Events */}
-          <div style={{ width: '100%' }}>
-            <CalendarEventsModule />
-          </div>
-          
-          {/* Team Roster */}
-          <div style={{ width: '100%' }}>
-            <TeamRosterModule />
+          {/* Right Column - Calendar Events + Team Roster */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: columnGap }}>
+            {/* Calendar Events */}
+            <div style={{ width: '100%' }}>
+              <CalendarEventsModule />
+            </div>
+            
+            {/* Team Roster */}
+            <div style={{ width: '100%' }}>
+              <TeamRosterModule />
+            </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </DashboardRefreshProvider>
   );
 } 

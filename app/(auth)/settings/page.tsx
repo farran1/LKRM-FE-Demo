@@ -7,8 +7,8 @@ export default function SettingsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to dashboard3 since settings is temporarily disabled
-    router.replace('/dashboard3');
+    // Redirect to dashboard since settings is temporarily disabled
+    router.replace('/dashboard');
   }, [router]);
 
   return (

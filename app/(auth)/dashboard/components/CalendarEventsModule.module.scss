@@ -1,0 +1,53 @@
+/* Calendar Events Module Styles */
+
+.upcomingEventsScroll {
+  /* Minimal scrollbar styling */
+  scrollbar-width: thin !important; /* Firefox - thin scrollbar */
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent !important; /* Firefox */
+  -ms-overflow-style: scrollbar !important; /* Internet Explorer 10+ */
+  
+  /* Webkit browsers (Chrome, Safari, Edge) - minimal scrollbar */
+  &::-webkit-scrollbar {
+    width: 4px !important;
+    height: 4px !important;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent !important;
+    border-radius: 2px !important;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border-radius: 2px !important;
+    transition: background 0.2s ease !important;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.5) !important;
+    }
+  }
+  
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch !important;
+  
+  /* Add subtle fade effect at bottom when scrollable */
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(transparent, rgba(32, 44, 62, 0.95));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 1;
+  }
+  
+  /* Show fade when content overflows */
+  &:not(:hover)::after {
+    opacity: 1;
+  }
+}

@@ -131,6 +131,11 @@ const CalendarView = ({dataSource, currentDate, showEventDetail, addTask}: any) 
               recurringDate = startDate.add(i, 'week') // Default to weekly
           }
           
+          // Check if this occurrence is within the end date (if specified)
+          if (entry.endDate && recurringDate.isAfter(dayjs(entry.endDate), 'day')) {
+            break
+          }
+          
           if (recurringDate.format('YYYY-MM-DD') === dateStr) {
             tasksForDate.push({
               ...entry,

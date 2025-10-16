@@ -2,17 +2,19 @@
 
 import BaseTable from '@/components/base-table'
 import style from './style.module.scss'
-import { App, Button, Flex, Input, Segmented } from 'antd'
+import { App, Button, Flex, Input, Segmented, notification } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CalendarIcon from '@/components/icon/calendar_view.svg'
 import ListIcon from '@/components/icon/list_view.svg'
 import ChartIcon from '@/components/icon/chart-bar.svg'
 import PlusIcon from '@/components/icon/plus.svg'
+import api from '@/services/api'
 import SearchIcon from '@/components/icon/search.svg'
 import FunnelIcon from '@/components/icon/funnel.svg'
 import SortIcon from '@/components/icon/sort.svg'
 import GearIcon from '@/components/icon/columns-grear.svg'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import convertSearchParams from '@/utils/app'
 import { stringify } from 'querystring'
 import useSWR from 'swr'
@@ -28,7 +30,11 @@ import CalendarView from './components/calendar'
 import KanbanView from './components/kanban'
 import DetailModal from './components/detail-modal'
 import EditTask from './components/edit-task'
-import TaskMentionInput from '../dashboard3/components/TaskMentionInput'
+import TaskMentionInput from '../dashboard/components/TaskMentionInput'
+import EventDetailModal from '../events/components/event-detail-modal'
+import ColumnEditor from './components/column-editor'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
+import { UserOutlined } from '@ant-design/icons'
 
 function Tasks() {
   const searchParams = useSearchParams()
@@ -36,12 +42,13 @@ function Tasks() {
   const API_KEY = `/api/tasks?${stringify(queryParams)}`
   const {data: response, isLoading, isValidating, mutate} = useSWR(API_KEY)
   
-  // Extract tasks from the API response
-  const dataSource = response?.tasks || []
+  // Extract tasks and meta from the API response
+  const dataSource = response || { data: [], meta: { total: 0, page: 1, perPage: 50 } }
   
   // Transform data for Kanban view
   const kanbanDataSource = useMemo(() => {
-    if (!dataSource || dataSource.length === 0) {
+    const tasks = dataSource?.data || []
+    if (!tasks || tasks.length === 0) {
       return {
         todos: [],
         inprogresses: [],
@@ -58,7 +65,7 @@ function Tasks() {
       archives: [] as any[]
     }
     
-    dataSource.forEach((task: any) => {
+    tasks.forEach((task: any) => {
       const status = task.status?.toUpperCase() || 'TODO'
       if (status === 'TODO') {
         grouped.todos.push(task)
@@ -77,8 +84,9 @@ function Tasks() {
   // Debug logging
   useEffect(() => {
     console.log('API Response:', response)
-    console.log('Extracted tasks:', dataSource)
-    console.log('Tasks count:', dataSource?.length || 0)
+    console.log('Data source:', dataSource)
+    console.log('Tasks count:', dataSource?.data?.length || 0)
+    console.log('Meta:', dataSource?.meta)
     console.log('Kanban data source:', kanbanDataSource)
   }, [response, dataSource, kanbanDataSource])
   
@@ -87,16 +95,105 @@ function Tasks() {
   const [isShowMentionTask, setIsShowMentionTask] = useState(false)
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(dayjs())
-  const [isSort, enableSort] = useState(false)
   const [taskDefaultVals, setTaskDefaultVals] = useState({})
-  const [searchkey, setSearchKey] = useState('')
   const [isShowDetailModal, showDetailModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<any>(null)
+  const [isShowEventDetail, showEventDetail] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<any>(null)
+
+  // Column configuration state
+  const [columnConfig, setColumnConfig] = useState([
+    { key: 'name', title: 'Title', visible: true, sortable: true },
+    { key: 'assignee', title: 'Assignee', visible: true, sortable: true },
+    { key: 'event', title: 'Event', visible: true, sortable: true },
+    { key: 'description', title: 'Description', visible: true, sortable: false },
+    { key: 'status', title: 'Progress', visible: true, sortable: true },
+    { key: 'priority', title: 'Priority Level', visible: true, sortable: true },
+    { key: 'dueDate', title: 'Due Date', visible: true, sortable: true },
+  ])
+
+  // My Tasks filter state
+  const [isMyTasksActive, setIsMyTasksActive] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+
+  // Get current user and check My Tasks filter from URL
+  useEffect(() => {
+    const checkMyTasksFilter = async () => {
+      try {
+        // Check if myTasks parameter is in URL
+        const myTasksParam = queryParams.myTasks === 'true'
+        setIsMyTasksActive(myTasksParam)
+
+        // Get current user info for filtering
+        const response = await api.get('/api/auth/user')
+        if (response.status === 200) {
+          const userData: { user?: any } = response.data as any
+          if (userData && (userData as any).user) {
+            setCurrentUser((userData as any).user)
+          } else {
+            setCurrentUser(null)
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user info:', error)
+      }
+    }
+
+    checkMyTasksFilter()
+  }, [queryParams.myTasks])
+
+  // Debounced search functionality
+  const handleDebouncedSearch = useCallback((searchTerm: string) => {
+    const currentParams = convertSearchParams(searchParams);
+    if (searchTerm.trim()) {
+      currentParams.name = searchTerm
+    } else {
+      delete currentParams.name
+    }
+    const newQuery = stringify(currentParams)
+    router.push(`?${newQuery}`)
+  }, [searchParams, router])
+
+  const {
+    searchTerm: searchkey,
+    setSearchTerm: setSearchKey,
+    isSearching,
+    handleImmediateSearch,
+    clearSearch
+  } = useDebouncedSearch(queryParams?.name ?? '', 500, handleDebouncedSearch);
   const [isShowEditTask, showEditTask] = useState(false)
 
+  const handleDeleteTask = async (taskId: number) => {
+    try {
+      const response = await api.delete(`/api/tasks/${taskId}`);
+
+      if (response.status === 200) {
+        notification.success({
+          message: 'Task deleted successfully',
+          description: 'The task has been permanently removed.'
+        });
+        mutate(); // Refresh the tasks list
+        showDetailModal(false); // Close detail modal
+        setSelectedTask(null);
+      } else {
+        const errorMessage = (response as any)?.data?.error || 'An error occurred while deleting the task.'
+        notification.error({
+          message: 'Failed to delete task',
+          description: errorMessage
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      notification.error({
+        message: 'Failed to delete task',
+        description: 'An error occurred while deleting the task.'
+      });
+    }
+  };
+
   useEffect(() => {
-    setSearchKey(queryParams?.name)
-  }, [queryParams?.name])
+    setSearchKey(queryParams?.name ?? '')
+  }, [queryParams?.name, setSearchKey])
 
   const viewMode = queryParams.viewMode || 'list'
   const setViewMode = useCallback((mode: string) => {
@@ -115,7 +212,7 @@ function Tasks() {
 
   const hasFilter = useMemo(() => {
     if (
-      queryParams.dueDate || queryParams.playerIds || queryParams.priority
+      queryParams.dueDate || queryParams.playerIds || queryParams.priority || queryParams.myTasks
     ) return true
     return false
   }, [searchParams.size])
@@ -131,9 +228,22 @@ function Tasks() {
     router.push(`?${newQuery}`)
   }, [queryParams])
 
-  const renderHeader = useCallback((title: string, dataIndex: string) => {
-    if (!isSort) return title
+  const toggleMyTasks = useCallback(() => {
+    const currentParams = convertSearchParams(searchParams)
+    
+    if (isMyTasksActive) {
+      // Remove My Tasks filter
+      delete currentParams.myTasks
+    } else {
+      // Add My Tasks filter
+      currentParams.myTasks = 'true'
+    }
+    
+    const newQuery = stringify(currentParams)
+    router.push(`?${newQuery}`)
+  }, [isMyTasksActive, searchParams, router])
 
+  const renderHeader = useCallback((title: string, dataIndex: string) => {
     return (
       <Flex className={style.header} justify='space-between' align='center'>
         <span>{title}</span>
@@ -142,67 +252,117 @@ function Tasks() {
         {(queryParams.sortBy === dataIndex && queryParams.sortDirection === 'asc') && <ArrowDownOutlined onClick={() => sort(dataIndex, 'desc')} />}
       </Flex>
     )
-  }, [queryParams.sortBy, queryParams.sortDirection, isSort])
+  }, [queryParams.sortBy, queryParams.sortDirection])
 
-  const columns = useMemo(() => [
-    {
-      title: renderHeader('Title', 'name'),
-      dataIndex: 'name',
-    },
-    {
-      title: 'Assignee',
-      render: (data: any) => {
-        if (!data.users || !data.users.username) return 'Unknown user'
-        return `👤 ${data.users.username}`
-      }
-    },
-    {
-      title: 'Event',
-      render: (data: any) => {
-        if (!data.events || !data.events.name) return 'No event'
-        return data.events.name
-      }
-    },
-    {
-      title: 'Description',
-      render: (data: any) => {
-        return data.description || 'No description'
-      }
-    },
-    {
-      title: renderHeader('Priority Level', 'priority'),
-      render: (data: any) => {
-        if (!data.task_priorities || !data.task_priorities.name) {
-          return <span className={classNames(style.priority, style['no-priority'])}>No priority</span>
+  const columns = useMemo(() => {
+    const columnDefinitions = {
+      name: {
+        title: renderHeader('Title', 'name'),
+        dataIndex: 'name',
+        ellipsis: true,
+        width: '25%',
+      },
+      assignee: {
+        title: renderHeader('Assignee', 'assigneeId'),
+        ellipsis: true,
+        width: '15%',
+        render: (data: any) => {
+          if (!data.users || !data.users.username) return 'Unknown user'
+          return data.users.username
         }
-        return <span className={classNames(style.priority, style[data.task_priorities.name.toLowerCase()])}>{data.task_priorities.name}</span>
-      }
-    },
-    {
-      title: renderHeader('Due Date', 'dueDate'),
-      render: (data: any) => {
-        if (!data.dueDate) return 'No due date'
-        return moment(data.dueDate).format('MMMM D, YYYY')
-      }
-    },
-  ], [queryParams.sortBy, queryParams.sortDirection, isSort])
+      },
+      event: {
+        title: renderHeader('Event', 'event'),
+        ellipsis: true,
+        width: '20%',
+        render: (data: any) => {
+          if (!data.events || !data.events.name) return 'No event'
+          return (
+            <span 
+              style={{ 
+                color: '#1D75D0', 
+                textDecoration: 'underline',
+                fontSize: '14px',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.textDecoration = 'underline'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.textDecoration = 'underline'}
+              onClick={(e) => {
+                e.stopPropagation() // Prevent row click from opening task detail modal
+                openEventDetailModal(data.events)
+              }}
+            >
+              {data.events.name}
+            </span>
+          )
+        }
+      },
+      description: {
+        title: 'Description',
+        ellipsis: true,
+        width: '20%',
+        render: (data: any) => {
+          return data.description || 'No description'
+        }
+      },
+      status: {
+        title: renderHeader('Progress', 'status'),
+        ellipsis: true,
+        width: '15%',
+        render: (data: any) => {
+          const status = data.status?.toUpperCase() || 'TODO'
+          const statusLabels = {
+            'TODO': 'To do',
+            'IN_PROGRESS': 'In Progress', 
+            'DONE': 'Done',
+            'ARCHIVE': 'Archive'
+          }
+          return (
+            <span className={classNames(style.status, style[status.toLowerCase()])}>
+              {statusLabels[status as keyof typeof statusLabels] || status}
+            </span>
+          )
+        }
+      },
+      priority: {
+        title: renderHeader('Priority Level', 'priority'),
+        ellipsis: true,
+        width: '15%',
+        render: (data: any) => {
+          if (!data.task_priorities || !data.task_priorities.name) {
+            return <span className={classNames(style.priority, style['no-priority'])}>No priority</span>
+          }
+          return <span className={classNames(style.priority, style[data.task_priorities.name.toLowerCase()])}>{data.task_priorities.name}</span>
+        }
+      },
+      dueDate: {
+        title: renderHeader('Due Date', 'dueDate'),
+        ellipsis: true,
+        width: '15%',
+        render: (data: any) => {
+          if (!data.dueDate) return 'No due date'
+          return moment(data.dueDate).format('MM/DD/YY')
+        }
+      },
+    }
+
+    // Filter and order columns based on configuration
+    return columnConfig
+      .filter(col => col.visible)
+      .map(col => columnDefinitions[col.key as keyof typeof columnDefinitions])
+  }, [queryParams.sortBy, queryParams.sortDirection, columnConfig])
 
   const refreshTask = () => {
     mutate()
   }
 
+  const resetToDefaultView = () => {
+    // Reset to default view with no filters
+    router.push('/tasks')
+  }
+
   const openFilter = () => {
     showFilter(true)
-  }
-
-  const handleSearch = () => {
-    queryParams.name = searchkey
-    const newQuery = stringify(queryParams)
-    router.push(`?${newQuery}`)
-  }
-
-  const onChangeSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchKey(e.target.value)
   }
 
   const handlePrevMonth = () => {
@@ -235,20 +395,8 @@ function Tasks() {
     queryParams.sortDirection = 'asc'
     const newQuery = stringify(queryParams)
     router.push(`?${newQuery}`)
-
-    enableSort(false)
   }, [queryParams, viewMode])
 
-  const toggleSort = () => {
-    enableSort(!isSort)
-    // Turn off sort
-    if (isSort && viewMode === 'list' && queryParams.sortBy) {
-      delete queryParams.sortBy 
-      delete queryParams.sortDirection
-      const newQuery = stringify(queryParams)
-      router.push(`?${newQuery}`)
-    }
-  }
 
   const openNewTask = (defaultValues = {}) => {
     showNewTask(true)
@@ -257,6 +405,16 @@ function Tasks() {
 
   const onCloseDetailModal = () => {
     showDetailModal(false)
+  }
+
+  const openEventDetailModal = useCallback((event: any) => {
+    setSelectedEvent(event)
+    showEventDetail(true)
+  }, [])
+
+  const onCloseEventDetailModal = () => {
+    showEventDetail(false)
+    setSelectedEvent(null)
   }
 
   const openTaskDetailModal = useCallback((task: any) => {
@@ -272,6 +430,7 @@ function Tasks() {
   }), [])
 
   const openEditTask = () => {
+    console.log('openEditTask called, selectedTask:', selectedTask)
     showEditTask(true)
     showDetailModal(false)
   }
@@ -298,18 +457,24 @@ function Tasks() {
     setIsShowMentionTask(false);
   };
 
+  // Column editor handlers
+  const handleColumnsChange = (newColumns: any[]) => {
+    setColumnConfig(newColumns);
+  };
+
+  const handleColumnReorder = (fromIndex: number, toIndex: number) => {
+    const newColumns = [...columnConfig];
+    const [movedColumn] = newColumns.splice(fromIndex, 1);
+    newColumns.splice(toIndex, 0, movedColumn);
+    setColumnConfig(newColumns);
+  };
+
   // Handle task status change from Kanban drag and drop
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      const response = await api.patch(`/api/tasks/${taskId}`, { status: newStatus });
 
-      if (!response.ok) {
+      if (response.status !== 200) {
         throw new Error('Failed to update task status');
       }
 
@@ -326,7 +491,7 @@ function Tasks() {
       <div className={style.container}>
         <Flex justify="space-between" align="center" style={{ marginBottom: 10 }}>
           <Flex align='flex-end' gap={16}>
-            <div className={style.title}>Tasks</div>
+            <div className={style.title} onClick={resetToDefaultView} style={{ cursor: 'pointer' }}>Tasks</div>
             <Segmented
               value={viewMode}
               onChange={setViewMode}
@@ -346,11 +511,19 @@ function Tasks() {
               placeholder="Search"
               className={style.search}
               value={searchkey}
-              onChange={onChangeSearch}
-              onPressEnter={handleSearch}
+              onChange={(e) => setSearchKey(e.target.value)}
+              onPressEnter={handleImmediateSearch}
               allowClear
             />
-            {(viewMode === 'calendar' || viewMode === 'progress') &&
+            <Button 
+              type={isMyTasksActive ? "primary" : "default"}
+              icon={<UserOutlined />}
+              onClick={toggleMyTasks}
+              className={classNames({[style.myTasksActive]: isMyTasksActive})}
+            >
+              My Tasks
+            </Button>
+            {viewMode === 'calendar' &&
               <div className={style.monthControll}>
                 <span className={style.month}>{currentDate.format('MMMM YYYY')}</span>
                 <span className={style.btnMonth} onClick={handlePrevMonth}><LeftIcon /></span>
@@ -360,7 +533,11 @@ function Tasks() {
           </Flex>
           <Flex align='center' gap={10}>
             <Button type="primary" className={classNames({[style.filter]: !hasFilter})} icon={<FunnelIcon />} onClick={openFilter}>Filters</Button>
-            <Button type="primary" className={classNames({[style.sort]: !isSort})} icon={<SortIcon />} onClick={toggleSort}>Sort</Button>
+            <ColumnEditor 
+              columns={columnConfig}
+              onColumnsChange={handleColumnsChange}
+              onReorder={handleColumnReorder}
+            />
           </Flex>
         </Flex>
         {viewMode === 'list' &&
@@ -375,7 +552,7 @@ function Tasks() {
         }
         {viewMode === 'calendar' &&
           <CalendarView 
-            dataSource={dataSource} 
+            dataSource={dataSource?.data || []} 
             currentDate={currentDate}
             showEventDetail={(task: any) => {
               setSelectedTask(task)
@@ -401,8 +578,9 @@ function Tasks() {
       </div>
       {isOpenFilter && <Filter isOpen={isOpenFilter} showOpen={showFilter} />}
       {isShowNewTask && <NewTask isOpen={isShowNewTask} showOpen={showNewTask} onRefresh={refreshTask} defaultValues={taskDefaultVals} />}
-      {isShowDetailModal && <DetailModal isShowModal={isShowDetailModal} onClose={onCloseDetailModal} task={selectedTask} openEdit={openEditTask} />}
+      {isShowDetailModal && <DetailModal isShowModal={isShowDetailModal} onClose={onCloseDetailModal} task={selectedTask} openEdit={openEditTask} onDelete={handleDeleteTask} openEventDetail={openEventDetailModal} />}
       {isShowEditTask && <EditTask task={selectedTask} isOpen={isShowEditTask} showOpen={showEditTask} onRefresh={refreshTask} />}
+      {isShowEventDetail && <EventDetailModal isShowModal={isShowEventDetail} onClose={onCloseEventDetailModal} event={selectedEvent} />}
     </>
   )
 }

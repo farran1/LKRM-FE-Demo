@@ -169,11 +169,14 @@ model Event {
   eventType      EventType @relation(fields: [eventTypeId], references: [id])
   startTime      DateTime
   endTime        DateTime?
-  location       Location
+  location       Location?
   venue          String
   oppositionTeam String?
   isRepeat       Boolean   @default(false)
   occurence      Int       @default(0)
+  repeatType     String?   @default("weekly")
+  daysOfWeek     Int[]
+  endDate        DateTime?
   isNotice       Boolean   @default(false)
   notes          String?
   
@@ -193,6 +196,7 @@ model Event {
   @@index([eventTypeId])
   @@index([startTime])
   @@index([createdBy])
+  @@index([endDate])
   @@map("events")
 }
 

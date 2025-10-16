@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase'
+
 export enum AuditAction {
   // User Management
   USER_LOGIN = 'user_login',
@@ -36,6 +38,8 @@ export enum AuditAction {
   SUSPICIOUS_ACTIVITY = 'suspicious_activity',
   LOGIN_ATTEMPT_FAILED = 'login_attempt_failed',
   SESSION_EXPIRED = 'session_expired',
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
+  INVALID_INPUT = 'invalid_input',
   
   // Data Access
   DATA_EXPORTED = 'data_exported',
@@ -106,14 +110,33 @@ export class AuditLogger {
         timestamp: new Date()
       }
       
-      // Log to console in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔒 AUDIT LOG:', entry)
-      }
+      // Log to database
+      const { error } = await supabase
+        .from('security_audit_logs')
+        .insert({
+          user_id: entry.userId,
+          user_email: entry.userEmail,
+          user_role: entry.userRole,
+          action: entry.action,
+          severity: entry.severity,
+          resource_type: entry.resourceType,
+          resource_id: entry.resourceId,
+          details: entry.details,
+          ip_address: entry.ipAddress,
+          user_agent: entry.userAgent,
+          session_id: entry.sessionId,
+          success: entry.success,
+          error_message: entry.errorMessage,
+          metadata: entry.metadata
+        })
       
-      // TODO: Implement actual audit log storage
-      // This should go to a secure, immutable audit log table
-      // and potentially to an external SIEM system
+      if (error) {
+        console.error('Failed to log audit entry to database:', error)
+        // Fallback to console logging in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔒 AUDIT LOG:', entry)
+        }
+      }
       
     } catch (error) {
       console.error('Failed to log audit entry:', error)
@@ -175,6 +198,96 @@ export class AuditLogger {
       success: false,
       metadata: {}
     })
+  }
+
+  // Method to get audit logs with filtering
+  async getAuditLogs(filter: AuditLogFilter = {}): Promise<AuditLogEntry[]> {
+    try {
+      let query = supabase
+        .from('security_audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+
+      if (filter.startDate) {
+        query = query.gte('timestamp', filter.startDate.toISOString())
+      }
+      if (filter.endDate) {
+        query = query.lte('timestamp', filter.endDate.toISOString())
+      }
+      if (filter.userId) {
+        query = query.eq('user_id', filter.userId)
+      }
+      if (filter.action) {
+        query = query.eq('action', filter.action)
+      }
+      if (filter.severity) {
+        query = query.eq('severity', filter.severity)
+      }
+      if (filter.resourceType) {
+        query = query.eq('resource_type', filter.resourceType)
+      }
+      if (filter.success !== undefined) {
+        query = query.eq('success', filter.success)
+      }
+      if (filter.limit) {
+        query = query.limit(filter.limit)
+      }
+      if (filter.offset) {
+        query = query.range(filter.offset, filter.offset + (filter.limit || 10) - 1)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Failed to fetch audit logs:', error)
+        return []
+      }
+
+      if (!data) return []
+      // Map DB rows to AuditLogEntry shape
+      return data.map((row: any) => ({
+        id: row.id ?? this.generateId(),
+        timestamp: new Date(row.timestamp ?? row.created_at ?? Date.now()),
+        userId: row.user_id ?? 'unknown',
+        userEmail: row.user_email ?? 'unknown',
+        userRole: row.user_role ?? 'unknown',
+        action: row.action,
+        severity: row.severity,
+        resourceType: row.resource_type ?? 'unknown',
+        resourceId: row.resource_id ?? undefined,
+        details: row.details ?? {},
+        ipAddress: row.ip_address ?? 'unknown',
+        userAgent: row.user_agent ?? 'unknown',
+        sessionId: row.session_id ?? 'unknown',
+        success: row.success ?? false,
+        errorMessage: row.error_message ?? undefined,
+        metadata: row.metadata ?? {}
+      })) as AuditLogEntry[]
+    } catch (error) {
+      console.error('Error fetching audit logs:', error)
+      return []
+    }
+  }
+
+  // Method to get security events
+  async getSecurityEvents(limit: number = 100): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('security_events')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limit)
+
+      if (error) {
+        console.error('Failed to fetch security events:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Error fetching security events:', error)
+      return []
+    }
   }
 }
 

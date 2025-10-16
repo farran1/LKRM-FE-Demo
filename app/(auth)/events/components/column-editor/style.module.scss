@@ -1,0 +1,213 @@
+.columnButton {
+  background-color: #1D75D0 !important;
+  border-color: #1D75D0 !important;
+  border-radius: 6px !important;
+  height: 40px !important;
+  padding: 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  color: white !important;
+  font-weight: 600 !important;
+
+  &:hover {
+    background-color: #1c66b4 !important;
+    border-color: #1c66b4 !important;
+    color: white !important;
+  }
+
+  &:focus {
+    background-color: #1D75D0 !important;
+    border-color: #1D75D0 !important;
+    color: white !important;
+  }
+
+  svg {
+    width: 24px !important;
+    height: 24px !important;
+    fill: #1D75D0 !important;
+  }
+}
+
+.columnSettingsModal {
+  :global(.ant-modal-content) {
+    background: linear-gradient(135deg, #17375c 0%, #1e3a5f 100%) !important;
+    border-radius: 12px !important;
+    border: 1px solid #2a4a6b !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  :global(.ant-modal-header) {
+    background: linear-gradient(135deg, #17375c 0%, #1e3a5f 100%) !important;
+    border-bottom: 1px solid #2a4a6b !important;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 4px 12px !important;
+    position: relative !important;
+
+    :global(.ant-modal-title) {
+      color: #ffffff !important;
+      font-weight: 600 !important;
+      font-size: 18px !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      width: 100% !important;
+      padding-right: 88px !important; // Make space for close button
+
+      h4 {
+        color: #ffffff !important;
+        margin: 0 !important;
+        font-weight: 600 !important;
+      }
+
+      :global(.ant-btn-primary) {
+        background: #1D75D0 !important;
+        border-color: #1D75D0 !important;
+        color: white !important;
+        border-radius: 6px !important;
+        height: 36px !important;
+        padding: 0 16px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+
+        &:hover {
+          background: #1c66b4 !important;
+          border-color: #1c66b4 !important;
+        }
+      }
+    }
+  }
+
+  :global(.ant-modal-close) {
+    color: #b8c5d3 !important;
+    top: 22px !important;
+    right: 24px !important;
+    position: absolute !important;
+
+    &:hover {
+      color: #ffffff !important;
+    }
+  }
+
+  :global(.ant-modal-body) {
+    background: linear-gradient(135deg, #17375c 0%, #1e3a5f 100%) !important;
+    padding: 0 8px 8px !important;
+    color: #ffffff !important;
+  }
+
+  :global(.ant-modal-footer) {
+    background: linear-gradient(135deg, #17375c 0%, #1e3a5f 100%) !important;
+    border-top: 1px solid #2a4a6b !important;
+    border-radius: 0 0 12px 12px !important;
+    padding: 16px 24px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+
+    .cancelButton {
+      background: rgba(255, 255, 255, 0.1) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      color: #ffffff !important;
+      border-radius: 6px !important;
+      height: 40px !important;
+      padding: 0 20px !important;
+      font-weight: 500 !important;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+        color: #ffffff !important;
+      }
+    }
+
+    .saveButton {
+      background: #1D75D0 !important;
+      border-color: #1D75D0 !important;
+      color: white !important;
+      border-radius: 6px !important;
+      height: 40px !important;
+      padding: 0 20px !important;
+      font-weight: 500 !important;
+
+      &:hover {
+        background: #1c66b4 !important;
+        border-color: #1c66b4 !important;
+      }
+    }
+  }
+}
+
+.modalContentArea {
+  :global(.ant-typography) {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    margin-bottom: 8px !important;
+  }
+}
+
+.columnItem {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  margin-bottom: 8px !important;
+  padding: 8px 8px !important;
+  transition: all 0.3s ease !important;
+  backdrop-filter: blur(10px) !important;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  &.dragging {
+    opacity: 0.7 !important;
+    background: rgba(29, 117, 208, 0.2) !important;
+    border-color: #1D75D0 !important;
+    transform: scale(1.02) !important;
+  }
+
+  :global(.ant-typography) {
+    color: #ffffff !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+  }
+
+  :global(.ant-switch) {
+    &.ant-switch-checked {
+      background-color: #1D75D0 !important;
+    }
+
+    &:not(.ant-switch-checked) {
+      background-color: rgba(255, 255, 255, 0.2) !important;
+    }
+  }
+}
+
+.dragHandle {
+  color: #b8c5d3 !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  cursor: grab !important;
+  user-select: none !important;
+  margin-right: 12px !important;
+  padding: 4px !important;
+  border-radius: 4px !important;
+  transition: all 0.2s ease !important;
+
+  &:hover {
+    color: #1D75D0 !important;
+    background: rgba(29, 117, 208, 0.1) !important;
+  }
+
+  &:active {
+    cursor: grabbing !important;
+  }
+}
+
+.dragInstructionText {
+  color: #b8c5d3 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}

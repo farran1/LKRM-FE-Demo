@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Typography, Button, Space } from 'antd';
 import { TrophyOutlined, BarChartOutlined, TeamOutlined } from '@ant-design/icons';
 import EventSelector from '../components/EventSelector';
 import { useRouter } from 'next/navigation';
+import { cacheService } from '@/services/cache-service';
 
 
 
@@ -14,6 +15,21 @@ export default function LiveStatTrackerPage() {
   const router = useRouter();
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>();
   const [resumeChoice, setResumeChoice] = useState<'resume' | 'startOver' | null>(null);
+
+  // Refresh roster and events cache when the page is opened
+  useEffect(() => {
+    (async () => {
+      try {
+        await Promise.all([
+          cacheService.refreshRoster(),
+          cacheService.refreshEvents(),
+        ])
+        console.log('Live tracker page: refreshed roster and events cache')
+      } catch (e) {
+        console.warn('Live tracker page: cache refresh failed (possibly offline)', e)
+      }
+    })()
+  }, [])
 
   const handleEventSelect = (eventId: number) => {
     setSelectedEventId(eventId);

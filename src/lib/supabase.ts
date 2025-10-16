@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClientComponentClient, createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -21,7 +21,7 @@ export const supabase = typeof window !== 'undefined'
 	: createClient<Database>(url, anon, { 
 		auth: { 
 			autoRefreshToken: true,
-			persistSession: false,
+			persistSession: true, // Enable session persistence
 			// Add rate limiting configuration
 			flowType: 'pkce'
 		},
@@ -44,4 +44,52 @@ export const createServerClient = () => {
 			persistSession: false 
 		}
 	})
+}
+
+export const createServerClientWithAuth = async (request: Request) => {
+	// Try to get authorization header first
+	const authHeader = request.headers.get('authorization')
+	
+	if (authHeader) {
+		const token = authHeader.replace('Bearer ', '')
+		
+		// Use service role client to verify the token and get user info
+		const serviceClient = createServerClient()
+		
+		try {
+			// Verify the token and get user info
+			const { data: { user }, error } = await serviceClient.auth.getUser(token)
+			
+			if (error || !user) {
+				throw new Error('Invalid token')
+			}
+			
+			// Return the service client with user context
+			return { client: serviceClient, user }
+		} catch (error) {
+			throw new Error('Authentication failed')
+		}
+	}
+	
+	// If no authorization header, use App Router server component client with cookies
+	try {
+		const { cookies } = await import('next/headers')
+		const cookieStore = cookies()
+		// Create server client bound to Next.js cookies (App Router)
+		const supabaseClient = createServerComponentClient<Database>({
+			cookies: () => cookieStore as any
+		})
+
+		// Get the current user
+		const { data: { user }, error } = await supabaseClient.auth.getUser()
+		
+		if (error || !user) {
+			throw new Error('No authenticated user')
+		}
+		
+		return { client: supabaseClient, user }
+	} catch (error) {
+		console.error('Authentication error:', error)
+		throw new Error('Authentication failed')
+	}
 }

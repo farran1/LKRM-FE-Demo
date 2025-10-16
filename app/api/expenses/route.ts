@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, createServerClient } from '@/lib/supabase'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClientWithAuth } from '@/lib/supabase'
 
 // Force Node.js runtime to avoid Edge Runtime issues with Supabase
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
+    const { client: supabase, user } = await createServerClientWithAuth(request)
+    
     const { searchParams } = new URL(request.url)
     const budgetId = searchParams.get('budgetId')
     const eventId = searchParams.get('eventId')
+    const description = searchParams.get('description')
+    const merchant = searchParams.get('merchant')
 
-    let query = (supabase as any).from('expenses').select(`
+    console.log('Expenses API - Search params:', { description, merchant, budgetId, eventId })
+
+    let query = supabase.from('expenses').select(`
       id,
       merchant,
       amount,
@@ -36,13 +41,30 @@ export async function GET(request: NextRequest) {
       query = query.eq('eventId', Number(eventId))
     }
 
+    // Add search filters - use OR logic for description and merchant
+    if (description && merchant && description === merchant) {
+      // Use OR query when both parameters are the same
+      query = query.or(`description.ilike.%${description}%,merchant.ilike.%${description}%`)
+    } else {
+      // Apply individual filters
+      if (description) {
+        query = query.ilike('description', `%${description}%`)
+      }
+      if (merchant) {
+        query = query.ilike('merchant', `%${merchant}%`)
+      }
+    }
+
     // Order newest first
+    console.log('Expenses API - Executing query with filters applied')
     const { data, error } = await query.order('date', { ascending: false })
 
     if (error) {
       console.error('Error fetching expenses:', error)
       return NextResponse.json({ error: 'Failed to fetch expenses' }, { status: 500 })
     }
+
+    console.log('Expenses API - Query results:', { count: data?.length, hasData: !!data })
 
     // Fetch user information for all expenses from auth.users
     const expensesWithUsers = await Promise.all(
@@ -147,23 +169,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('📦 Request body:', JSON.stringify(body, null, 2))
     
-    // First, let's test if we can connect to the database
-    console.log('🔍 Testing database connection...')
-    const { data: testData, error: testError } = await (supabase as any)
-      .from('expenses')
-      .select('id')
-      .limit(1)
+    // Get the authenticated user
+    const { client: supabaseAuth, user: authUser } = await createServerClientWithAuth(request)
     
-    if (testError) {
-      console.error('❌ Database connection test failed:', testError)
-      return NextResponse.json({ 
-        error: 'Database connection failed', 
-        details: testError.message,
-        code: testError.code 
-      }, { status: 500 })
+    if (!authUser) {
+      console.error('API POST /expenses - Not authenticated')
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
     }
-    
-    console.log('✅ Database connection successful')
+    console.log('API POST /expenses - Authenticated user:', authUser.email, authUser.id)
     
     // Validate required fields
     if (!body.merchant || !body.amount || !body.date) {
@@ -174,39 +190,21 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Get the authenticated user from the request cookies using middleware client
-    const res = NextResponse.next()
-    const supabaseAuth = createMiddlewareClient({ req: request, res })
-    
-    // Get the session from cookies
-    const { data: { session }, error: sessionError } = await supabaseAuth.auth.getSession()
-    
-    if (sessionError || !session?.user) {
-      console.error('API POST /expenses - Session error:', sessionError)
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      )
-    }
-    
-    const user = session.user
-    console.log('API POST /expenses - Authenticated user:', user.email, user.id)
-    
     // Store user information directly in the expense data
-    const userEmail = user.email
-    const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
-      ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-      : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
+    const userEmail = authUser.email
+    const userName = authUser.user_metadata?.first_name && authUser.user_metadata?.last_name 
+      ? `${authUser.user_metadata.first_name} ${authUser.user_metadata.last_name}`
+      : authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Unknown'
     
     // Use auth.users table for tracking (public users table being phased out)
     // Store user info as JSON string for updatedBy (same approach as createdBy)
     const updatedByData = JSON.stringify({
       email: userEmail,
       name: userName,
-      id: user.id
+      id: authUser.id
     })
     
-    console.log('Using auth.users for expense creation:', userEmail, user.id)
+    console.log('Using auth.users for expense creation:', userEmail, authUser.id)
 
     // Prepare the expense data - match exact database schema
     const expenseData = {
@@ -221,14 +219,14 @@ export async function POST(request: NextRequest) {
       createdBy: JSON.stringify({
         email: userEmail,
         name: userName,
-        id: user.id
+        id: authUser.id
       }),
       updatedBy: updatedByData
     }
     
     console.log('🔧 Prepared expense data:', JSON.stringify(expenseData, null, 2))
     
-    const { data: newExpense, error } = await (supabase as any)
+    const { data: newExpense, error } = await supabaseAuth
       .from('expenses')
       .insert([expenseData])
       .select()

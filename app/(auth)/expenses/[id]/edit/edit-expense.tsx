@@ -106,7 +106,8 @@ function EditExpense({ expenseId }: { expenseId: string }) {
     try {
       const { data, error } = await (supabase as any)
         .from('budgets')
-        .select('id, name')
+        .select('id, name, season')
+        .eq('season', '2025-2026')
         .order('name')
       
       if (error) throw error

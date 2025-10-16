@@ -7,7 +7,7 @@ import style from './style.module.scss'
 import api from '@/services/api'
 import TagSelector from '@/components/tag-selector'
 import dayjs from 'dayjs'
-import { safeMapData } from '@/utils/api-helpers'
+import { safeMapData, extractArrayFromApiResponse } from '@/utils/api-helpers'
 import { supabase } from '@/lib/supabase'
 
 const STATUS = [
@@ -20,7 +20,14 @@ const STATUS = [
 function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
   const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
-  const [users, setUsers] = useState<Array<{label: string, value: string}>>([])
+  
+  // Debug: Log task data when component receives it
+  useEffect(() => {
+    if (task) {
+      console.log('EditTask received task data:', JSON.stringify(task, null, 2))
+    }
+  }, [task])
+  const [coaches, setCoaches] = useState<Array<{label: string, value: string}>>([])
   const [priorities, setPriorities] = useState<Array<{label: string, value: number}>>([])
   const [events, setEvents] = useState<Array<{label: string, value: number}>>([])
   
@@ -29,7 +36,7 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
 
   useEffect(() => {
     if (isOpen) {
-      getUsers()
+      getCoaches()
       getPriorities()
       getEvents()
       // Reset form when opening
@@ -88,14 +95,9 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
       }
     } catch (error) {
       console.error('Error fetching priorities:', error)
-      // Fallback to default priorities
-      const defaults = [
-        { name: 'High', weight: 1, color: '#ff4d4f' },
-        { name: 'Medium', weight: 2, color: '#faad14' },
-        { name: 'Low', weight: 3, color: '#52c41a' },
-      ]
-      setPriorities(defaults.map((d, idx) => ({ label: d.name, value: -(idx + 1) })))
-      console.log('Using fallback priorities due to error')
+      // No fallback priorities - let user know priorities are unavailable
+      setPriorities([])
+      console.log('No priorities available')
     }
     setLoading(false)
   }
@@ -120,49 +122,57 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
     setLoading(false)
   }
 
-  async function getUsers() {
+  async function getCoaches() {
     setLoading(true)
     try {
-      console.log('Fetching users from Supabase...')
+      console.log('🔄 Fetching all users from /api/users...')
       
-      // Get authenticated users from session instead of public users table
-      const { data: { session } } = await supabase.auth.getSession()
+      // Fetch all users from the API endpoint
+      const response = await api.get('/api/users')
+      const raw: unknown = (response as any)?.data ?? response
+      const users = extractArrayFromApiResponse(raw)
       
-      if (!session?.user) {
-        console.error('No authenticated user found')
-        setUsers([])
-        setLoading(false)
+      console.log('🔄 Fetched users:', users)
+
+      if (!Array.isArray(users) || users.length === 0) {
+        console.log('🔄 No users found or invalid response format')
+        setCoaches([])
         return
       }
-      
-      // Create user options from authenticated user
-      const user = session.user
-      const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
-        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-        : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
-      
-      const userData = [{
-        id: user.id,
-        username: userName,
-        email: user.email,
-        isActive: true,
-        role: 'COACH'
-      }]
-      
-      console.log('Using authenticated user for task assignment:', userData)
-      
-      // Map the data to the format expected by the Select component
-      const userOptions = userData?.map(userItem => ({
-        label: userItem.username,
-        value: userItem.username
-      })) || []
-      
-      console.log('Mapped user options:', userOptions)
-      setUsers(userOptions)
+
+      // Process the users data
+      const processedUsers = users.map((user: any) => {
+        // Extract name from user_metadata
+        const firstName = user.user_metadata?.first_name || ''
+        const lastName = user.user_metadata?.last_name || ''
+        const fullName = user.user_metadata?.full_name || ''
+        
+        // Create display name
+        let displayName = ''
+        if (fullName) {
+          displayName = fullName
+        } else if (firstName && lastName) {
+          displayName = `${firstName} ${lastName}`
+        } else if (firstName) {
+          displayName = firstName
+        } else {
+          displayName = user.email?.split('@')[0] || 'Unknown User'
+        }
+        
+        return {
+          label: displayName,
+          value: user.email || user.id // Use email as value for consistency
+        }
+      })
+
+      // Sort users alphabetically by display name
+      processedUsers.sort((a: any, b: any) => a.label.localeCompare(b.label))
+
+      console.log('🔄 Final processed users:', processedUsers)
+      setCoaches(processedUsers)
     } catch (error) {
-      console.error('Error fetching users:', error)
-      // Fallback to default user if API fails
-      setUsers([{ label: 'default', value: 'default' }])
+      console.error('🔄 Error in getCoaches:', error)
+      setCoaches([])
     }
     setLoading(false)
   }
@@ -175,6 +185,12 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
   const onSubmit = async (payload: any) => {
     if (payload.dueDate) {
       payload.dueDate = payload.dueDate.format('YYYY-MM-DD')
+    }
+
+    // Convert assignee display name back to email for backend
+    if (payload.assigneeId) {
+      // The assigneeId is now already an email from the coaches API
+      // No conversion needed
     }
 
     // Validate required fields
@@ -217,21 +233,17 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
       console.log('Updating task with payload:', JSON.stringify(payload, null, 2))
       
       // Use PATCH method to update the task
-      const response = await fetch(`/api/tasks/${task.userId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
+      // Use the correct task ID - prefer 'id' if available, fallback to 'userId'
+      const taskId = task.id || task.userId
+      const response = await api.patch(`/api/tasks/${taskId}`, payload)
 
-      if (!response.ok) {
-        const errorText = await response.text()
+      if (response.status !== 200) {
+        const errorText = (response as any).data?.error || 'Unknown error'
         console.error('API error response:', errorText)
         throw new Error(`Failed to update task: ${response.status} ${errorText}`)
       }
 
-      const result = await response.json()
+      const result = response.data
       console.log('Task updated successfully:', JSON.stringify(result, null, 2))
       
       // Show success message
@@ -259,7 +271,7 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
   }
 
   useEffect(() => {
-    if (!task || !form) return 
+    if (!task || !form || !isOpen) return 
 
     console.log('Setting form values for task:', task)
 
@@ -290,12 +302,16 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
       priorityId: task.priorityId || null,
       status: task.status || 'TODO',
       eventId: task.eventId || null,
-      assigneeId: task.assigneeId || null
+      assigneeId: task.users?.email || task.assigneeId || null // Use email for form compatibility
     }
     
     console.log('Setting form values:', formValues)
-    form.setFieldsValue(formValues)
-  }, [task, form])
+    
+    // Use setTimeout to ensure form is ready
+    setTimeout(() => {
+      form.setFieldsValue(formValues)
+    }, 100)
+  }, [task, form, isOpen])
 
   return (
     <Drawer
@@ -323,9 +339,9 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
           <Select 
             allowClear 
             showSearch 
-            options={users} 
+            options={coaches} 
             optionFilterProp="label"
-            placeholder="Select user to assign task to"
+            placeholder="Select coach to assign task to"
             loading={loading}
           />
         </Form.Item>

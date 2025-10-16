@@ -32,59 +32,42 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
 
-    // Search for coaches from auth.users table directly
-    let coachesQuery = supabase
-      .from('auth.users')
-      .select('id, email, raw_user_meta_data')
+    // Search for users from the public.users table
+    let usersQuery = supabase
+      .from('users')
+      .select('id, email, first_name, last_name, full_name, avatar_url')
       .order('email')
 
     if (query) {
-      // Since we can't use complex WHERE clauses on auth.users, we'll filter in the application
-      coachesQuery = coachesQuery.limit(50) // Get more results to filter
-    } else {
-      coachesQuery = coachesQuery.limit(20) // Limit results when no query
+      // Filter by search query
+      usersQuery = usersQuery.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,full_name.ilike.%${query}%,email.ilike.%${query}%`)
     }
 
-    const { data: coaches, error } = await coachesQuery
+    const { data: users, error } = await usersQuery
 
     if (error) {
-      console.error('Error searching coaches from auth.users:', error)
-      // Fallback: return empty array if query fails
+      console.error('Error searching users:', error)
       return NextResponse.json({ coaches: [] })
     }
 
     // Transform the data to match our expected format
-    let transformedCoaches = (coaches || []).map((coach: any) => {
-      const email = coach.email || ''
-      const metadata = coach.raw_user_meta_data || {}
-      // Use first_name and last_name from metadata, fallback to full_name, then email prefix
-      const firstName = metadata.first_name || ''
-      const lastName = metadata.last_name || ''
-      const fullName = `${firstName} ${lastName}`.trim() || metadata.full_name || email.split('@')[0]
-      const username = email.split('@')[0]
+    const transformedCoaches = (users || []).map((user: any) => {
+      const firstName = user.first_name || ''
+      const lastName = user.last_name || ''
+      const fullName = user.full_name || `${firstName} ${lastName}`.trim() || user.email.split('@')[0]
+      const username = user.email.split('@')[0]
       
       return {
-        id: coach.id,
-        email: email,
+        id: user.id,
+        email: user.email,
         name: fullName,
         firstName: firstName,
         lastName: lastName,
         initials: fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2),
-        username: username
+        username: username,
+        avatarUrl: user.avatar_url
       }
     })
-
-    // Filter coaches based on search query if provided
-    if (query) {
-      const lowerQuery = query.toLowerCase()
-      transformedCoaches = transformedCoaches.filter(coach => 
-        coach.name.toLowerCase().includes(lowerQuery) ||
-        coach.email.toLowerCase().includes(lowerQuery) ||
-        coach.username.toLowerCase().includes(lowerQuery) ||
-        coach.firstName.toLowerCase().includes(lowerQuery) ||
-        coach.lastName.toLowerCase().includes(lowerQuery)
-      )
-    }
 
     return NextResponse.json({ coaches: transformedCoaches })
   } catch (error) {

@@ -72,3 +72,16 @@ export async function safeApiCall<T>(
     return defaultValue
   }
 }
+
+/**
+ * Extracts an array from common API response shapes.
+ * Supports either a bare array or an object with a `data` array.
+ */
+export function extractArrayFromApiResponse(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object' && 'data' in (value as Record<string, unknown>)) {
+    const inner = (value as { data?: unknown }).data
+    if (Array.isArray(inner)) return inner
+  }
+  return []
+}

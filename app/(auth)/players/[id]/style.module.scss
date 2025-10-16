@@ -9,6 +9,41 @@
     color: #fff;
   }
 }
+
+// Custom dropdown styling to match dark theme
+:global(.custom-stat-dropdown) {
+  .ant-select-dropdown {
+    background: rgba(0, 0, 0, 0.9) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    backdrop-filter: blur(8px);
+  }
+  
+  .ant-select-item {
+    color: #ffffff !important;
+    background: transparent !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    transition: all 0.2s ease !important;
+    
+    &:hover {
+      background: rgba(24, 144, 255, 0.2) !important;
+      color: #1890ff !important;
+    }
+    
+    &.ant-select-item-option-selected {
+      background: rgba(24, 144, 255, 0.3) !important;
+      color: #1890ff !important;
+      font-weight: 600 !important;
+    }
+  }
+  
+  .ant-select-item-option-active {
+    background: rgba(24, 144, 255, 0.15) !important;
+    color: #1890ff !important;
+  }
+}
 .playerName {
   font-weight: 600;
   font-size: 16px;

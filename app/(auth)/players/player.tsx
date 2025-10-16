@@ -16,21 +16,49 @@ import ProfileIcon from '@/components/icon/profile.svg'
 import UploadIcon from '@/components/icon/arrow-up-tray.svg'
 import SearchIcon from '@/components/icon/search.svg'
 import classNames from 'classnames'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
+import ColumnEditor from './components/column-editor'
 
 function Player() {
   const searchParams = useSearchParams()
   const queryParams = convertSearchParams(searchParams)
-  const API_KEY = `/api/players?${stringify(queryParams)}`
-  const {data: dataSource, isLoading, isValidating, mutate} = useSWR(API_KEY)
+  const ensureActive = { ...queryParams }
+  // Always hide archived players
+  ensureActive.isActive = 'true'
+  const API_KEY = `/api/players?${stringify(ensureActive)}`
+  const {data: response, isLoading, isValidating, mutate} = useSWR(API_KEY)
+  const dataSource = response?.data || []
   const { notification } = App.useApp()
   const [loadingSearch, setLoadingSearch] = useState(false)
-  const [searchkey, setSearchKey] = useState('')
   const router = useRouter()
+  const [columnConfig, setColumnConfig] = useState([
+    { key: 'name', title: 'Name', visible: true, sortable: true },
+    { key: 'jersey', title: 'Jersey #', visible: true, sortable: true },
+    { key: 'position', title: 'Position', visible: true, sortable: true },
+    { key: 'school_year', title: 'School Year', visible: true, sortable: true },
+    { key: 'notes', title: 'Notes', visible: true, sortable: false },
+    { key: 'goals', title: 'Goals', visible: true, sortable: false },
+  ])
 
+  // Debounced search functionality
+  const handleDebouncedSearch = useCallback((searchTerm: string) => {
+    const currentParams = convertSearchParams(searchParams);
+    if (searchTerm.trim()) {
+      currentParams.name = searchTerm
+    } else {
+      delete currentParams.name
+    }
+    const newQuery = stringify(currentParams)
+    router.push(`?${newQuery}`)
+  }, [searchParams, router])
 
-  useEffect(() => {
-    setSearchKey(queryParams?.name)
-  }, [queryParams?.name])
+  const {
+    searchTerm: searchkey,
+    setSearchTerm: setSearchKey,
+    isSearching,
+    handleImmediateSearch,
+    clearSearch
+  } = useDebouncedSearch(queryParams?.name || '', 500, handleDebouncedSearch);
 
   const sort = useCallback((sortBy: string, sortDirection = 'desc') => {
     queryParams.sortBy = sortBy
@@ -51,13 +79,9 @@ function Player() {
 
       switch (sortBy) {
         case 'name':
-          // Alphabetical sorting by last name, then first name
-          aVal = (a.first_name && a.last_name) 
-            ? `${a.last_name}, ${a.first_name}`.toLowerCase()
-            : (a.name || '').toLowerCase()
-          bVal = (b.first_name && b.last_name) 
-            ? `${b.last_name}, ${b.first_name}`.toLowerCase()
-            : (b.name || '').toLowerCase()
+          // Alphabetical sorting by first name
+          aVal = (a.first_name || a.name || '').toLowerCase()
+          bVal = (b.first_name || b.name || '').toLowerCase()
           break
 
         case 'jersey':
@@ -68,8 +92,8 @@ function Player() {
 
         case 'position':
           // Alphabetical sorting for positions
-          aVal = (a.position?.name || '').toLowerCase()
-          bVal = (b.position?.name || '').toLowerCase()
+          aVal = (a.positions?.name || '').toLowerCase()
+          bVal = (b.positions?.name || '').toLowerCase()
           break
 
         case 'school_year':
@@ -108,74 +132,80 @@ function Player() {
 
 
 
-  const columns = useMemo(() => [
-    {
-      title: renderHeader('Name', 'name'),
-      dataIndex: 'name',
-      render: (text: string, data: any) => {
-        // Use first_name and last_name if available, otherwise fall back to name
-        const fullName = data?.first_name && data?.last_name 
-          ? `${data.first_name} ${data.last_name}` 
-          : (data?.name || text || 'Unknown Player')
-        return fullName
-      }
-    },
-    {
-      title: renderHeader('#', 'jersey'),
-      render: (data: any) => {
-        // Use jersey_number if available, otherwise fall back to jersey
-        return data?.jersey_number || data?.jersey || '-'
-      }
-    },
-    {
-      title: renderHeader('Position', 'position'),
-      render: (data: any) => {
-        return data?.position?.name || '-'
-      }
-    },
-    {
-      title: renderHeader('School Year', 'school_year'),
-      render: (data: any) => {
-        // Capitalize first letter of school year
-        const schoolYear = data?.school_year
-        return schoolYear ? schoolYear.charAt(0).toUpperCase() + schoolYear.slice(1) : '-'
-      }
-    },
-    {
-      title: 'Notes',
-      render: (data: any) => {
-        // Show actual note content separated by pipes
-        const notes = data?.notes || []
-        if (notes.length === 0) return '-'
-        
-        const noteTexts = notes.map((note: any) => note.note || note.note_text || 'No content')
-        const fullText = noteTexts.join(' | ')
-        
-        // Truncate to 100 characters and add ellipses if longer
-        if (fullText.length > 35) {
-          return fullText.substring(0, 35) + '...'
+  const columns = useMemo(() => {
+    const columnDefinitions = {
+      name: {
+        title: renderHeader('Name', 'name'),
+        dataIndex: 'name',
+        render: (text: string, data: any) => {
+          // Use first_name and last_name if available, otherwise fall back to name
+          const fullName = data?.first_name && data?.last_name 
+            ? `${data.first_name} ${data.last_name}` 
+            : (data?.name || text || 'Unknown Player')
+          return fullName
         }
-        return fullText
-      }
-    },
-    {
-      title: 'Goals',
-      render: (data: any) => {
-        // Show actual goal content separated by pipes
-        const goals = data?.goals || []
-        if (goals.length === 0) return '-'
-        
-        const goalTexts = goals.map((goal: any) => goal.goal || goal.goal_text || 'No content')
-        const fullText = goalTexts.join(' | ')
-        
-        // Truncate to 100 characters and add ellipses if longer
-        if (fullText.length > 35) {
-          return fullText.substring(0, 35) + '...'
+      },
+      jersey: {
+        title: renderHeader('#', 'jersey'),
+        render: (data: any) => {
+          // Use jersey_number if available, otherwise fall back to jersey
+          return data?.jersey_number || data?.jersey || '-'
         }
-        return fullText
+      },
+      position: {
+        title: renderHeader('Position', 'position'),
+        render: (data: any) => {
+          return data?.positions?.name || '-'
+        }
+      },
+      school_year: {
+        title: renderHeader('School Year', 'school_year'),
+        render: (data: any) => {
+          // Capitalize first letter of school year
+          const schoolYear = data?.school_year
+          return schoolYear ? schoolYear.charAt(0).toUpperCase() + schoolYear.slice(1) : '-'
+        }
+      },
+      notes: {
+        title: 'Notes',
+        render: (data: any) => {
+          // Show actual note content separated by pipes
+          const notes = data?.notes || []
+          if (notes.length === 0) return '-'
+          
+          const noteTexts = notes.map((note: any) => note.note || note.note_text || 'No content')
+          const fullText = noteTexts.join(' | ')
+          
+          // Truncate to 100 characters and add ellipses if longer
+          if (fullText.length > 35) {
+            return fullText.substring(0, 35) + '...'
+          }
+          return fullText
+        }
+      },
+      goals: {
+        title: 'Goals',
+        render: (data: any) => {
+          // Show actual goal content separated by pipes
+          const goals = data?.goals || []
+          if (goals.length === 0) return '-'
+          
+          const goalTexts = goals.map((goal: any) => goal.goal || goal.goal_text || 'No content')
+          const fullText = goalTexts.join(' | ')
+          
+          // Truncate to 100 characters and add ellipses if longer
+          if (fullText.length > 35) {
+            return fullText.substring(0, 35) + '...'
+          }
+          return fullText
+        }
       }
-    },
-  ], [queryParams.sortBy, queryParams.sortDirection])
+    }
+
+    return columnConfig
+      .filter(col => col.visible)
+      .map(col => columnDefinitions[col.key as keyof typeof columnDefinitions])
+  }, [queryParams.sortBy, queryParams.sortDirection, columnConfig])
 
   const openNewPlayer = () => {
     router.push('/players/create')
@@ -185,17 +215,23 @@ function Player() {
     router.push('/players/import')
   }
 
-  const handleSearch = async () => {
-    queryParams.name = searchkey
-    const newQuery = stringify(queryParams)
-    router.push(`?${newQuery}`)
+  const handleColumnsChange = (newColumns: any[]) => {
+    setColumnConfig(newColumns)
   }
 
-  const onChangeSearch = (e: any) => {
-    setSearchKey(e.target.value)
+  const handleColumnReorder = (fromIndex: number, toIndex: number) => {
+    const newColumns = [...columnConfig]
+    const [movedColumn] = newColumns.splice(fromIndex, 1)
+    newColumns.splice(toIndex, 0, movedColumn)
+    setColumnConfig(newColumns)
   }
 
 
+
+  const resetToDefaultView = () => {
+    // Reset to default view with no filters
+    router.push('/players')
+  }
 
   const onRow = useCallback((record: any) => ({
     onClick: () => {
@@ -209,7 +245,7 @@ function Player() {
       <div className={style.container}>
         <Flex justify="space-between" align="center" style={{ marginBottom: 10 }}>
           <Flex align='flex-end' gap={16}>
-            <div className={style.title}>Players</div>
+            <div className={style.title} onClick={resetToDefaultView} style={{ cursor: 'pointer' }}>Players</div>
           </Flex>
           <Flex gap={10}>
             <Input
@@ -217,9 +253,14 @@ function Player() {
               placeholder="Search"
               className={style.search}
               value={searchkey}
-              onChange={onChangeSearch}
-              onPressEnter={handleSearch}
+              onChange={(e) => setSearchKey(e.target.value)}
+              onPressEnter={handleImmediateSearch}
               allowClear
+            />
+            <ColumnEditor 
+              columns={columnConfig}
+              onColumnsChange={handleColumnsChange}
+              onReorder={handleColumnReorder}
             />
             <Button icon={<PlusIcon />} onClick={openNewPlayer}>Add New Player</Button>
             {/*

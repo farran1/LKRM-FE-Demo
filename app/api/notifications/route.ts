@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +12,17 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    // Create a Supabase client with the JWT token
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    })
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -48,19 +56,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 })
     }
 
-    // Transform the data
+    // Get user information for mentioned_by users
+    const mentionedByUserIds = [...new Set((notifications || []).map(n => n.mentioned_by))]
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, email, first_name, last_name, full_name')
+      .in('id', mentionedByUserIds)
+
+    const userMap = new Map((users || []).map(u => [u.id, u]))
+
+    // Transform the data with real user information
     const transformedNotifications = (notifications || []).map((notification: any) => {
-      // For now, we'll use placeholder data since we can't access auth.users directly
-      const mentionedBy = {
+      const mentionedByUser = userMap.get(notification.mentioned_by)
+      const mentionedBy = mentionedByUser ? {
+        id: mentionedByUser.id,
+        name: mentionedByUser.full_name || `${mentionedByUser.first_name} ${mentionedByUser.last_name}`.trim() || mentionedByUser.email.split('@')[0],
+        email: mentionedByUser.email,
+        initials: (mentionedByUser.full_name || `${mentionedByUser.first_name} ${mentionedByUser.last_name}`.trim() || mentionedByUser.email.split('@')[0])
+          .split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)
+      } : {
         id: notification.mentioned_by || 'unknown',
-        name: 'Coach',
-        email: 'coach@example.com',
-        initials: 'C'
+        name: 'Unknown User',
+        email: 'unknown@example.com',
+        initials: 'U'
       }
 
       return {
         id: notification.id,
-        type: notification.note_id ? 'mention' : 'generic',
+        type: notification.note_id ? 'mention' : 'assignment',
         noteId: notification.note_id,
         mentionedBy: mentionedBy,
         note: notification.quick_notes,
@@ -85,7 +108,17 @@ export async function PUT(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    // Create a Supabase client with the JWT token
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    })
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

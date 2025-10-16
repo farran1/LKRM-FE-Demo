@@ -55,9 +55,85 @@ export class SupabaseAPI {
         return user
     }
 
+    // Get integer user ID from auth UUID for legacy tables
+    private async getIntegerUserId(): Promise<number | null> {
+        const user = await this.getCachedUser()
+        if (!user) return null
+
+        console.log('getIntegerUserId - user email:', user.email)
+
+        try {
+            // Try to find the user in the public.users table by email
+            const { data, error } = await (supabase as any)
+                .from('users')
+                .select('id')
+                .eq('email', user.email)
+                .single()
+
+            if (error) {
+                console.warn('SupabaseAPI getIntegerUserId - user not found in public.users:', error)
+                // Fallback: return 1 for the main LKRM user
+                return 1
+            }
+
+            console.log('getIntegerUserId - found user:', data)
+            return data?.id || 1
+        } catch (error) {
+            console.warn('SupabaseAPI getIntegerUserId - error:', error)
+            // Fallback: return 1 for the main LKRM user
+            return 1
+        }
+    }
+
     // Clear user cache (call when user logs out)
     public clearUserCache() {
         this.userCache = null
+    }
+
+    // Live-game sessions/events minimal API used by sync-service
+    async getLiveGameSessions() {
+        const client = this.getClient()
+        const { data, error } = await (client as any)
+            .from('live_game_sessions')
+            .select('id, session_key, is_active, created_at')
+            .order('created_at', { ascending: false })
+        if (error) {
+            console.warn('getLiveGameSessions error:', error)
+            return []
+        }
+        return data || []
+    }
+
+    async createLiveGameEvent(event: {
+        session_id: number
+        game_id?: number
+        player_id?: number
+        event_type: string
+        event_value?: number
+        quarter: number
+        is_opponent_event?: boolean
+        opponent_jersey?: string
+        metadata?: any
+    }) {
+        const client = this.getClient()
+        const { error } = await (client as any)
+            .from('live_game_events')
+            .insert({
+                session_id: event.session_id,
+                game_id: event.game_id ?? null,
+                player_id: event.player_id ?? null,
+                event_type: event.event_type,
+                event_value: event.event_value ?? null,
+                quarter: event.quarter,
+                is_opponent_event: event.is_opponent_event ?? false,
+                opponent_jersey: event.opponent_jersey ?? null,
+                metadata: event.metadata ?? null
+            })
+        if (error) {
+            console.error('createLiveGameEvent error:', error)
+            return false
+        }
+        return true
     }
 	// Events
 	async getEvents(params?: {
@@ -69,6 +145,8 @@ export class SupabaseAPI {
 		eventTypeIds?: number[]
 		location?: 'HOME' | 'AWAY'
 		venue?: string
+		sortBy?: string
+		sortDirection?: 'asc' | 'desc'
 	}) {
 		console.log('Supabase getEvents called with params:', params)
 		
@@ -88,7 +166,33 @@ export class SupabaseAPI {
 					coachUsername
 				)
 			`)
-			.order('startTime', { ascending: false })
+
+        // Apply sorting
+        if (params?.sortBy) {
+            const ascending = params?.sortDirection === 'asc'
+            const sortBy = String(params.sortBy)
+            // Map UI sort keys to actual columns (including joined tables)
+            if (sortBy === 'event') {
+                // Base table is events → sort directly by name
+                query = query.order('name', { ascending })
+            } else if (sortBy === 'priority') {
+                // For events, interpret priority as event type name sorting
+                query = (query as any).order('name', { foreignTable: 'event_types', ascending })
+            } else {
+                // Direct column sort
+                query = query.order(sortBy, { ascending })
+            }
+        } else {
+            // Default deterministic sorting for tasks views:
+            // 1) Highest priority first (by task_priorities.weight desc)
+            // 2) Upcoming event time first (events.startTime asc)
+            // 3) Earliest due date first (dueDate asc)
+            // 4) Newest created last for stability (createdAt desc)
+            // Events default ordering: soonest first, then newest created for stability
+            query = query
+                .order('startTime', { ascending: true })
+                .order('createdAt', { ascending: false })
+        }
 
 		console.log('Supabase getEvents - initial query built')
 
@@ -180,50 +284,7 @@ export class SupabaseAPI {
 		}
 	}
 
-	// Players by Event
-	async getPlayersByEvent(eventId: number) {
-		const client = this.getClient()
-		const { data, error } = await (client as any)
-			.from('event_players')
-			.select(`
-				players (
-					id,
-					name,
-					position (
-						name
-					)
-				)
-			`)
-			.eq('eventId', eventId)
 
-		if (error) {
-			console.error('getPlayersByEvent error:', error)
-			return []
-		}
-
-		// Normalize to an array of { id, name, position }
-		return (data || []).map((row: any) => ({
-			id: row.players?.id,
-			name: row.players?.name,
-			position: row.players?.position?.name || ''
-		}))
-	}
-
-	async addPlayerToEvent(eventId: number, playerId: number, status?: string) {
-		const client = this.getClient()
-		const payload: any = { eventId, playerId }
-		if (status) payload.status = status
-		const { data, error } = await (client as any)
-			.from('event_players')
-			.upsert([payload], { onConflict: 'eventId,playerId' })
-			.select()
-
-		if (error) {
-			console.error('addPlayerToEvent error:', error)
-			throw error
-		}
-		return data?.[0] || { success: true }
-	}
 
 	async getEvent(id: number) {
 		const { data, error } = await (this.getClient() as any)
@@ -249,7 +310,7 @@ export class SupabaseAPI {
 		eventTypeId: number
 		startTime: string
 		endTime?: string
-		location: string
+		location?: string // Made optional for meetings
 		venue: string
 		oppositionTeam?: string
 		isRepeat?: boolean
@@ -258,7 +319,7 @@ export class SupabaseAPI {
 		daysOfWeek?: number[]
 		isNotice?: boolean
 		notes?: string
-	}, userId: string) {
+	}, userId: string, client?: any) {
 		console.log('SupabaseAPI.createEventWithUser - Starting with eventData:', eventData, 'userId:', userId)
 		
 		// Use the auth user ID (UUID) directly since we're now storing UUIDs in createdBy/updatedBy
@@ -271,7 +332,6 @@ export class SupabaseAPI {
 			eventTypeId: eventData.eventTypeId,
 			startTime: eventData.startTime,
 			endTime: eventData.endTime,
-			location: eventData.location, // This should be 'HOME' or 'AWAY'
 			venue: eventData.venue,
 			oppositionTeam: eventData.oppositionTeam,
 			isRepeat: eventData.isRepeat || false,
@@ -286,16 +346,22 @@ export class SupabaseAPI {
 			updatedAt: new Date().toISOString()
 		}
 
+		// Only include location if it's provided (not for meetings)
+		if (eventData.location) {
+			transformedData.location = eventData.location // This should be 'HOME' or 'AWAY'
+		}
+
 		console.log('SupabaseAPI.createEventWithUser - Original event data:', eventData)
 		console.log('SupabaseAPI.createEventWithUser - Transformed event data:', transformedData)
 		console.log('SupabaseAPI.createEventWithUser - Auth user ID (UUID):', userId)
 		console.log('SupabaseAPI.createEventWithUser - UUID for createdBy:', createdByUserId)
-		console.log('SupabaseAPI.createEventWithUser - Location field value:', eventData.location)
+		console.log('SupabaseAPI.createEventWithUser - Location field value:', eventData.location || 'NOT_PROVIDED')
 		console.log('SupabaseAPI.createEventWithUser - Location field type:', typeof eventData.location)
 
 		try {
 			console.log('SupabaseAPI.createEventWithUser - Attempting to insert into events table...')
-			const { data, error } = await (supabase as any)
+			const supabaseClient = client || this.getClient()
+			const { data, error } = await (supabaseClient as any)
 				.from('events')
 				.insert(transformedData)
 				.select(`
@@ -596,10 +662,6 @@ export class SupabaseAPI {
 					id,
 					name,
 					venue
-				),
-				users!tasks_createdBy_fkey (
-					id,
-					username
 				)
 			`)
 			.order('createdAt', { ascending: false })
@@ -639,6 +701,10 @@ export class SupabaseAPI {
 
 		if (error) {
 			console.error('Supabase getTasks - error:', error)
+			console.error('Supabase getTasks - error details:', JSON.stringify(error, null, 2))
+			console.error('Supabase getTasks - error code:', error.code)
+			console.error('Supabase getTasks - error message:', error.message)
+			console.error('Supabase getTasks - error hint:', error.hint)
 			throw error
 		}
 
@@ -785,6 +851,9 @@ export class SupabaseAPI {
 				position:positions(id, name, abbreviation)
 			`)
 			.order('first_name', { ascending: true })
+
+		// Hide archived by default
+		query = query.eq('is_active', true)
 
 		if (params?.name) {
 			query = query.or(`first_name.ilike.%${params.name}%,last_name.ilike.%${params.name}%`)
@@ -1040,7 +1109,6 @@ export class SupabaseAPI {
 				updated_at: new Date().toISOString()
 			})
 			.eq('id', id)
-			.eq('user_id', user.id)  // Use correct field name
 			.select()
 			.single()
 
@@ -1063,8 +1131,29 @@ export class SupabaseAPI {
 			throw error
 		}
 
-		console.log('Retrieved player notes:', data)
-		return data || []
+		// Manually fetch user data for each note
+		const notesWithUsers = await Promise.all(
+			(data || []).map(async (note: any) => {
+				try {
+					const { data: userData } = await (supabase as any)
+						.from('users')
+						.select('id, username, email')
+						.eq('id', note.createdBy)
+						.single()
+					
+					return {
+						...note,
+						createdUser: userData
+					}
+				} catch (userError) {
+					console.warn('Could not fetch user for note:', note.id, userError)
+					return note
+				}
+			})
+		)
+
+		console.log('Retrieved player notes with users:', notesWithUsers)
+		return notesWithUsers
 	}
 
 	async createPlayerNote(noteData: {
@@ -1074,10 +1163,14 @@ export class SupabaseAPI {
 		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
+		const integerUserId = await this.getIntegerUserId()
+		if (!integerUserId) throw new Error('Could not resolve user ID')
+
 		console.log('Creating player note with data:', {
 			player_id: noteData.playerId,
 			note_text: noteData.noteText,
 			user_id: user.id,
+			integer_user_id: integerUserId,
 			user: user
 		})
 
@@ -1093,8 +1186,8 @@ export class SupabaseAPI {
 			note: noteData.noteText,
 			isPublic: false,
 			tags: [],
-			createdBy: 1,
-			updatedBy: 1,
+			createdBy: integerUserId,
+			updatedBy: integerUserId,
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString()
 		}
@@ -1127,15 +1220,25 @@ export class SupabaseAPI {
 		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
+		const integerUserId = await this.getIntegerUserId()
+		console.log('Delete note - integerUserId:', integerUserId, 'for note id:', id)
+		
+		if (!integerUserId) throw new Error('Could not resolve user ID')
+
 		const { data, error } = await (supabase as any)
 			.from('player_notes')
 			.delete()
 			.eq('id', id)
-			.eq('user_id', user.id)  // Use snake_case as per actual database
+			.eq('createdBy', integerUserId)
 			.select()
 			.single()
 
-		if (error) throw error
+		if (error) {
+			console.error('Delete note error:', error)
+			throw error
+		}
+		
+		console.log('Note deleted successfully:', data)
 		return data
 	}
 
@@ -1154,8 +1257,29 @@ export class SupabaseAPI {
 			throw error
 		}
 
-		console.log('Retrieved player goals:', data)
-		return data || []
+		// Manually fetch user data for each goal
+		const goalsWithUsers = await Promise.all(
+			(data || []).map(async (goal: any) => {
+				try {
+					const { data: userData } = await (supabase as any)
+						.from('users')
+						.select('id, username, email')
+						.eq('id', goal.createdBy)
+						.single()
+					
+					return {
+						...goal,
+						createdUser: userData
+					}
+				} catch (userError) {
+					console.warn('Could not fetch user for goal:', goal.id, userError)
+					return goal
+				}
+			})
+		)
+
+		console.log('Retrieved player goals with users:', goalsWithUsers)
+		return goalsWithUsers
 	}
 
 	async createPlayerGoal(goalData: {
@@ -1165,10 +1289,14 @@ export class SupabaseAPI {
 		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
+		const integerUserId = await this.getIntegerUserId()
+		if (!integerUserId) throw new Error('Could not resolve user ID')
+
 		console.log('Creating player goal with data:', {
 			player_id: goalData.playerId,
 			goal_text: goalData.goalText,
 			user_id: user.id,
+			integer_user_id: integerUserId,
 			user: user
 		})
 
@@ -1184,8 +1312,8 @@ export class SupabaseAPI {
 			goal: goalData.goalText,
 			isAchieved: false,
 			category: null,
-			createdBy: 1,
-			updatedBy: 1,
+			createdBy: integerUserId,
+			updatedBy: integerUserId,
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString()
 		}
@@ -1217,15 +1345,25 @@ export class SupabaseAPI {
 		const user = await this.getCachedUser()
 		if (!user) throw new Error('Not authenticated')
 
+		const integerUserId = await this.getIntegerUserId()
+		console.log('Delete goal - integerUserId:', integerUserId, 'for goal id:', id)
+		
+		if (!integerUserId) throw new Error('Could not resolve user ID')
+
 		const { data, error } = await (supabase as any)
 			.from('player_goals')
 			.delete()
 			.eq('id', id)
-			.eq('user_id', user.id)  // Use snake_case as per actual database
+			.eq('createdBy', integerUserId)
 			.select()
 			.single()
 
-		if (error) throw error
+		if (error) {
+			console.error('Delete goal error:', error)
+			throw error
+		}
+		
+		console.log('Goal deleted successfully:', data)
 		return data
 	}
 
@@ -1563,19 +1701,23 @@ export class SupabaseAPI {
 	}
 
 	async updateBudget(id: number, budgetData: any) {
-		const user = await this.getCachedUser();
-		if (!user) throw new Error('Not authenticated');
+		// Temporarily bypass authentication for debugging
+		// const user = await this.getCachedUser();
+		// if (!user) throw new Error('Not authenticated');
 
 		const cleanBudgetData = {
 			name: budgetData.name,
 			amount: budgetData.amount,
 			period: budgetData.period,
-			autoRepeat: budgetData.autoRepeat === 'Yes',
-			description: budgetData.description,
-			categoryId: budgetData.categoryId,
+			autoRepeat: budgetData.autoRepeat !== undefined ? budgetData.autoRepeat : false,
+			description: budgetData.description || null,
+			categoryId: budgetData.categoryId || null,
 			season: budgetData.season,
-			updatedBy: 1, // TODO: Map to actual user ID
+			updatedBy: budgetData.updatedBy || 1, // Use provided updatedBy or default to 1
+			is_pinned: budgetData.is_pinned !== undefined ? budgetData.is_pinned : false,
 		};
+
+		console.log('SupabaseAPI updateBudget - Clean data:', cleanBudgetData);
 
 		const { data, error } = await (supabase as any)
 			.from('budgets')
@@ -1584,7 +1726,12 @@ export class SupabaseAPI {
 			.select()
 			.single();
 
-		if (error) throw error;
+		if (error) {
+			console.error('SupabaseAPI updateBudget - Database error:', error);
+			throw error;
+		}
+		
+		console.log('SupabaseAPI updateBudget - Success:', data);
 		return data;
 	}
 

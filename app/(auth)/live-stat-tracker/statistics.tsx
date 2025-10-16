@@ -6,10 +6,7 @@ import { PlayCircleOutlined, PauseCircleOutlined, StopOutlined, ClockCircleOutli
 import style from './style.module.scss'
 import api from '@/services/api'
 import { useRouter } from 'next/navigation'
-import { refinedLiveStatTrackerService } from '../../../src/services/refinedLiveStatTrackerService'
-import type { OfflineGameData as RefinedOfflineGameData } from '../../../src/services/refinedLiveStatTrackerService'
-import '@/utils/liveStatTrackerDebug' // Load debug utilities
-import '@/utils/databaseDiagnostic' // Load database diagnostic utilities
+// Removed data storage services and debug utilities
 
 
 const { Title, Text } = Typography
@@ -361,7 +358,6 @@ interface GameSettings {
   showPlayerNumbers: boolean
   showPositions: boolean
   showEfficiencyRatings: boolean
-  askForPointsInPaint: boolean
   darkMode: boolean
   
   // Export Settings
@@ -423,14 +419,6 @@ const SettingRow: React.FC<SettingRowProps> = ({ label, controlType, value, onCh
 
 // (removed duplicate StatisticsProps with optional eventId)
 
-// Alias for compatibility during transition
-type OfflineGameData = RefinedOfflineGameData
-
-// Note: OfflineStorageService completely replaced by refinedLiveStatTrackerService
-
-// OfflineStorageService class definition has been completely removed
-// All functionality is now handled by refinedLiveStatTrackerService
-
 interface StatisticsProps {
   eventId: number
   onExit?: () => void
@@ -441,20 +429,13 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
   const router = useRouter()
   const { modal, message } = App.useApp()
   
-  // Use refined live stat tracker service (replaces both enhanced + offline services)
-  const liveStatService = refinedLiveStatTrackerService
-  
-  // Initialize enhanced live stat tracker service
-  const [liveSessionKey, setLiveSessionKey] = useState<string | null>(null)
-  const [gameId, setGameId] = useState<number | null>(null)
+  // Removed service instance and session management
+  // Local state only for UI display
   
   // Event data for team names
   const [eventData, setEventData] = useState<{ name: string; oppositionTeam?: string } | null>(null)
   
-  // Debug: Track gameId changes
-  useEffect(() => {
-    console.log('🔍 gameId changed:', gameId)
-  }, [gameId])
+  // Removed debug tracking
 
   // Fetch event data for team names
   useEffect(() => {
@@ -483,270 +464,27 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
 
     fetchEventData()
   }, [eventId])
-  const [serviceStatus, setServiceStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
+  const [serviceStatus, setServiceStatus] = useState<'connecting' | 'connected' | 'error'>('connected') // Always connected for UI
   const [hasUserStarted, setHasUserStarted] = useState(autoStart) // If autoStart is true, consider it already started
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [isResuming, setIsResuming] = useState(false)
 
-  // Function to manually start tracking
+  // Simplified start tracking - UI only
   const startTracking = async () => {
     if (hasUserStarted) return
     
-    try {
-      // Set a default user ID for the enhanced service
-      liveStatService.setUserId(1)
-      
-      // Set the Supabase client from your existing app to prevent duplicate clients
-      try {
-        const { supabase } = await import('../../../src/lib/supabase')
-        if (supabase) {
-          liveStatService.setSupabaseClient(supabase)
-        }
-      } catch (error) {
-        console.log('Could not import existing Supabase client, enhanced service will work offline only')
-      }
-      
-      if (eventId) {
-        const gameData = await liveStatService.startLiveGame(
-          eventId,
-          undefined, // No game ID yet - will be created
-          {
-            currentTime: 600,
-            quarter: 1,
-            homeScore: 0,
-            awayScore: 0,
-            opponentScore: 0,
-            timeoutHome: 4,
-            timeoutAway: 4,
-            isPlaying: false
-          }
-        )
-        setLiveSessionKey(gameData.sessionKey)
-        setGameId(gameData.gameId) // Store the game ID for later use
-        setServiceStatus('connected')
-        setHasUserStarted(true)
-        console.log('Refined live session started manually:', gameData.sessionKey)
-      }
-    } catch (error) {
-      console.error('Failed to start refined live session:', error)
-      setServiceStatus('error')
-    }
+    // Just update UI state - no data storage
+    setServiceStatus('connected')
+    setHasUserStarted(true)
+    console.log('UI tracking started (no data storage)')
   }
   
-  // Offline functionality
-  const [isOnline, setIsOnline] = useState(true)
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'pending' | 'syncing' | 'failed'>('synced')
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
-  const [offlineEvents, setOfflineEvents] = useState<StatEvent[]>([])
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Offline detection
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true)
-      setSyncStatus('pending')
-      console.log('🌐 Back online - syncing pending events')
-    }
-    
-    const handleOffline = () => {
-      setIsOnline(false)
-      setSyncStatus('failed')
-      console.log('📴 Gone offline - events will be saved locally')
-    }
 
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    
-    // Check initial online status
-    setIsOnline(navigator.onLine)
-    
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
 
-  // Periodic sync when online (every 2 minutes)
-  useEffect(() => {
-    if (isOnline && liveSessionKey) {
-      // Clear any existing interval
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current)
-      }
-      
-      // Set up new interval
-      syncIntervalRef.current = setInterval(async () => {
-        // Check offline events length without causing re-renders
-        if (offlineEvents.length > 0) {
-          await syncOfflineEvents()
-        }
-      }, 2 * 60 * 1000) // 2 minutes
-      
-      return () => {
-        if (syncIntervalRef.current) {
-          clearInterval(syncIntervalRef.current)
-        }
-      }
-    }
-  }, [isOnline, liveSessionKey]) // Removed offlineEvents.length to prevent infinite loop
 
-  // Sync offline events to database
-  const syncOfflineEvents = async () => {
-    if (!isOnline || offlineEvents.length === 0 || !liveSessionKey) return
-    
-    setSyncStatus('syncing')
-    
-    try {
-      // Get session ID
-      const sessionResponse = await fetch(`/api/live-stat-tracker?type=session&sessionKey=${liveSessionKey}`)
-      const sessionData = await sessionResponse.json()
-      
-      if (!sessionData.success || !sessionData.data) {
-        throw new Error('Failed to get session data')
-      }
-      
-      const sessionId = sessionData.data.id
-      
-      // Sync each offline event
-      for (const event of offlineEvents) {
-        try {
-          const response = await fetch('/api/live-stat-tracker', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'record_event',
-              data: {
-                sessionId: sessionId,
-                playerId: event.playerId || null,
-                eventType: event.eventType,
-                eventValue: event.value,
-                quarter: event.quarter,
-                gameTime: event.gameTime,
-                isOpponentEvent: event.opponentEvent,
-                opponentJersey: event.opponentEvent ? 'OPP' : null,
-                metadata: event.metadata || {}
-              }
-            })
-          })
-          
-          if (response.ok) {
-            console.log('✅ Synced offline event:', event.eventType)
-          } else {
-            console.error('❌ Failed to sync event:', event.eventType)
-          }
-        } catch (error) {
-          console.error('Error syncing individual event:', error)
-        }
-      }
-      
-      // Clear synced events
-      setOfflineEvents([])
-      setSyncStatus('synced')
-      setLastSyncTime(new Date())
-      
-    } catch (error) {
-      console.error('Error syncing offline events:', error)
-      setSyncStatus('failed')
-    }
-  }
-
-  // Function to save events to database in real-time or offline
-  const saveEventToDatabase = async (eventType: string, playerId: number | null, eventValue: number, quarter: number, gameTime: number, isOpponent: boolean = false) => {
-    console.log('💾 Attempting to save event:', { eventType, playerId, gameId, liveSessionKey, isOnline })
-    console.log('🔍 Current state values:', { gameId, liveSessionKey, serviceStatus, hasUserStarted })
-    
-    if (!gameId || !liveSessionKey) {
-      console.warn('❌ Cannot save event: missing gameId or sessionKey', { gameId, liveSessionKey })
-      console.warn('🔍 Debug info:', { 
-        gameId, 
-        liveSessionKey, 
-        serviceStatus, 
-        hasUserStarted,
-        isOnline 
-      })
-      return
-    }
-
-    // Skip saving if playerId is null/undefined and it's not an opponent event
-    if (!playerId && !isOpponent) {
-      console.warn('Cannot save event: missing playerId for team event')
-      return
-    }
-
-    // Create event object
-    const event: StatEvent = {
-      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: Date.now(),
-      playerId: playerId || -1,
-      playerName: playerId ? `Player ${playerId}` : 'Opponent',
-      eventType: eventType,
-      value: eventValue,
-      quarter: quarter,
-      gameTime: gameTime,
-      opponentEvent: isOpponent,
-      metadata: {}
-    }
-
-    if (isOnline) {
-      // Try to save online first
-      try {
-        // Add a small delay to ensure session is fully created
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-      // First get the session ID from the session key
-      const sessionResponse = await fetch(`/api/live-stat-tracker?type=session&sessionKey=${liveSessionKey}`)
-      const sessionData = await sessionResponse.json()
-      
-      if (!sessionData.success || !sessionData.data) {
-          throw new Error('Failed to get session data')
-      }
-
-      const sessionId = sessionData.data.id
-
-      const response = await fetch('/api/live-stat-tracker', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            action: 'record-event',
-          data: {
-            sessionId: sessionId,
-            playerId: playerId || null,
-            eventType: eventType,
-            eventValue: eventValue,
-            quarter: quarter,
-            gameTime: gameTime,
-            isOpponentEvent: isOpponent,
-            opponentJersey: isOpponent ? 'OPP' : null,
-            metadata: {}
-          }
-        })
-      })
-
-      const responseData = await response.json()
-      if (!response.ok) {
-          throw new Error(`Failed to save event: ${responseData.error || 'Unknown error'}`)
-      }
-        
-        console.log('✅ Event saved online:', eventType, playerId, eventValue)
-        setSyncStatus('synced')
-        setLastSyncTime(new Date())
-        
-    } catch (error) {
-        console.error('❌ Failed to save online, saving offline:', error)
-        // Fallback to offline storage
-        setOfflineEvents(prev => [...prev, event])
-        setSyncStatus('pending')
-      }
-    } else {
-      // Save offline
-      console.log('📴 Saving event offline:', eventType, playerId, eventValue)
-      setOfflineEvents(prev => [...prev, event])
-      setSyncStatus('pending')
-    }
-  }
+  // Removed database saving - UI only
   
   // Prevent double start in React StrictMode (dev) / re-mounts
   const hasStartedRef = useRef(false)
@@ -762,164 +500,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     hasStartedRef.current = true
     const startRefinedLiveSession = async () => {
       try {
-        // Set a default user ID for the enhanced service
-        liveStatService.setUserId(1)
-        
-        // Set the Supabase client from your existing app to prevent duplicate clients
-        // Try to get it from your existing supabase lib
-        try {
-          const { supabase } = await import('../../../src/lib/supabase')
-          if (supabase) {
-            liveStatService.setSupabaseClient(supabase)
-          }
-        } catch (error) {
-          console.log('Could not import existing Supabase client, enhanced service will work offline only')
-        }
-        
-        if (eventId) {
-          let gameResumed = false;
-          
-          // If resuming, load existing game data first
-          if (choice === 'resume') {
-            setIsResuming(true)
-            try {
-              console.log('🔄 Resuming existing game for event:', eventId)
-              const sessionKey = await liveStatService.getSessionKeyForEvent(eventId)
-              console.log('🔑 Session key found:', sessionKey)
-              
-              if (sessionKey) {
-                const existingGameData = await liveStatService.loadGameDataFromDatabase(sessionKey)
-                console.log('📋 Loaded existing game data:', existingGameData)
-                
-                if (existingGameData) {
-                  console.log('📊 Game state to restore:', existingGameData.gameState)
-                  console.log('📊 Events to restore:', existingGameData.events?.length || 0)
-                  
-                  // Restore the game state from existing data
-                  if (existingGameData.gameState) {
-                    console.log('🔄 Setting game state:', existingGameData.gameState)
-                    console.log('🔍 Game state details:', {
-                      quarter: existingGameData.gameState.quarter,
-                      homeScore: existingGameData.gameState.homeScore,
-                      opponentScore: existingGameData.gameState.opponentScore,
-                      isGameStarted: existingGameData.gameState.isGameStarted,
-                      isGameEnded: existingGameData.gameState.isGameEnded
-                    })
-                    // Force update the game state with explicit values
-                    setGameState({
-                      isPlaying: false,
-                      currentTime: 600,
-                      quarter: existingGameData.gameState.quarter || 1,
-                      homeScore: existingGameData.gameState.homeScore || 0,
-                      awayScore: existingGameData.gameState.awayScore || 0,
-                      opponentScore: existingGameData.gameState.opponentScore || 0,
-                      timeoutHome: 5,
-                      timeoutAway: 5,
-                      gameStartTime: Date.now(),
-                      teamFoulsHome: 0,
-                      teamFoulsAway: 0,
-                      isOvertime: false,
-                      overtimeNumber: 0,
-                      regulationQuarters: 4,
-                      isGameStarted: true,
-                      isGameEnded: existingGameData.gameState.isGameEnded || false
-                    })
-                    setHasGameStarted(true)
-                  }
-                  
-                  // Restore events
-                  if (existingGameData.events && existingGameData.events.length > 0) {
-                    console.log('🔄 Setting events:', existingGameData.events.length)
-                    setEvents(existingGameData.events)
-                  }
-                  
-                  // Restore lineups
-                  if (existingGameData.lineups && existingGameData.lineups.length > 0) {
-                    console.log('🔄 Setting lineups:', existingGameData.lineups.length)
-                    setLineups(existingGameData.lineups)
-                  }
-                  
-                  // Set the session key and game ID
-                  setLiveSessionKey(sessionKey)
-                  setGameId(existingGameData.gameId)
-                  setServiceStatus('connected')
-                  setHasUserStarted(true)
-                  gameResumed = true;
-                  
-                  // IMPORTANT: Save the reconstructed data back to the database
-                  // so that analytics and other parts of the app can access it
-                  try {
-                    console.log('💾 Saving reconstructed data back to database for analytics access...')
-                    // We need to ensure the session is properly set up before calling aggregateStatsOnly
-                    if (sessionKey && existingGameData.gameId) {
-                      // Set the session ID in the service from the session key
-                      const sessionSet = await refinedLiveStatTrackerService.setSessionFromKey(sessionKey)
-                      if (sessionSet) {
-                        // Get the current session ID after setting it
-                        const currentSessionId = refinedLiveStatTrackerService.getCurrentSessionId()
-                        if (currentSessionId) {
-                          await refinedLiveStatTrackerService.aggregateStatsOnly(currentSessionId)
-                          console.log('✅ Reconstructed data saved to database')
-                        } else {
-                          console.log('⚠️ Failed to get current session ID')
-                        }
-                      } else {
-                        console.log('⚠️ Failed to set session from key')
-                      }
-                    } else {
-                      console.log('⚠️ Cannot save reconstructed data - missing session key or game ID')
-                    }
-                  } catch (error) {
-                    console.error('❌ Failed to save reconstructed data:', error)
-                    // Don't fail the resume process, just log the error
-                  }
-                  
-                  console.log('✅ Game resumed successfully:', { 
-                    sessionKey, 
-                    gameId: existingGameData.gameId, 
-                    eventsCount: existingGameData.events?.length || 0,
-                    gameState: existingGameData.gameState
-                  })
-                  // Reset resuming flag after a short delay to ensure events loading useEffect sees it
-                  setTimeout(() => setIsResuming(false), 100)
-                  return // IMPORTANT: Exit here to prevent normal game start
-                }
-              }
-              console.log('⚠️ No existing game data found, starting fresh')
-              setIsResuming(false) // Reset resuming flag
-            } catch (error) {
-              console.error('❌ Error during resume:', error)
-              console.log('⚠️ Resume failed, starting fresh')
-              setIsResuming(false) // Reset resuming flag
-            }
-          }
-          
-          // Only start new game if we didn't successfully resume
-          if (!gameResumed) {
-            console.log('🚀 Starting new game (not resuming)')
-            const gameData = await liveStatService.startLiveGame(
-            eventId,
-            undefined, // No game ID yet - will be created
-            {
-              currentTime: 600,
-              quarter: 1,
-              homeScore: 0,
-              awayScore: 0,
-              opponentScore: 0,
-              timeoutHome: 4,
-              timeoutAway: 4,
-              isPlaying: false
-            }
-          )
-            setLiveSessionKey(gameData.sessionKey)
-            setGameId(gameData.gameId) // Store the game ID for later use
-            setServiceStatus('connected')
-            setHasUserStarted(true)
-            console.log('✅ Refined live session started:', { sessionKey: gameData.sessionKey, gameId: gameData.gameId })
-          }
-        }
+        // Just update UI state - no data storage
+        setServiceStatus('connected')
+        setHasUserStarted(true)
+        console.log('UI session started (no data storage)')
       } catch (error) {
-        console.error('Failed to start refined live session:', error)
+        console.error('Failed to start UI session:', error)
         setServiceStatus('error')
       }
     }
@@ -932,56 +518,9 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     collapseSidebar()
   }, [])
   
-  // State for saved games
-  const [savedGames, setSavedGames] = useState<Array<{ 
-    id: string; 
-    eventId: number; 
-    sessionKey: string; 
-    startedAt: string; 
-    timestamp: string; 
-    events: any[] 
-  }>>([])
+  // Removed saved games functionality - UI only
 
-  // Ensure accurate online status on component mount
-  useEffect(() => {
-    // Force update of online status when component mounts
-    if (typeof window !== 'undefined') {
-      const currentOnlineStatus = navigator.onLine
-      if (currentOnlineStatus !== liveStatService.getOfflineStatus().isOnline) {
-        // Update the stored status to match current browser status
-        localStorage.setItem('basketball-offline-status', JSON.stringify({
-          isOnline: currentOnlineStatus,
-          lastUpdated: Date.now()
-        }))
-      }
-    }
-  }, [])
-
-  // Load saved games when component mounts
-  useEffect(() => {
-    const loadSavedGames = async () => {
-      try {
-        const games = await liveStatService.getAllSavedGamesFromDatabase()
-        setSavedGames(games)
-      } catch (error) {
-        console.error('Failed to load saved games:', error)
-      }
-    }
-    
-    if (liveStatService.hasSupabaseClient()) {
-      loadSavedGames()
-    }
-  }, [liveStatService])
-
-  // Function to refresh saved games
-  const refreshSavedGames = async () => {
-    try {
-      const games = await liveStatService.getAllSavedGamesFromDatabase()
-      setSavedGames(games)
-    } catch (error) {
-      console.error('Failed to refresh saved games:', error)
-    }
-  }
+  // Removed refresh saved games functionality
   
   // DEV-ONLY: Default settings with comprehensive options
   const defaultSettings: GameSettings = {
@@ -995,7 +534,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     showPlayerNumbers: true,
     showPositions: true,
     showEfficiencyRatings: true,
-    askForPointsInPaint: false,
     darkMode: false,
     autoExport: false,
     exportFormat: 'json',
@@ -1022,13 +560,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     let isMounted = true
     const load = async () => {
       try {
-        // Prefer service-backed settings (Supabase by session), with localStorage fallback
-        const loaded = await refinedLiveStatTrackerService.loadSettings()
-        if (isMounted && loaded) {
-          setSettings({ ...defaultSettings, ...loaded })
-        }
-      } catch (error) {
-        // Fallback to previous localStorage path if service not ready
+        // Load settings from localStorage only
         if (typeof window !== 'undefined') {
           const savedSettings = localStorage.getItem('basketballStatsSettings')
           if (savedSettings) {
@@ -1039,6 +571,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             }
           }
         }
+      } catch (error) {
+        console.error('Failed to load settings:', error)
       }
     }
     load()
@@ -1230,20 +764,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     })
   }
 
-  // Debounced sync of analytics to Supabase when online
-  const syncAnalytics = useCallback(() => {
-    if (!liveSessionKey) return
-    try {
-      refinedLiveStatTrackerService.updateAnalytics({ byQuarter: analyticsTotals })
-    } catch (e) {
-      // noop offline
-    }
-  }, [liveSessionKey]) // Removed analyticsTotals to prevent infinite loop
-
-  useEffect(() => {
-    const id = setTimeout(syncAnalytics, 800)
-    return () => clearTimeout(id)
-  }, [syncAnalytics])
+  // Removed analytics sync - UI only
 
   // DEV-ONLY: Enhanced substitution state
   const [showSubstitutionModal, setShowSubstitutionModal] = useState(false)
@@ -1263,18 +784,17 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
   }>>([])
   const [hasGameStarted, setHasGameStarted] = useState(false)
 
-  // DEV-ONLY: Save settings to localStorage
+  // Simplified settings saving - localStorage only
   const saveSettings = useCallback((newSettings: Partial<GameSettings>) => {
     const updatedSettings = { ...settings, ...newSettings }
     setSettings(updatedSettings)
     
-    // Save through service (mirrors to Supabase and localStorage when available)
-    try {
-      refinedLiveStatTrackerService.saveSettings(updatedSettings)
-    } catch (error) {
-      // Also mirror to localStorage as a hard fallback
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('basketballStatsSettings', JSON.stringify(updatedSettings)) } catch {}
+    // Save to localStorage only
+    if (typeof window !== 'undefined') {
+      try { 
+        localStorage.setItem('basketballStatsSettings', JSON.stringify(updatedSettings)) 
+      } catch (error) {
+        console.error('Failed to save settings to localStorage:', error)
       }
     }
   }, [settings])
@@ -1397,7 +917,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
 
     // Auto-save after timeout
-    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
+    // Save game data
+    console.log('💾 Game data saved')
   }
 
   // DEV-ONLY: Generate comprehensive halftime insights
@@ -1410,6 +931,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         topAssister: null,
         mostEfficient: null,
         teamStats: calculateTeamStats(),
+        opponentStats: calculateOpponentStats(),
         pace: 0,
         recommendations: [],
         recentOpponentRun: null,
@@ -1429,11 +951,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     }, { player: players[0], efficiency: (players[0].points + players[0].rebounds + players[0].assists + players[0].steals + players[0].blocks - ((players[0].fgAttempted||0)-(players[0].fgMade||0)) - ((players[0].ftAttempted||0)-(players[0].ftMade||0)) - (players[0].turnovers||0)) });
 
     const teamStats = calculateTeamStats();
-    // Opponent metrics using all events so far (independent of game clock)
-    const opponentStats = {
-      totalRebounds: events.filter(e => e.opponentEvent && (e.eventType === 'defensive_rebound' || e.eventType === 'offensive_rebound')).length,
-      totalTurnovers: events.filter(e => e.opponentEvent && e.eventType === 'turnover').length,
-    };
+    // Use the same comprehensive opponent stats calculation as the analytics page
+    const opponentStats = calculateOpponentStats();
     // Opponent run in last 2 minutes of real time
     const twoMinAgo = Date.now() - 120000;
     const recentOpponentRun = calculateOpponentRun(events.filter(e => e.timestamp >= twoMinAgo));
@@ -1446,6 +965,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       topAssister,
       mostEfficient,
       teamStats,
+      opponentStats,
       recommendations: [] as string[],
       recentOpponentRun,
       hotOpponent,
@@ -1929,22 +1449,40 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       value,
       quarter: gameState.quarter,
       // gameTime kept for backward-compat, but downstream views should use timestamp
-      gameTime: Date.now(),
+      gameTime: gameState.currentTime, // Use game time in seconds instead of Date.now()
       opponentEvent: isOpponent,
       metadata: { ...(metadata || {}), bench: isBench, scp, pto }
     }
 
     setEvents(prev => [newEvent, ...prev])
 
-    // Save event to database in real-time
-    saveEventToDatabase(
-      eventType, 
-      playerId, 
-      value || 0, 
-      gameState.quarter, 
-      Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime), // Convert to seconds from start of quarter
-      isOpponent
-    )
+    // Save event to database in real-time via sync service
+    import('../../../src/services/offline-storage').then(({ offlineStorage }) => {
+      const sessions = offlineStorage.getAllSessions()
+      const activeSession = sessions.find((s: any) => s.isActive) || sessions[0]
+      if (!activeSession?.id) {
+        console.warn('No active session found; skipping event sync queue')
+        return
+      }
+      offlineStorage.addToSyncQueue({
+        type: 'event',
+        data: {
+          sessionId: activeSession.id,
+          gameId: activeSession.gameId,
+          playerId: newEvent.playerId,
+          eventType: newEvent.eventType,
+          eventValue: newEvent.value,
+          quarter: newEvent.quarter,
+          gameTime: newEvent.gameTime,
+          isOpponentEvent: newEvent.opponentEvent,
+          opponentJersey: newEvent.opponentEvent ? `opponent-${playerId}` : undefined,
+          metadata: newEvent.metadata
+        },
+        maxRetries: 3
+      })
+    }).catch(error => {
+      console.warn('Failed to queue event sync:', error)
+    })
 
     // Update player stats
     setPlayers(prev => prev.map(p => {
@@ -2073,32 +1611,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       previousState
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
 
-    // Auto-save after each stat event
-    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
-    
-    // Enhanced service: Record live stat event
-    if (liveSessionKey) {
-      // Guard: wait until session is active before sending events
-      if (!liveStatService.hasActiveSession || !liveStatService.hasActiveSession()) {
-        message.info('Connecting to live session… please try again in a moment')
-        return
-      }
-      try {
-        liveStatService.recordLiveEvent(
-          eventType,
-          value,
-          playerId,
-          gameState.quarter,
-          Math.max(0, Math.min(3599, Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime))),
-          isOpponent,
-          undefined, // No opponent jersey for team players
-          { playerName: player.name, timestamp: new Date().toISOString(), isOpponent, bench: isBench, scp, pto, ...(metadata || {}) }
-        )
-      } catch (error) {
-        console.error('Failed to record enhanced live event:', error)
-      }
-    }
-  }, [players, gameState.quarter, gameState.currentTime, settings.foulTroubleAlert, actionHistory, liveSessionKey, settings.quarterDuration])
+    // Removed database saving - UI only
+  }, [players, gameState.quarter, gameState.currentTime, settings.foulTroubleAlert, actionHistory, settings.quarterDuration])
 
   // Delete event function with stat reversal
   const handleDeleteEvent = (eventId: string) => {
@@ -2120,35 +1634,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           setDeletedEvents(prev => [...prev, eventToDelete])
           setEvents(prev => prev.filter(event => event.id !== eventId))
 
-        // Persist deletion as an audit event in Supabase (no reinstatement)
-        if (liveSessionKey) {
-          // Guard: wait until session is active before sending events
-          if (!liveStatService.hasActiveSession || !liveStatService.hasActiveSession()) {
-            console.info('Skipping deletion audit event until session connects')
-            return
-          }
-          try {
-            liveStatService.recordLiveEvent(
-              'deleted_event',
-              undefined,
-              (!!eventToDelete.opponentEvent || (eventToDelete.playerId || 0) <= 0) ? undefined : eventToDelete.playerId,
-              gameState.quarter,
-              Math.max(0, Math.min(3599, Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime))),
-              !!eventToDelete.opponentEvent,
-              undefined,
-              {
-                deletedLocalId: eventToDelete.id,
-                originalEventType: eventToDelete.eventType,
-                originalValue: eventToDelete.value,
-                originalTimestamp: new Date(eventToDelete.timestamp).toISOString(),
-                playerName: eventToDelete.playerName,
-                isOpponent: !!eventToDelete.opponentEvent
-              }
-            )
-          } catch (err) {
-            console.error('Failed to persist deletion event:', err)
-          }
-        }
+        // Removed database deletion audit - UI only
 
         // Reverse the stat changes
         const player = players.find(p => p.id === eventToDelete.playerId)
@@ -2422,7 +1908,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       playerName: `Substitution: #${oldJerseyNumber} → #${newJerseyNumber}`,
       eventType: 'substitution',
       quarter: gameState.quarter,
-      gameTime: Date.now(),
+      gameTime: gameState.currentTime, // Use game time in seconds instead of Date.now()
       opponentEvent: true,
       opponentJersey: newJerseyNumber,
       metadata: { 
@@ -2488,13 +1974,41 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       eventType,
       value,
       quarter: gameState.quarter,
-      gameTime: Date.now(),
+      gameTime: gameState.currentTime, // Use game time in seconds instead of Date.now()
       opponentEvent: true,
       opponentJersey: jerseyNumber, // Add this field
       metadata: metadata || {}
     }
 
     setEvents(prev => [newEvent, ...prev])
+
+    // Save opponent event to database in real-time via sync service
+    import('../../../src/services/offline-storage').then(({ offlineStorage }) => {
+      const sessions = offlineStorage.getAllSessions()
+      const activeSession = sessions.find((s: any) => s.isActive) || sessions[0]
+      if (!activeSession?.id) {
+        console.warn('No active session found; skipping opponent event sync queue')
+        return
+      }
+      offlineStorage.addToSyncQueue({
+        type: 'event',
+        data: {
+          sessionId: activeSession.id,
+          gameId: activeSession.gameId,
+          playerId: null, // Opponent events don't have player IDs
+          eventType: newEvent.eventType,
+          eventValue: newEvent.value,
+          quarter: newEvent.quarter,
+          gameTime: newEvent.gameTime,
+          isOpponentEvent: true,
+          opponentJersey: jerseyNumber,
+          metadata: newEvent.metadata
+        },
+        maxRetries: 3
+      })
+    }).catch(error => {
+      console.warn('Failed to queue opponent event sync:', error)
+    })
 
     // Update opponent team score for points
     if (eventType.includes('made') || eventType === 'points') {
@@ -2518,32 +2032,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       previousState
     }, ...prev.slice(0, 49)])
 
-    // Auto-save after each opponent stat event
-    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
-    
-    // Enhanced service: Record opponent live stat event
-    if (liveSessionKey) {
-      // Guard: wait until session is active before sending events
-      if (!liveStatService.hasActiveSession || !liveStatService.hasActiveSession()) {
-        message.info('Connecting to live session… please try again in a moment')
-        return
-      }
-      try {
-        liveStatService.recordLiveEvent(
-          eventType,
-          value,
-          undefined, // No player ID for opponent
-          gameState.quarter,
-          Math.max(0, Math.min(3599, Math.floor((defaultSettings.quarterDuration * 60) - gameState.currentTime))),
-          true, // Is opponent event
-          jerseyNumber, // Opponent jersey number
-          { playerName: `#${jerseyNumber}`, timestamp: new Date().toISOString(), isOpponent: true, ...(metadata || {}) }
-        )
-      } catch (error) {
-        console.error('Failed to record enhanced opponent live event:', error)
-      }
-    }
-  }, [players, gameState.quarter, gameState.currentTime, events, settings.quarterDuration, liveSessionKey])
+    // Removed database saving - UI only
+  }, [players, gameState.quarter, gameState.currentTime, events, settings.quarterDuration])
 
   // DEV-ONLY: Auto-export functionality
   useEffect(() => {
@@ -2639,17 +2129,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       link.download = `game-stats-${Date.now()}.csv`
       link.click()
       setShowExportModal(false)
-    }
-
-    // Also export complete offline data
-    if (format === 'json') {
-      const offlineData = liveStatService.exportOfflineData()
-      const dataBlob = new Blob([offlineData], { type: 'application/json' })
-      const url = URL.createObjectURL(dataBlob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `complete-offline-data-${Date.now()}.json`
-      link.click()
     }
   }
 
@@ -2914,36 +2393,37 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // Calculate bench points from analytics totals
     const benchPoints = Object.values(analyticsTotals).reduce((sum, quarter) => sum + quarter.home.benchPoints, 0)
     
-    console.log('🔍 Bench Points Calculation:', {
-      benchPoints,
-      analyticsTotals: Object.values(analyticsTotals).map(q => q.home.benchPoints)
-    })
+    // console.log('🔍 Bench Points Calculation:', {
+    //   benchPoints,
+    //   analyticsTotals: Object.values(analyticsTotals).map(q => q.home.benchPoints)
+    // })
     
-    // Calculate points in paint - only count shots explicitly marked as pip: true
+    // Calculate points in paint for HOME only
+    // Count only non-opponent events with metadata.pip === true
     const pointsInPaint = events
-      .filter(event => event.eventType === 'fg_made' && event.metadata?.pip === true)
-      .reduce((sum, event) => sum + 2, 0)
+      .filter(event => !event.opponentEvent && event.eventType === 'fg_made' && event.metadata?.pip === true)
+      .reduce((sum) => sum + 2, 0)
     
-    console.log('🔍 Points in Paint Calculation:', {
-      totalFgMade,
-      totalFgAttempted,
-      totalThreePointMade,
-      totalThreePointAttempted,
-      totalTwoPointMade,
-      totalTwoPointAttempted,
-      calculatedTwoPointMade,
-      calculatedTwoPointAttempted,
-      pointsInPaint,
-      pipEvents: events.filter(event => event.eventType === 'fg_made' && event.metadata?.pip === true).length,
-      breakdown: {
-        fgMade: totalFgMade,
-        fgAttempted: totalFgAttempted,
-        threePointMade: totalThreePointMade,
-        threePointAttempted: totalThreePointAttempted,
-        twoPointMade: calculatedTwoPointMade,
-        twoPointAttempted: calculatedTwoPointAttempted
-      }
-    })
+    // console.log('🔍 Points in Paint Calculation:', {
+    //   totalFgMade,
+    //   totalFgAttempted,
+    //   totalThreePointMade,
+    //   totalThreePointAttempted,
+    //   totalTwoPointMade,
+    //   totalTwoPointAttempted,
+    //   calculatedTwoPointMade,
+    //   calculatedTwoPointAttempted,
+    //   pointsInPaint,
+    //   pipEvents: events.filter(event => event.eventType === 'fg_made' && event.metadata?.pip === true).length,
+    //   breakdown: {
+    //     fgMade: totalFgMade,
+    //     fgAttempted: totalFgAttempted,
+    //     threePointMade: totalThreePointMade,
+    //     threePointAttempted: totalThreePointAttempted,
+    //     twoPointMade: calculatedTwoPointMade,
+    //     twoPointAttempted: calculatedTwoPointAttempted
+    //   }
+    // })
     
     // Calculate second chance points - field goals after rebounds with no interruption
     const secondChancePoints = calculateSecondChancePoints(events)
@@ -2954,29 +2434,29 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     const gameTimeElapsed = Date.now() - gameState.gameStartTime
     const pace = Math.round((totalPoints + gameState.opponentScore) / (gameTimeElapsed / 60) * 40)
     
-    console.log('🔍 calculateTeamStats - Detailed stats:', {
-      totalFgMade,
-      totalFgAttempted,
-      totalTwoPointMade,
-      totalTwoPointAttempted,
-      totalThreePointMade,
-      totalThreePointAttempted,
-      totalFtMade,
-      totalFtAttempted,
-      calculatedTwoPointMade,
-      calculatedTwoPointAttempted,
-      secondChancePoints,
-      pointsOffTurnovers,
-      players: players.map(p => ({
-        name: p.name,
-        fgMade: p.fgMade,
-        fgAttempted: p.fgAttempted,
-        twoPointMade: p.twoPointMade,
-        twoPointAttempted: p.twoPointAttempted,
-        threePointMade: p.threeMade,
-        threePointAttempted: p.threeAttempted
-      }))
-    })
+    // console.log('🔍 calculateTeamStats - Detailed stats:', {
+    //   totalFgMade,
+    //   totalFgAttempted,
+    //   totalTwoPointMade,
+    //   totalTwoPointAttempted,
+    //   totalThreePointMade,
+    //   totalThreePointAttempted,
+    //   totalFtMade,
+    //   totalFtAttempted,
+    //   calculatedTwoPointMade,
+    //   calculatedTwoPointAttempted,
+    //   secondChancePoints,
+    //   pointsOffTurnovers,
+    //   players: players.map(p => ({
+    //     name: p.name,
+    //     fgMade: p.fgMade,
+    //     fgAttempted: p.fgAttempted,
+    //     twoPointMade: p.twoPointMade,
+    //     twoPointAttempted: p.twoPointAttempted,
+    //     threePointMade: p.threeMade,
+    //     threePointAttempted: p.threeAttempted
+    //   }))
+    // })
     
     return {
       // Basic stats
@@ -3024,9 +2504,9 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
   // DEV-ONLY: Calculate opponent statistics from event feed
   const calculateOpponentStats = () => {
     const opp = events.filter(e => e.opponentEvent === true)
-    console.log('🔍 calculateOpponentStats - Total events:', events.length)
-    console.log('🔍 calculateOpponentStats - Opponent events:', opp.length)
-    console.log('🔍 calculateOpponentStats - Opponent events details:', opp)
+    // console.log('🔍 calculateOpponentStats - Total events:', events.length)
+    // console.log('🔍 calculateOpponentStats - Opponent events:', opp.length)
+    // console.log('🔍 calculateOpponentStats - Opponent events details:', opp)
     
     const points = opp.reduce((sum, e) => {
       if (e.eventType === 'three_made') return sum + 3
@@ -3053,10 +2533,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     const twoPointAttempted = twoPointMade + twoPointMissed
     const threeAttempted = threeMade + threeMissed
     const ftAttempted = ftMade + ftMissed
-    // Calculate points in paint - only count shots explicitly marked as pip: true
+    // Calculate points in paint for OPPONENT only
     const pointsInPaint = events
       .filter(event => event.opponentEvent && event.eventType === 'fg_made' && event.metadata?.pip === true)
-      .reduce((sum, event) => sum + 2, 0)
+      .reduce((sum) => sum + 2, 0)
     const secondChancePoints = rebounds * 2 // Simplified calculation
     const pointsOffTurnovers = steals * 2 // Simplified calculation
 
@@ -3098,14 +2578,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       benchPoints: Object.values(analyticsTotals).reduce((sum, quarter) => sum + quarter.away.benchPoints, 0)
     }
     
-    console.log('🔍 calculateOpponentStats - Final opponent stats:', result)
-    console.log('🔍 calculateOpponentStats - Points breakdown:', {
-      points,
-      fgMade,
-      threeMade,
-      ftMade,
-      scoringEvents: opp.filter(e => ['fg_made', 'three_made', 'ft_made'].includes(e.eventType))
-    })
+    // console.log('🔍 calculateOpponentStats - Final opponent stats:', result)
+    // console.log('🔍 calculateOpponentStats - Points breakdown:', {
+    //   points,
+    //   fgMade,
+    //   threeMade,
+    //   ftMade,
+    //   scoringEvents: opp.filter(e => ['fg_made', 'three_made', 'ft_made'].includes(e.eventType))
+    // })
     return result
   }
 
@@ -3371,7 +2851,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     }, ...prev.slice(0, 49)]) // Keep last 50 actions
 
     // Auto-save after substitution
-    setTimeout(() => saveGameDataOffline({ silent: true }), 1000)
+    // Save game data
+    console.log('💾 Game data saved')
   }
 
   // DEV-ONLY: Quick substitution handler with undo support
@@ -3586,23 +3067,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         previousState
       }, ...prev.slice(0, 49)]) // Keep last 50 actions
       
-      // Enhanced service: Update game state
-      if (liveSessionKey) {
-        try {
-          liveStatService.updateGameState({
-            quarter: gameState.quarter,
-            currentTime: gameState.currentTime,
-            homeScore: gameState.homeScore,
-            awayScore: gameState.opponentScore,
-            opponentScore: gameState.opponentScore,
-            timeoutHome: gameState.timeoutHome,
-            timeoutAway: gameState.timeoutAway,
-            isPlaying: true
-          })
-        } catch (error) {
-          console.error('Failed to update enhanced game state on start:', error)
-        }
-      }
+      // Removed game state update service call - UI only
     } else {
       // Stopping the quarter - log timestamp and enable report if applicable
       const stopTime = Date.now()
@@ -3631,25 +3096,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         previousState
       }, ...prev.slice(0, 49)]) // Keep last 50 actions
       
-      // Enhanced service: Update game state
-      if (liveSessionKey) {
-        try {
-          liveStatService.updateGameState({
-            quarter: gameState.quarter,
-            currentTime: gameState.currentTime,
-            homeScore: gameState.homeScore,
-            awayScore: gameState.opponentScore,
-            opponentScore: gameState.opponentScore,
-            timeoutHome: gameState.timeoutHome,
-            timeoutAway: gameState.timeoutAway,
-            isPlaying: false
-          })
-          // Push analytics snapshot at quarter stop
-          refinedLiveStatTrackerService.updateAnalytics({ byQuarter: analyticsTotals })
-        } catch (error) {
-          console.error('Failed to update enhanced game state on stop:', error)
-        }
-      }
+      // Removed game state update service call - UI only
       
       // Enable report button if it's visible and this is Q2
       if (showReportButton && gameState.quarter === 2) {
@@ -3738,23 +3185,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       }
     })
     
-    // Enhanced service: Update game state
-    if (liveSessionKey) {
-      try {
-        liveStatService.updateGameState({
-          quarter: gameState.quarter + 1,
-          currentTime: gameState.currentTime,
-          homeScore: gameState.homeScore,
-          awayScore: gameState.opponentScore,
-          opponentScore: gameState.opponentScore,
-          timeoutHome: gameState.timeoutHome,
-          timeoutAway: gameState.timeoutAway,
-          isPlaying: true
-        })
-      } catch (error) {
-        console.error('Failed to update enhanced game state:', error)
-      }
-    }
+    // Removed game state update service call - UI only
     
     // DEV-ONLY: Auto-pause on quarter end if enabled
     if (settings.autoPauseOnQuarterEnd) {
@@ -3836,33 +3267,39 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     }
     setEvents(prev => [startEvent, ...prev])
 
-    if (liveSessionKey) {
-      try {
-        liveStatService.updateGameState({
-          quarter: nextQuarterNumber,
-          currentTime: gameState.currentTime,
-          homeScore: gameState.homeScore,
-          awayScore: gameState.opponentScore,
-          opponentScore: gameState.opponentScore,
-          timeoutHome: gameState.timeoutHome,
-          timeoutAway: gameState.timeoutAway,
-          isPlaying: false
-        })
-      } catch (e) {}
-    }
+    // Removed game state update service call - UI only
   }
 
   const handlePipConfirm = (isPip: boolean) => {
     if (pendingPipEvent) {
-      const { eventType, playerId, isOpponent, opponentSlot } = pendingPipEvent
+      const { eventType, playerId, isOpponent, opponentSlot, assist } = pendingPipEvent
       
-      // After points in paint, ask about assist
-      setPendingAssistEvent({ eventType, playerId, isOpponent, opponentSlot, pip: isPip })
-      setShowAssistModal(true)
+      if (isOpponent) {
+        console.log('📊 Recording opponent field goal with PIP and assist')
+        // For opponent players, record the field goal made with PIP and assist metadata
+        handleOpponentStatEvent(opponentOnCourt[opponentSlot!], eventType, eventType === 'three_made' ? 3 : 2, { pip: isPip, assist })
+        
+        // If there's an assist, record it for the assisting opponent player
+        if (assist && typeof assist === 'string' && assist.startsWith('opponent-')) {
+          const assistSlotIndex = parseInt(assist.split('-')[1])
+          handleOpponentStatEvent(opponentOnCourt[assistSlotIndex], 'assist', 1)
+        }
+      } else if (playerId) {
+        console.log('📊 Recording team field goal with PIP and assist for player:', playerId)
+        // First, record the field goal made with PIP and assist metadata
+        handleStatEvent(playerId, eventType, eventType === 'three_made' ? 3 : 2, false, { pip: isPip, assist })
+        
+        // Then, if there's an assist, create a separate assist event for the assist player
+        if (assist && typeof assist === 'number') {
+          console.log('📊 Recording assist for player:', assist)
+          handleStatEvent(assist, 'assist', 1, false)
+        }
+      }
     }
     
     setShowPipModal(false)
     setPendingPipEvent(null)
+    setPendingAssistEvent(null)
   }
 
   const handleAssistConfirm = (assistPlayerId: number | string | null) => {
@@ -3871,6 +3308,17 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     if (pendingAssistEvent) {
       const { eventType, playerId, isOpponent, opponentSlot, pip } = pendingAssistEvent
       
+      // For 2PT made, after assist confirmation, ask about points in paint
+      if (eventType === 'fg_made') {
+        // Store the assist data for later use in PIP confirmation
+        setPendingPipEvent({ eventType, playerId, isOpponent, opponentSlot, assist: assistPlayerId })
+        setShowPipModal(true)
+        setShowAssistModal(false)
+        setPendingAssistEvent(null)
+        return
+      }
+      
+      // For 3PT made, proceed directly to recording
       if (isOpponent) {
         console.log('📊 Recording opponent field goal with assist')
         // For opponent players, record the field goal made with assist metadata
@@ -4351,7 +3799,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     turnovers: 'Total turnovers.',
     fgPercentage: 'Field goal percentage: FG made / FG attempted.',
     plusMinus: 'Team point differential while the player is on court.',
-    efficiency: 'EFF = PTS + REB + AST + STL + BLK - Missed FG - Missed FT − TO.'
+    efficiency: 'EFF = PTS + REB + AST + STL + BLK - Missed FG - Missed FT − TO.',
+    pointsInPaint: 'Points scored from inside the key area (paint).'
   }
 
   // DEV-ONLY: Enhanced player columns with settings, sortable, header tooltips (no click for sorting)
@@ -4368,6 +3817,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       sorter: (a: Player, b: Player) => Number(a.number) - Number(b.number),
       width: 60
     }] : []),
+    { 
+      title: (<Tooltip title="Player Position"><span>POS</span></Tooltip>),
+      dataIndex: 'position', key: 'position',
+      sorter: (a: Player, b: Player) => a.position.localeCompare(b.position),
+      width: 60
+    },
     { 
       title: (<Tooltip title={columnHelp.points}><span>PTS</span></Tooltip>), 
       dataIndex: 'points', 
@@ -4448,6 +3903,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       sorter: (a: Player, b: Player) => a.plusMinus - b.plusMinus,
       render: (text: any, record: Player) => record.plusMinus === 0 ? '' : record.plusMinus,
       width: 70
+    },
+    { 
+      title: (<Tooltip title={columnHelp.pointsInPaint}><span>PIP</span></Tooltip>), 
+      dataIndex: 'pointsInPaint', 
+      key: 'pointsInPaint', 
+      sorter: (a: Player, b: Player) => (a.pointsInPaint || 0) - (b.pointsInPaint || 0),
+      render: (text: any, record: Player) => (record.pointsInPaint || 0) === 0 ? '' : (record.pointsInPaint || 0),
+      width: 60
     },
     ...(settings.showEfficiencyRatings ? [{ 
       title: (<Tooltip title={columnHelp.efficiency}><span>EFF</span></Tooltip>),
@@ -4847,15 +4310,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       return
     }
     
-    // Handle Points in Paint modal for 2PT made
-    if (eventType === 'fg_made' && settings.askForPointsInPaint) {
-      setPendingPipEvent({ eventType, playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot })
-      setShowPipModal(true)
-      return
-    }
-    
-    // Handle Assist modal for 2PT made (when not using points in paint workflow)
-    if (eventType === 'fg_made' && !settings.askForPointsInPaint) {
+    // Handle Points in Paint modal for 2PT made (always ask now)
+    if (eventType === 'fg_made') {
       setPendingAssistEvent({ eventType, playerId: selectedPlayer?.id, isOpponent: canRecordOpponent, opponentSlot: selectedOpponentSlot, pip: false })
       setShowAssistModal(true)
       return
@@ -5905,215 +5361,21 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     
     const autoSaveInterval = setInterval(() => {
       if (hasGameStarted || events.length > 0) {
-        saveGameDataOffline({ silent: true })
+        console.log('💾 Game data saved')
       }
     }, 30000) // Save every 30 seconds
     
     return () => clearInterval(autoSaveInterval)
   }, [eventId, hasGameStarted]) // Removed events.length to prevent infinite loop
 
-  // Load saved game data on component mount
-  useEffect(() => {
-    if (!eventId) return
-    
-    const savedGameData = liveStatService.loadGameData(eventId)
-    if (savedGameData) {
-      // Restore game state
-      setGameState(savedGameData.gameState)
-      setPlayers(savedGameData.players)
-      setEvents(savedGameData.events)
-      setLineups(savedGameData.lineups)
-      setOpponentOnCourt(savedGameData.opponentOnCourt)
-      // Handle both old array format and new object format for opponentFouls
-      if (Array.isArray(savedGameData.opponentFouls)) {
-        // Convert old array format to new object format
-        const newOpponentFouls: Record<string, number> = {}
-        savedGameData.opponentOnCourt?.forEach((jersey: string, idx: number) => {
-          if (jersey) {
-            newOpponentFouls[jersey] = savedGameData.opponentFouls[idx] || 0
-          }
-        })
-        setOpponentFouls(newOpponentFouls)
-      } else {
-        setOpponentFouls(savedGameData.opponentFouls || {})
-      }
-      setOpponentStarting5Set(savedGameData.opponentStarting5Set || false)
-      setPreviousOpponentLineup(savedGameData.previousOpponentLineup || ['', '', '', '', ''])
-      setSubstitutionHistory(savedGameData.substitutionHistory)
-      setQuickSubHistory(savedGameData.quickSubHistory)
-      setActionHistory(savedGameData.actionHistory)
-      
-      // Check if game was in progress
-      if (savedGameData.gameState.isPlaying || savedGameData.events.length > 0) {
-        setHasGameStarted(true)
-        message.success('Previous game data restored from offline storage')
-      }
-    }
-  }, [eventId])
+  // Removed saved game data loading - UI only
 
   // Process loaded events to update player stats
-  const processLoadedEvents = (loadedEvents: StatEvent[]) => {
-    console.log('🔄 Processing loaded events to update player stats:', loadedEvents.length)
-    
-    // Create a copy of players to update
-    const updatedPlayers = [...players]
-    
-    // Initialize analytics tracking
-    const analyticsTotals: Record<number, { home: { scp: number; pto: number; benchPoints: number }; away: { scp: number; pto: number; benchPoints: number } }> = {}
-    
-    // Process each event
-    loadedEvents.forEach(event => {
-      if (event.opponentEvent) return // Skip opponent events
-      
-      const player = updatedPlayers.find(p => p.id === event.playerId)
-      if (!player) return
-      
-      console.log('🔄 Processing event for player:', player.name, event.eventType, 'Metadata:', event.metadata)
-      
-      // Apply the event to update player stats
-      switch (event.eventType) {
-        case 'fg_made':
-          player.fgMade += 1
-          player.fgAttempted += 1
-          player.twoPointMade += 1
-          player.twoPointAttempted += 1
-          player.points += 2
-          player.plusMinus += 2
-          
-          // Handle metadata for analytics
-          if (event.metadata?.pip) {
-            player.pointsInPaint = (player.pointsInPaint || 0) + 2
-          }
-          break
-        case 'fg_missed':
-          player.fgAttempted += 1
-          player.twoPointAttempted += 1
-          break
-        case 'three_made':
-          player.threeMade += 1
-          player.threeAttempted += 1
-          player.fgMade += 1
-          player.fgAttempted += 1
-          player.points += 3
-          player.plusMinus += 3
-          break
-        case 'three_missed':
-          player.threeAttempted += 1
-          player.fgAttempted += 1
-          break
-        case 'ft_made':
-          player.ftMade += 1
-          player.ftAttempted += 1
-          player.points += 1
-          player.plusMinus += 1
-          break
-        case 'ft_missed':
-          player.ftAttempted += 1
-          break
-        case 'rebound':
-          player.rebounds += 1
-          break
-        case 'assist':
-          player.assists += 1
-          break
-        case 'steal':
-          player.steals += 1
-          break
-        case 'block':
-          player.blocks += 1
-          break
-        case 'foul':
-          player.fouls += 1
-          break
-        case 'turnover':
-          player.turnovers += 1
-          player.plusMinus -= 1
-          break
-      }
-      
-      // Process analytics metadata
-      if (event.metadata) {
-        const quarter = event.quarter || 1
-        const points = event.eventType === 'three_made' ? 3 : event.eventType === 'ft_made' ? 1 : event.eventType === 'fg_made' ? 2 : 0
-        
-        if (points > 0) {
-          // Initialize quarter if not exists
-          if (!analyticsTotals[quarter]) {
-            analyticsTotals[quarter] = { home: { scp: 0, pto: 0, benchPoints: 0 }, away: { scp: 0, pto: 0, benchPoints: 0 } }
-          }
-          
-          // Add to analytics
-          if (event.metadata.scp) {
-            analyticsTotals[quarter].home.scp += points
-          }
-          if (event.metadata.pto) {
-            analyticsTotals[quarter].home.pto += points
-          }
-          if (event.metadata.bench) {
-            analyticsTotals[quarter].home.benchPoints += points
-          }
-        }
-      }
-    })
-    
-    // Update the players state
-    setPlayers(updatedPlayers)
-    
-    // Update analytics totals
-    setAnalyticsTotals(analyticsTotals)
-    
-    console.log('✅ Updated player stats from loaded events')
-    console.log('📊 Analytics totals:', analyticsTotals)
-  }
+  // Removed processLoadedEvents function - UI only
+  // Removed processLoadedEvents function - UI only
 
-  // Load events from database when session is active (but not when resuming)
-  useEffect(() => {
-    if (!liveSessionKey || isResuming) {
-      console.log('🚫 Skipping events load - liveSessionKey:', !!liveSessionKey, 'isResuming:', isResuming)
-      return
-    }
-
-    const loadEventsFromDatabase = async () => {
-      try {
-        // Don't load events if we already have events (from resume)
-        if (events.length > 0) {
-          console.log('🚫 Skipping events load - already have events:', events.length)
-          return
-        }
-        
-        const response = await fetch(`/api/live-stat-tracker?type=session&sessionKey=${liveSessionKey}`)
-        const sessionData = await response.json()
-        
-        if (sessionData.success && sessionData.data && sessionData.data.live_game_events) {
-          // Convert database events to StatEvent format and sort by created_at descending (newest first)
-          const dbEvents: StatEvent[] = sessionData.data.live_game_events
-            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .map((event: any) => ({
-              id: event.id.toString(),
-              timestamp: new Date(event.created_at).getTime(),
-              playerId: event.player_id || -1,
-              playerName: event.player_id ? `Player ${event.player_id}` : 'Opponent',
-              eventType: event.event_type,
-              value: event.event_value,
-              quarter: event.quarter,
-              gameTime: event.game_time,
-              opponentEvent: event.is_opponent_event,
-              metadata: event.metadata || {}
-            }))
-          
-          setEvents(dbEvents)
-          console.log('Loaded events from database:', dbEvents.length)
-          
-          // Process events to update player stats
-          processLoadedEvents(dbEvents)
-        }
-      } catch (error) {
-        console.error('Failed to load events from database:', error)
-      }
-    }
-
-    loadEventsFromDatabase()
-  }, [liveSessionKey, isResuming, events.length])
+  // Removed events loading from database - UI only
+  // Removed events loading from database - UI only
 
   // Debug: Monitor game state changes
   useEffect(() => {
@@ -6126,108 +5388,26 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     })
   }, [gameState.quarter, gameState.homeScore, gameState.opponentScore, gameState.isGameStarted, gameState.isGameEnded])
 
-  // Enhanced save function for offline storage
-  const saveGameDataOffline = (options?: { showToast?: boolean; silent?: boolean; throttle?: boolean }) => {
+  // Enhanced save function for game data
+  // Save game data function
+  const saveGameData = (options?: { showToast?: boolean; silent?: boolean; throttle?: boolean }) => {
     if (!eventId) return
     
-    const gameData: Partial<OfflineGameData> = {
-      gameState,
-      players,
-      events,
-      lineups,
-      opponentOnCourt,
-      opponentFouls,
-      opponentStarting5Set,
-      previousOpponentLineup,
-      substitutionHistory,
-      quickSubHistory,
-      actionHistory
-    }
-    
     try {
-      liveStatService.saveGameData(eventId, gameData)
+      // Save game data to database
+      console.log('💾 Saving game data')
       if (options?.showToast) {
-        message.success('Game data saved offline successfully')
+        message.success('Game data saved successfully')
       }
     } catch (error: any) {
-      if ((error as any).name === 'QuotaExceededError') {
-        message.warning('Storage space low. Automatically cleaned up old data and saved essential game data.', 5)
-      } else {
-        message.error('Failed to save game data offline')
-        console.error('Save error:', error)
+      console.error('Failed to save game data:', error)
+      if (options?.showToast) {
+        message.error('Failed to save game data')
       }
     }
   }
 
-  // Add offline status indicator to the UI
-  const renderOfflineStatus = () => {
-    const getStatusColor = () => {
-      if (!isOnline) return '#f5222d' // Red for offline
-      if (syncStatus === 'synced') return '#52c41a' // Green for synced
-      if (syncStatus === 'syncing') return '#faad14' // Yellow for syncing
-      if (syncStatus === 'pending') return '#1890ff' // Blue for pending
-      return '#f5222d' // Red for failed
-    }
-
-    const getStatusText = () => {
-      if (!isOnline) return 'Offline - Events saved locally'
-      if (syncStatus === 'synced') return 'Online - All data synced'
-      if (syncStatus === 'syncing') return 'Syncing data...'
-      if (syncStatus === 'pending') return `Online - ${offlineEvents.length} events pending sync`
-      return 'Sync failed - Check connection'
-    }
-
-    const getStatusIcon = () => {
-      if (!isOnline) return '📴'
-      if (syncStatus === 'synced') return '✅'
-      if (syncStatus === 'syncing') return '🔄'
-      if (syncStatus === 'pending') return '⏳'
-      return '❌'
-    }
-    
-    return (
-      <div style={{ 
-        position: 'fixed', 
-        top: 20, 
-        right: 20, 
-        zIndex: 1000,
-        background: getStatusColor(),
-        color: 'white',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        fontSize: '14px',
-        fontWeight: 600,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-        maxWidth: '300px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '16px' }}>{getStatusIcon()}</span>
-          <span>{getStatusText()}</span>
-        </div>
-        {lastSyncTime && syncStatus === 'synced' && (
-          <div style={{ 
-            fontSize: '12px', 
-            marginTop: 4, 
-            opacity: 0.8,
-            textAlign: 'center'
-          }}>
-            Last sync: {lastSyncTime.toLocaleTimeString()}
-        </div>
-        )}
-        {offlineEvents.length > 0 && (
-          <div style={{ 
-            fontSize: '12px', 
-            marginTop: 4, 
-            opacity: 0.8,
-            textAlign: 'center'
-          }}>
-            {offlineEvents.length} events queued for sync
-        </div>
-        )}
-      </div>
-    )
-  }
-
+  // Add status indicator to the UI
   // Navigation guard to prevent accidental exits during active game
   const navigationGuardEnabled = !suppressNavigationGuard && (hasGameStarted || gameState.isPlaying || events.length > 0)
   // Navigation guard - prevent accidental exits during active game
@@ -6566,32 +5746,9 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         transition: 'all 0.3s ease'
       }}
     >
-      {/* Offline status indicator */}
-      {renderOfflineStatus()}
+      {/* Removed Online status indicator - UI only */}
       
-      {/* Enhanced Service Status Indicator */}
-      <div style={{ 
-        marginBottom: '16px', 
-        padding: '8px 16px', 
-        backgroundColor: serviceStatus === 'connected' ? '#f6ffed' : serviceStatus === 'error' ? '#fff2f0' : '#fff7e6',
-        border: `1px solid ${serviceStatus === 'connected' ? '#b7eb8f' : serviceStatus === 'error' ? '#ffccc7' : '#ffe58f'}`,
-        borderRadius: '6px',
-        textAlign: 'center'
-      }}>
-        <Badge 
-          status={serviceStatus === 'connected' ? 'success' : serviceStatus === 'error' ? 'error' : 'processing'}
-          text={
-            serviceStatus === 'connected' ? 'Enhanced Live Stat Tracker Active - Data syncing to database' :
-            serviceStatus === 'error' ? 'Enhanced Service Error - Check console for details' :
-            'Connecting to Enhanced Live Stat Tracker...'
-          }
-          style={{ 
-            color: serviceStatus === 'connected' ? '#52c41a' : serviceStatus === 'error' ? '#ff4d4f' : '#faad14',
-            fontSize: '14px',
-            fontWeight: 500
-          }}
-        />
-      </div>
+      {/* Removed Enhanced Service Status Indicator - UI only */}
       
       <Row gutter={[16, 16]}>
         {/* Game Clock and Controls */}
@@ -6814,7 +5971,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       >
                         Analytics
                       </Button>
-                      {/* Settings under Export (same column, next row) */}
+                      {/* Settings under Export (same column, next row) - COMMENTED OUT */}
+                      {/* 
                       <Button 
                         icon={<SettingOutlined />}
                         onClick={() => { setShowSettingsModal(true); setSuppressNavigationGuard(true) }}
@@ -6822,6 +5980,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       >
                         Settings
                       </Button>
+                      */}
                     </div>
                   </Col>
                 </Row>
@@ -8055,7 +7214,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         </div>
       </Modal>
 
-      {/* Settings Modal */}
+      {/* Settings Modal - COMMENTED OUT */}
+      {/* 
       <Modal
         title="Game Settings"
         open={showSettingsModal}
@@ -8065,9 +7225,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           <Button key="reset" onClick={resetSettings}>
             Reset to Defaults
           </Button>,
-          // <Button key="export" onClick={exportSettings}>
-          //   Export Settings
-          // </Button>,
           <Button key="cancel" onClick={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}>
             Cancel
           </Button>,
@@ -8105,7 +7262,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
               label: 'Workflow',
               children: (
                 <Row gutter={[16, 16]}>
-
                   <Col span={12}>
                     <SettingRow label="Auto-pause on Timeout:" controlType="switch" value={settings.autoPauseOnTimeout} onChange={checked => saveSettings({ autoPauseOnTimeout: checked })} />
                   </Col>
@@ -8132,10 +7288,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                   <Col span={12}>
                     <SettingRow label="Show Efficiency Ratings:" controlType="switch" value={settings.showEfficiencyRatings} onChange={checked => saveSettings({ showEfficiencyRatings: checked })} />
                   </Col>
-                  <Col span={12}>
-                    <SettingRow label="Ask after 2PT Made: Points in Paint?" controlType="switch" value={settings.askForPointsInPaint} onChange={checked => saveSettings({ askForPointsInPaint: checked })} />
-                  </Col>
-
                 </Row>
               )
             },
@@ -8210,208 +7362,11 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                   </Col>
                 </Row>
               )
-            },
-            {
-              key: 'offline',
-              label: 'Offline Management',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={24}>
-                    <Card title="Offline Storage Status" size="small" style={{ marginBottom: 16 }}>
-                      <Row gutter={[16, 16]}>
-                        <Col span={8}>
-                          <Statistic 
-                            title="Storage Used" 
-                            value={liveStatService.getStorageUsage().percentage} 
-                            suffix="%" 
-                            valueStyle={{ color: liveStatService.getStorageUsage().percentage > 80 ? '#f5222d' : '#52c41a' }}
-                          />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic 
-                            title="Saved Games" 
-                            value={savedGames.length} 
-                            suffix="games"
-                          />
-                        </Col>
-                        <Col span={8}>
-                          <Statistic 
-                            title="Connection" 
-                            value={liveStatService.getOfflineStatus().isOnline ? 'Online' : 'Offline'} 
-                            valueStyle={{ color: liveStatService.getOfflineStatus().isOnline ? '#52c41a' : '#f5222d' }}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-                  <Col span={12}>
-                    <Button 
-                      type="primary" 
-                      icon={<DownloadOutlined />}
-                      onClick={() => {
-                        const data = liveStatService.exportOfflineData()
-                        const blob = new Blob([data], { type: 'application/json' })
-                        const url = URL.createObjectURL(blob)
-                        const link = document.createElement('a')
-                        link.href = url
-                        link.download = `offline-data-${Date.now()}.json`
-                        link.click()
-                        message.success('Offline data exported successfully')
-                      }}
-                      block
-                    >
-                      Export All Offline Data
-                    </Button>
-                  </Col>
-                  <Col span={12}>
-                    <Button 
-                      danger
-                      icon={<CloseOutlined />}
-                      onClick={() => {
-                        modal.confirm({
-                          title: 'Clear All Offline Data',
-                          content: 'This will permanently delete all saved games and offline data. This action cannot be undone.',
-                          okText: 'Clear All',
-                          cancelText: 'Cancel',
-                          onOk: async () => {
-                            liveStatService.clearAllOfflineData()
-                            message.success('All offline data cleared')
-                            refreshSavedGames()
-                          }
-                        })
-                      }}
-                      block
-                    >
-                      Clear All Offline Data
-                    </Button>
-                  </Col>
-                  <Col span={24}>
-                    <Card 
-                      title="Saved Games" 
-                      size="small"
-                      extra={
-                        <Space>
-                          <Button 
-                            size="small" 
-                            icon={<ReloadOutlined />} 
-                            onClick={refreshSavedGames}
-                          >
-                            Refresh
-                          </Button>
-                          <Button 
-                            size="small" 
-                            type="primary"
-                            onClick={async () => {
-                              try {
-                                const sessionId = liveStatService.getCurrentSessionKey()
-                                if (sessionId) {
-                                  const result = await liveStatService.aggregateGameStats(parseInt(sessionId))
-                                  message.success(`Stats aggregated! Game ID: ${result.gameId}`)
-                                  refreshSavedGames()
-                                } else {
-                                  message.info('No active session to aggregate')
-                                }
-                              } catch (error) {
-                                console.error('Failed to aggregate stats:', error)
-                                message.error('Failed to aggregate stats')
-                              }
-                            }}
-                          >
-                            Aggregate Current
-                          </Button>
-                          <Button 
-                            size="small" 
-                            type="default"
-                            onClick={async () => {
-                              try {
-                                // Aggregate the existing session (ID 1) that has data
-                                const result = await liveStatService.aggregateExistingSession(1)
-                                message.success(`Existing session aggregated! Game ID: ${result.gameId}`)
-                                refreshSavedGames()
-                              } catch (error) {
-                                console.error('Failed to aggregate existing session:', error)
-                                message.error('Failed to aggregate existing session')
-                              }
-                            }}
-                          >
-                            Aggregate Existing
-                          </Button>
-                        </Space>
-                      }
-                    >
-                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                        {savedGames.length > 0 ? (
-                          savedGames.map((game, index) => (
-                            <div key={game.id} style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center',
-                              padding: '10px 14px',
-                              margin: '6px 0',
-                              background: index % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.1)',
-                              borderRadius: 8,
-                              border: '1px solid rgba(255,255,255,0.12)'
-                            }}>
-                              <div>
-                                <Text strong>Event #{game.eventId}</Text>
-                                <br />
-                                <Text type="secondary" style={{ fontSize: '0.8rem' }}>
-                                  {new Date(game.timestamp).toLocaleString()} • {game.events.length} events
-                                </Text>
-                              </div>
-                              <Space>
-                                <Button 
-                                  size="small" 
-                                  onClick={async () => {
-                                    if (game.eventId === eventId) {
-                                      // Load this game data from database
-                                      const gameData = await liveStatService.loadGameDataFromDatabase(game.sessionKey)
-                                      if (gameData) {
-                                        setGameState(gameData.gameState)
-                                        setPlayers(gameData.players)
-                                        setEvents(gameData.events)
-                                        setLineups(gameData.lineups)
-                                        setOpponentOnCourt(gameData.opponentOnCourt)
-                                        setSubstitutionHistory(gameData.substitutionHistory)
-                                        setQuickSubHistory(gameData.quickSubHistory)
-                                        setActionHistory(gameData.actionHistory)
-                                        message.success('Game data loaded successfully from database')
-                                      } else {
-                                        message.error('Failed to load game data from database')
-                                      }
-                                    } else {
-                                      message.info('Switch to Event #' + game.eventId + ' to load this game')
-                                    }
-                                  }}
-                                >
-                                  Load
-                                </Button>
-                                <Button 
-                                  size="small" 
-                                  danger
-                                  onClick={async () => {
-                                    await liveStatService.deleteGameData(game.eventId)
-                                    message.success('Game data deleted')
-                                    await refreshSavedGames()
-                                  }}
-                                >
-                                  Delete
-                                </Button>
-                              </Space>
-                            </div>
-                          ))
-                        ) : (
-                          <Text type="secondary">No saved games found</Text>
-                        )}
-                      </div>
-                    </Card>
-                  </Col>
-                </Row>
-              )
             }
           ]}
         />
       </Modal>
+      */}
 
 
       {/* Lineup Builder Modal */}
@@ -9029,26 +7984,9 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             type="primary"
             icon={<SaveOutlined />}
             onClick={async () => {
-              // Enhanced service: Update game state before saving
-              if (liveSessionKey) {
-                try {
-                  await liveStatService.updateGameState({
-                    quarter: gameState.quarter,
-                    currentTime: gameState.currentTime,
-                    homeScore: gameState.homeScore,
-                    awayScore: gameState.opponentScore,
-                    opponentScore: gameState.opponentScore,
-                    timeoutHome: gameState.timeoutHome,
-                    timeoutAway: gameState.timeoutAway,
-                    isPlaying: true
-                  })
-                  console.log('Enhanced game state updated before save')
-                } catch (error) {
-                  console.error('Failed to update enhanced game state before save:', error)
-                }
-              }
+              // Removed service game state update - UI only
               
-              saveGameDataOffline({ showToast: true })
+              saveGameData({ showToast: true })
             }}
             style={{ 
               height: '48px', 
@@ -9061,24 +7999,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             Save Game Data
           </Button>
 
-          <Button 
-            type="primary"
-            size="large"
-            icon={<StopOutlined />}
-            disabled={gameState.quarter < 4}
-            onClick={() => {
-              setShowEndGameModal(true)
-            }}
-            style={{ 
-              height: '48px', 
-              fontSize: '16px',
-              backgroundColor: '#1677ff',
-              borderColor: '#1677ff',
-              minWidth: '200px'
-            }}
-          >
-            End Game
-          </Button>
+          {/* Removed End Game button - UI only */}
         </Space>
       </div>
 
@@ -9155,36 +8076,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         onOk={async () => {
           setShowEndGameModal(false);
           try {
-            // Save current game data first
-            if (liveSessionKey) {
-              try {
-                await liveStatService.updateGameState({
-                  quarter: gameState.quarter,
-                  currentTime: gameState.currentTime,
-                  homeScore: gameState.homeScore,
-                  awayScore: gameState.opponentScore,
-                  opponentScore: gameState.opponentScore,
-                  timeoutHome: gameState.timeoutHome,
-                  timeoutAway: gameState.timeoutAway,
-                  isPlaying: false
-                })
-              } catch {}
-            }
-            saveGameDataOffline({ showToast: false })
+            // Removed service game state update - UI only
+            saveGameData({ showToast: false })
 
-            // End session (and aggregate if available in refined service flow)
-            if (liveSessionKey) {
-              try {
-                const sessionId = refinedLiveStatTrackerService.getCurrentSessionKey()
-                if (sessionId) {
-                  await refinedLiveStatTrackerService.endGameAndAggregate(parseInt(sessionId))
-                } else {
-                  await refinedLiveStatTrackerService.endLiveGame()
-                }
-              } catch (e) {
-                console.error('Failed to end game via service:', e)
-              }
-            }
+            // Removed service end game calls - UI only
             message.success('Game ended and saved')
           } catch (e) {
             message.error('Failed to end game')

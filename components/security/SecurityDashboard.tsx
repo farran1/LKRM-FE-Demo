@@ -59,23 +59,9 @@ const SecurityDashboard: React.FC = () => {
       const status = calculateSecurityStatus(calculatedMetrics)
       setSecurityStatus(status)
       
-      // Load recent security alerts (mock data for now)
-      setRecentAlerts([
-        {
-          id: '1',
-          timestamp: new Date(),
-          severity: 'high',
-          message: 'Multiple failed login attempts detected',
-          source: '192.168.1.100'
-        },
-        {
-          id: '2',
-          timestamp: new Date(Date.now() - 3600000),
-          severity: 'medium',
-          message: 'Large file upload detected',
-          source: 'user@example.com'
-        }
-      ])
+      // Load recent security alerts from API
+      // TODO: Implement real security alerts API
+      setRecentAlerts([])
       
     } catch (error) {
       console.error('Failed to load security data:', error)

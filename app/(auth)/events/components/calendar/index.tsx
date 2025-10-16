@@ -111,10 +111,20 @@ const CalendarView = ({dataSource, currentDate, showEventDetail, addEvent}: any)
           const daysOfWeek = entry.daysOfWeek.map((d: any) => parseInt(d))
           const startOfWeek = startDate.startOf('week')
           
-          // Generate instances for each selected day of the week
-          for (let weekOffset = 0; weekOffset < Math.ceil(occurrences / daysOfWeek.length); weekOffset++) {
+          // Generate instances for each selected day of the week, respecting occurrence limits
+          let occurrenceCount = 0
+          let weekOffset = 0
+          
+          while (occurrenceCount < occurrences) {
             for (const dayOfWeek of daysOfWeek) {
+              if (occurrenceCount >= occurrences) break
+              
               const recurringDate = startOfWeek.add(weekOffset, 'week').add(dayOfWeek, 'day')
+              
+              // Check if this occurrence is within the end date (if specified)
+              if (entry.endDate && recurringDate.isAfter(dayjs(entry.endDate), 'day')) {
+                break
+              }
               
               if (recurringDate.format('YYYY-MM-DD') === dateStr) {
                 eventsForDate.push({
@@ -123,10 +133,13 @@ const CalendarView = ({dataSource, currentDate, showEventDetail, addEvent}: any)
                   startTime: recurringDate.toISOString(),
                   isRecurringInstance: true,
                   originalEventId: entry.id,
-                  occurrenceNumber: weekOffset * daysOfWeek.length + daysOfWeek.indexOf(dayOfWeek) + 1
+                  occurrenceNumber: occurrenceCount + 1
                 })
               }
+              
+              occurrenceCount++
             }
+            weekOffset++
           }
         } else {
           // Regular repeating (daily, monthly, yearly, or weekly without specific days)
@@ -148,6 +161,11 @@ const CalendarView = ({dataSource, currentDate, showEventDetail, addEvent}: any)
                 break
               default:
                 recurringDate = startDate.add(i, 'week') // Default to weekly
+            }
+            
+            // Check if this occurrence is within the end date (if specified)
+            if (entry.endDate && recurringDate.isAfter(dayjs(entry.endDate), 'day')) {
+              break
             }
             
             if (recurringDate.format('YYYY-MM-DD') === dateStr) {

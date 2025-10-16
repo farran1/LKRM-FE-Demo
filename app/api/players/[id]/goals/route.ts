@@ -1,35 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { SupabaseAPI } from '../../../../../src/services/supabase-api'
+import { createServerClientWithAuth } from '@/lib/supabase'
+import { z } from 'zod'
 
-const supabaseAPI = new SupabaseAPI()
+// Force Node.js runtime to avoid Edge Runtime issues with Supabase
+export const runtime = 'nodejs'
+
+// Input validation schema
+const createGoalSchema = z.object({
+	title: z.string().min(1).max(255).trim(),
+	description: z.string().max(1000).optional(),
+	target_value: z.number().optional(),
+	priority: z.enum(['low', 'medium', 'high']).optional(),
+	deadline: z.string().datetime().optional()
+})
 
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = await params
-		const playerId = parseInt(id)
+		const { client: supabase, user } = await createServerClientWithAuth(request)
 		
-		if (isNaN(playerId)) {
-			return NextResponse.json(
-				{ error: 'Invalid player ID' },
-				{ status: 400 }
-			)
+		if (!user) {
+			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+		}
+		
+		const resolvedParams = await params
+		const playerId = parseInt(resolvedParams.id)
+		
+		if (isNaN(playerId) || playerId <= 0) {
+			return NextResponse.json({ error: 'Invalid player ID' }, { status: 400 })
 		}
 
-		console.log('API GET /players/[id]/goals - fetching goals for player:', playerId)
-		
-		const goals = await supabaseAPI.getPlayerGoals(playerId)
-		
-		console.log('API GET /players/[id]/goals - returning goals:', goals)
-		return NextResponse.json({ goals })
+		// Verify player exists
+		const { data: player, error: playerError } = await supabase
+			.from('players')
+			.select('id')
+			.eq('id', playerId)
+			.single()
+
+		if (playerError || !player) {
+			return NextResponse.json({ error: 'Player not found' }, { status: 404 })
+		}
+
+		// Get player goals
+		const { data: goals, error } = await supabase
+			.from('player_goals')
+			.select(`
+				id,
+				goal,
+				goal_text,
+				targetDate,
+				isAchieved,
+				category,
+				createdAt,
+				created_at
+			`)
+			.eq('playerId', playerId)
+			.order('createdAt', { ascending: false })
+
+		if (error) {
+			return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 })
+		}
+
+		return NextResponse.json({ goals: goals || [] })
 	} catch (error) {
-		console.error('Error fetching player goals:', error)
-		return NextResponse.json(
-			{ error: 'Failed to fetch player goals' },
-			{ status: 500 }
-		)
+		return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 	}
 }
 
@@ -38,31 +74,67 @@ export async function POST(
 	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = await params
-		const playerId = parseInt(id)
+		const { client: supabase, user } = await createServerClientWithAuth(request)
 		
-		if (isNaN(playerId)) {
-			return NextResponse.json(
-				{ error: 'Invalid player ID' },
-				{ status: 400 }
-			)
+		if (!user) {
+			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+		}
+		
+		const resolvedParams = await params
+		const playerId = parseInt(resolvedParams.id)
+		
+		if (isNaN(playerId) || playerId <= 0) {
+			return NextResponse.json({ error: 'Invalid player ID' }, { status: 400 })
+		}
+
+		// Verify player exists
+		const { data: player, error: playerError } = await supabase
+			.from('players')
+			.select('id')
+			.eq('id', playerId)
+			.single()
+
+		if (playerError || !player) {
+			return NextResponse.json({ error: 'Player not found' }, { status: 404 })
 		}
 
 		const body = await request.json()
-		console.log('API POST /players/[id]/goals - creating goal for player:', playerId, 'with data:', body)
-		
-		const goal = await supabaseAPI.createPlayerGoal({
-			playerId,
-			goalText: body.goal || body.goalText
-		})
-		
-		console.log('API POST /players/[id]/goals - created goal:', goal)
+		const validatedData = createGoalSchema.parse(body)
+		const { title, description, target_value, priority, deadline } = validatedData
+
+		// Create new goal
+		const { data: goal, error } = await supabase
+			.from('player_goals')
+			.insert({
+				playerId: playerId,
+				goal: title,
+				goal_text: description || '',
+				targetDate: deadline || null,
+				isAchieved: false,
+				category: priority || 'medium',
+				createdBy: parseInt(user.id) || 0
+			})
+			.select(`
+				id,
+				goal,
+				goal_text,
+				targetDate,
+				isAchieved,
+				category,
+				createdAt,
+				created_at
+			`)
+			.single()
+
+		if (error) {
+			return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 })
+		}
+
 		return NextResponse.json({ goal }, { status: 201 })
 	} catch (error) {
-		console.error('Error creating player goal:', error)
-		return NextResponse.json(
-			{ error: 'Failed to create player goal' },
-			{ status: 500 }
-		)
+		if (error instanceof z.ZodError) {
+			return NextResponse.json({ error: 'Invalid input data', details: error.issues }, { status: 400 })
+		}
+		return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 	}
 }

@@ -1,4 +1,4 @@
-import { Button, Col, ColorPicker, Flex, Form, Input, Modal, Row, Skeleton, Tooltip } from 'antd'
+import { Button, Col, ColorPicker, Flex, Form, Input, Modal, Row, Skeleton, Tooltip, List, Typography } from 'antd'
 import { memo, useEffect, useState } from 'react'
 import style from './style.module.scss'
 import CloseIcon from '@/components/icon/close.svg'
@@ -6,35 +6,33 @@ import CalendarIcon from '@/components/icon/calendar.svg'
 import MapIcon from '@/components/icon/map-pin.svg'
 import UserIcon from '@/components/icon/users-round.svg'
 import TaskIcon from '@/components/icon/credit-card.svg'
+import TrashIcon from '@/components/icon/trash.svg'
 import api from '@/services/api'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { EditFilled } from '@ant-design/icons'
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 
-function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
+function EventDetailModal({isShowModal, onClose, event, openEdit, onDelete}: any) {
   // const [event, setEvent] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [playerLoading, setPlayerLoading] = useState(false)
-  const [players, setPlayers] = useState<Array<{id: number, name: string, position: string}>>([]);
   const [tasks, setTasks] = useState<Array<any>>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
   const [expenses, setExpenses] = useState<Array<any>>([])
   const [expensesLoading, setExpensesLoading] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    if (!event) {
+    if (!event || !isShowModal) {
       return
     }
 
-    // fetch attendees/coaches only for meeting/practice types
-    const type = event?.event_types?.name?.toLowerCase()
-    if (type === 'meeting' || type === 'practice' || type === 'workout') {
-      fetchPlayer()
-    }
     // always fetch tasks and expenses linked to this event
     fetchTasks()
     fetchExpenses()
-  }, [event])
+  }, [event, isShowModal])
 
   // const fetchDetail = async () => {
   //   setLoading(true)
@@ -43,25 +41,23 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
   //   setLoading(false)
   // }
 
-  const fetchPlayer = async () => {
-    setPlayerLoading(true)
-    // Use originalEventId for recurring instances, otherwise use the regular id
-    const eventId = event.originalEventId || event.id
-    const res = await api.get(`/api/events/${eventId}/players`)
-    setPlayers((res as any).data.data)
-    setPlayerLoading(false)
-  }
 
   const fetchTasks = async () => {
+    if (!event?.id) return
+    
+    setTasksLoading(true)
     try {
       // Use originalEventId for recurring instances, otherwise use the regular id
-      const eventId = event.originalEventId || event.id
+      const eventId = event.id
       const res = await api.get('/api/tasks', { params: { eventId: eventId } })
       // normalize envelope { data } or direct array
       const list = Array.isArray((res as any)?.data) ? (res as any).data : (Array.isArray((res as any)?.data?.data) ? (res as any).data.data : [])
       setTasks(list)
     } catch (e) {
+      console.error('Error fetching tasks for event:', e)
       setTasks([])
+    } finally {
+      setTasksLoading(false)
     }
   }
 
@@ -69,7 +65,7 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
     setExpensesLoading(true)
     try {
       // Use originalEventId for recurring instances, otherwise use the regular id
-      const eventId = event.originalEventId || event.id
+      const eventId = event.id
       const res = await api.get(`/api/events/${eventId}/expenses`)
       const expensesData = (res as any)?.data?.data || []
       setExpenses(Array.isArray(expensesData) ? expensesData : [])
@@ -84,6 +80,21 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
   //   router.push('/events/' + event.id)
   // }
 
+  const handleDeleteEvent = async () => {
+    if (!event || !onDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      await onDelete(event.id);
+      setShowDeleteModal(false);
+      onClose(); // Close the detail modal after successful deletion
+    } catch (error) {
+      console.error('Error deleting event:', error);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <Modal
       closeIcon={null}
@@ -97,19 +108,42 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
       {loading && <Skeleton active />}
       {!loading &&
         <>
-          <Flex className={style.header} justify="space-between" align='flex-end' style={{ marginBottom: 16 }}>
-            <Flex gap={8}>
+          <Flex className={style.header} justify="space-between" align='center' style={{ marginBottom: 16 }}>
+            <Flex align="center" gap={12}>
               <div className={style.title}>{event?.name}</div>
-              <Tooltip title="Edit Event">
-                <EditFilled className={style.edit} onClick={openEdit} />
-              </Tooltip>
+              <Flex align="center" gap={8}>
+                <Tooltip title="Edit Event">
+                  <EditFilled 
+                    className={style.edit} 
+                    onClick={openEdit}
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: '#1890ff',
+                      fontSize: '16px'
+                    }}
+                  />
+                </Tooltip>
+                {onDelete && (
+                  <Tooltip title="Delete Event">
+                    <TrashIcon 
+                      onClick={() => setShowDeleteModal(true)}
+                      style={{ 
+                        cursor: 'pointer', 
+                        color: '#ff4d4f',
+                        width: '16px',
+                        height: '16px'
+                      }}
+                    />
+                  </Tooltip>
+                )}
+              </Flex>
             </Flex>
             <CloseIcon onClick={onClose} />
           </Flex>
           <div>
             <div className={style.subtitle}>
               <span className={style.eventType} style={{ backgroundColor: event?.event_types?.color || '#1890ff', color: '#ffffff' }}>{event?.event_types?.name || 'Unknown'}</span>
-              <span>{event?.isRepeat ? 'Weekly' : 'Only'} on {dayjs(event?.startTime).format('dddd')}</span>
+              <span>{event?.isRepeat ? (event?.repeatType || 'Weekly') : 'Only'} on {dayjs(event?.startTime).format('dddd')}</span>
             </div>
             <div className={style.time}>
               <CalendarIcon /><span>{dayjs(event?.startTime).format('MMM D, h:mm A')}</span>
@@ -120,83 +154,147 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
             {(event?.event_types?.name?.toLowerCase() === 'meeting' || event?.event_types?.name?.toLowerCase() === 'practice' || event?.event_types?.name?.toLowerCase() === 'workout') && (
               <div className={style.sectionPlayer}>
                 <Flex justify="space-between" align="center" className={style.header}>
-                  <div className={style.title}><UserIcon /><span>{players?.length || 0} Coaches</span></div>
+                  <div className={style.title}><UserIcon /><span>Attendees:</span></div>
                 </Flex>
-                {playerLoading && <Skeleton active />}
-                {players && players.map((item: any) => (
-                  <Row key={item.id}>
-                    <Col span={14}>👤 {item.name}</Col>
-                    <Col span={10} style={{ textAlign: 'right' }}>{item.position?.name || ''}</Col>
-                  </Row>
-                ))}
+                {event?.event_coaches && event.event_coaches.length > 0 ? (
+                  <div style={{ padding: '8px 0' }}>
+                    {event.event_coaches.map((coach: any, index: number) => (
+                      <div key={index} className={style.task}>
+                        <Flex align='center'>
+                          <UserIcon />
+                          <div>
+                            <div className={style.title}>{coach.coachUsername}</div>
+                            <div className={style.value}>Coach</div>
+                          </div>
+                        </Flex>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: '#666', fontSize: '14px', padding: '8px 0' }}>
+                    No coaches assigned
+                  </div>
+                )}
               </div>
             )}
             <div className={style.line}></div>
             <div className={style.sectionTask}>
-              <div className={style.title}>Tasks</div>
-              {tasks.length === 0 && <div className={style.card}>No Tasks Linked</div>}
-              {tasks.slice(0, 3).map((t) => (
-                <div key={t.userId || t.id} className={style.task}>
-                  <Flex align='center'>
-                    <TaskIcon />
-                    <div>
-                      <div className={style.title}>{t.name}</div>
-                      <div className={style.value}>{t.users?.username ? `👤 ${t.users.username}` : ''}</div>
+              <Typography.Title level={5} className={style.title}>Tasks</Typography.Title>
+              <List
+                className={style.taskList}
+                loading={tasksLoading}
+                dataSource={tasks.slice(0, 2)}
+                locale={{ emptyText: 'No tasks linked to this event.' }}
+                renderItem={(item) => (
+                  <List.Item 
+                    className={style.taskItem} 
+                    onClick={() => router.push(`/tasks/${item.userId || item.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <List.Item.Meta
+                      title={
+                        <span className={style.taskTitle}>
+                          {(() => {
+                            const title = item.name || 'Untitled Task'
+                            return title.length > 35 ? `${title.substring(0, 35)}...` : title
+                          })()}
+                        </span>
+                      }
+                      description={
+                        <span className={style.taskMeta}>
+                          {(() => {
+                            const parts = []
+                            if (item.description) {
+                              parts.push(item.description)
+                            }
+                            if (item.dueDate) {
+                              parts.push(new Date(item.dueDate).toLocaleDateString())
+                            }
+                            if (item.task_priorities?.name) {
+                              parts.push(item.task_priorities.name)
+                            }
+                            return parts.join(' • ')
+                          })()}
+                        </span>
+                      }
+                    />
+                    <div className={`${style.taskStatus} ${style[item.status]}`}>
+                      {item.status}
                     </div>
-                  </Flex>
-                </div>
-              ))}
-              {tasks.length > 3 && (
+                  </List.Item>
+                )}
+              />
+              {tasks.length > 2 && (
                 <div 
-                  className={style.card} 
-                  style={{ 
-                    textAlign: 'center', 
-                    opacity: 0.8, 
-                    cursor: 'pointer',
-                    textDecoration: 'underline'
+                  className={style.moreButton}
+                  onClick={() => {
+                    router.push(`/tasks?eventId=${event.id}`)
+                    onClose()
                   }}
-                  onClick={() => router.push(`/tasks?eventId=${event.id}`)}
                 >
-                  & {tasks.length - 3} more...
+                  & {tasks.length - 2} more...
                 </div>
               )}
             </div>
             <div className={style.sectionExpenses}>
-              <div className={style.title}>Expenses</div>
-              {expensesLoading ? (
-                <div className={style.card}>Loading...</div>
-              ) : expenses.length === 0 ? (
-                <div className={style.card}>No Expenses Linked</div>
-              ) : (
-                <>
-                  {expenses.slice(0, 3).map((expense) => (
-                    <div key={expense.id} className={style.task}>
-                      <Flex align='center'>
-                        <TaskIcon />
-                        <div>
-                          <div className={style.title}>{expense.merchant}</div>
-                          <div className={style.value}>
-                            ${expense.amount} • {new Date(expense.date).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </Flex>
+              <Typography.Title level={5} className={style.title}>Expenses</Typography.Title>
+              <List
+                className={style.expenseList}
+                loading={expensesLoading}
+                dataSource={expenses.slice(0, 2)}
+                locale={{ emptyText: 'No expenses linked to this event.' }}
+                renderItem={(item) => (
+                  <List.Item 
+                    className={style.expenseItem} 
+                    onClick={() => router.push(`/expenses/${item.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <List.Item.Meta
+                      title={
+                        <span className={style.expenseTitle}>
+                          {(() => {
+                            const title = item.description || item.merchant || 'Untitled Expense'
+                            return title.length > 35 ? `${title.substring(0, 35)}...` : title
+                          })()}
+                        </span>
+                      }
+                      description={
+                        <span className={style.expenseMeta}>
+                          {(() => {
+                            const parts = []
+                            if (item.merchant && item.description !== item.merchant) {
+                              parts.push(item.merchant)
+                            }
+                            if (item.date) {
+                              parts.push(new Date(item.date).toLocaleDateString())
+                            }
+                            if (item.budgets?.name) {
+                              parts.push(item.budgets.name)
+                            }
+                            return parts.join(' • ')
+                          })()}
+                        </span>
+                      }
+                    />
+                    <div className={style.expenseAmount}>
+                      ${Number(item.amount || 0).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })}
                     </div>
-                  ))}
-                  {expenses.length > 3 && (
-                    <div 
-                      className={style.card} 
-                      style={{ 
-                        textAlign: 'center', 
-                        opacity: 0.8, 
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                      onClick={() => router.push(`/expenses?eventId=${event.id}`)}
-                    >
-                      & {expenses.length - 3} more...
-                    </div>
-                  )}
-                </>
+                  </List.Item>
+                )}
+              />
+              {expenses.length > 2 && (
+                <div 
+                  className={style.moreButton}
+                  onClick={() => {
+                    router.push(`/expenses?eventId=${event.id}`)
+                    onClose()
+                  }}
+                >
+                  & {expenses.length - 2} more...
+                </div>
               )}
             </div>
             {/* COMMENTED OUT: Full screen event detail pages are temporarily disabled */}
@@ -206,6 +304,16 @@ function EventDetailModal({isShowModal, onClose, event, openEdit}: any) {
           </div>
         </>
       }
+      
+      <DeleteConfirmationModal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteEvent}
+        title="Delete Event"
+        itemName={event?.name || ''}
+        itemType="event"
+        loading={deleteLoading}
+      />
     </Modal>
   )
 }

@@ -1,11 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-
-// Mock jwt for frontend static export
-const jwt = {
-  verify: (token: string, secret: string) => ({ userId: 1, email: 'mock@example.com' })
-}
-const JsonWebTokenError = Error
-const TokenExpiredError = Error
+import jwt from 'jsonwebtoken'
 
 export interface AuthRequest extends Request {
   userId?: number
@@ -34,9 +28,10 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     req.userId = payload.userId
     next()
   } catch (err) {
-    if (err instanceof TokenExpiredError) {
+    const name = (err as any)?.name
+    if (name === 'TokenExpiredError') {
       res.status(401).json({ error: 'Token expired' })
-    } else if (err instanceof JsonWebTokenError) {
+    } else if (name === 'JsonWebTokenError') {
       res.status(403).json({ error: 'Invalid token' })
     } else {
       res.status(500).json({ error: 'Token verification failed' })

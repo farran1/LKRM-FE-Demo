@@ -137,17 +137,8 @@ export class SecurityMiddleware {
       }
       
       // TODO: Implement proper Supabase session validation
-      // For now, return a mock context
-      const mockContext: SecurityContext = {
-        userId: 'mock_user_id',
-        userEmail: 'mock@example.com',
-        userRole: UserRole.COACH,
-        ipAddress: this.getClientIP(request),
-        userAgent: request.headers.get('user-agent') || 'unknown',
-        sessionId: 'mock_session_id'
-      }
-      
-      return { authenticated: true, context: mockContext }
+      // For now, return unauthenticated
+      return { authenticated: false }
       
     } catch (error) {
       console.error('Authentication validation error:', error)

@@ -2,8 +2,51 @@
 
 import React, { useState, useEffect } from 'react'
 import { BookOutlined, SearchOutlined, DeleteFilled, PushpinOutlined, CalendarOutlined } from '@ant-design/icons'
-import { Input, Button, message, Popconfirm, Tooltip, Pagination, Spin } from 'antd'
+import { Input, Button, App, Popconfirm, Tooltip, Pagination, Spin } from 'antd'
 import api from '@/services/api'
+
+// Utility function to calculate appropriate colors based on background color
+const getContrastingColors = (backgroundColor: string) => {
+  // Convert hex to RGB
+  const hex = backgroundColor.replace('#', '')
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+  
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  
+  // Return appropriate colors based on background brightness
+  if (luminance > 0.5) {
+    // Light background - use dark colors
+    return {
+      iconColor: '#333333',
+      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+      hoverBackgroundColor: 'rgba(0, 0, 0, 0.2)',
+      borderColor: 'rgba(0, 0, 0, 0.2)',
+      deleteIconColor: '#ff4d4f',
+      deleteBackgroundColor: 'rgba(255, 77, 79, 0.1)',
+      deleteHoverBackgroundColor: 'rgba(255, 77, 79, 0.2)',
+      deleteBorderColor: 'rgba(255, 77, 79, 0.3)',
+      pinColor: '#4ecdc4',
+      pinHoverBackgroundColor: 'rgba(78, 205, 196, 0.2)'
+    }
+  } else {
+    // Dark background - use light colors
+    return {
+      iconColor: '#ffffff',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      hoverBackgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      deleteIconColor: '#ff6b6b',
+      deleteBackgroundColor: 'rgba(255, 107, 107, 0.2)',
+      deleteHoverBackgroundColor: 'rgba(255, 107, 107, 0.3)',
+      deleteBorderColor: 'rgba(255, 107, 107, 0.4)',
+      pinColor: '#4ecdc4',
+      pinHoverBackgroundColor: 'rgba(78, 205, 196, 0.3)'
+    }
+  }
+}
 
 interface Coach {
   id: string
@@ -36,8 +79,10 @@ interface QuickNote {
 }
 
 export default function NotebookPage() {
+  const { message } = App.useApp()
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [loading, setLoading] = useState(false)
+  const [coaches, setCoaches] = useState<Coach[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalNotes, setTotalNotes] = useState(0)
@@ -62,7 +107,28 @@ export default function NotebookPage() {
 
   useEffect(() => {
     loadNotes()
+    loadCoaches()
   }, [currentPage, searchQuery])
+
+  const loadCoaches = async () => {
+    try {
+      const response = await api.get('/api/coaches/search')
+      console.log('Coaches response:', response.data)
+      if (response.data && typeof response.data === 'object' && 'coaches' in response.data && Array.isArray(response.data.coaches)) {
+        setCoaches(response.data.coaches)
+        console.log('Loaded coaches:', response.data.coaches)
+      } else {
+        // No coaches available - set empty array
+        setCoaches([])
+        console.log('No coaches available')
+      }
+    } catch (error) {
+      console.error('Error loading coaches:', error as Error)
+      // No coaches available due to error - set empty array
+      setCoaches([])
+      console.log('No coaches available due to error')
+    }
+  }
 
   const loadNotes = async () => {
     setLoading(true)
@@ -87,9 +153,16 @@ export default function NotebookPage() {
 
   const deleteNote = async (id: number) => {
     try {
-      await api.delete(`/api/quick-notes/${id}`)
-      setNotes(prev => prev.filter(note => note.id !== id))
-      message.success('Note deleted successfully')
+      const response = await api.delete(`/api/quick-notes/${id}`)
+      console.log('Delete note response:', response)
+      
+      // Check if the response indicates success
+      if (response.status === 200 || response.status === 204) {
+        setNotes(prev => prev.filter(note => note.id !== id))
+        message.success('Note deleted successfully')
+      } else {
+        throw new Error(`API returned status ${response.status}`)
+      }
     } catch (error) {
       console.error('Error deleting note:', error as Error)
       message.error('Failed to delete note')
@@ -124,26 +197,40 @@ export default function NotebookPage() {
         parts.push(content.substring(lastIndex, match.index))
       }
       
-      parts.push(
-        <span 
-          key={match.index} 
-          style={{
-            background: '#1e3a8a',
-            color: '#ffffff',
-            padding: '4px 4px',
-            borderRadius: '16px',
-            fontSize: '13px',
-            fontWeight: '600',
-            margin: '0 2px',
-            display: 'inline-block',
-            boxShadow: '0 2px 0px rgba(255, 107, 107, 0.4)',
-            border: '2px solid #ffffff',
-            letterSpacing: '0.3px'
-          }}
-        >
-          @{match[1]}
-        </span>
+      const mentionText = match[1]
+      // Check if this mention corresponds to a real user
+      const isValidUser = coaches.some(coach => 
+        coach.name.toLowerCase().includes(mentionText.toLowerCase()) || 
+        coach.username.toLowerCase() === mentionText.toLowerCase() ||
+        coach.firstName.toLowerCase() === mentionText.toLowerCase()
       )
+      
+      if (isValidUser) {
+        // Add styled mention for valid users
+        parts.push(
+          <span 
+            key={match.index} 
+            style={{
+              background: '#1e3a8a',
+              color: '#ffffff',
+              padding: '4px 4px',
+              borderRadius: '16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              margin: '0 2px',
+              display: 'inline-block',
+              boxShadow: '0 2px 0px rgba(255, 107, 107, 0.4)',
+              border: '2px solid #ffffff',
+              letterSpacing: '0.3px'
+            }}
+          >
+            @{mentionText}
+          </span>
+        )
+      } else {
+        // Add unstyled text for invalid mentions
+        parts.push(`@${mentionText}`)
+      }
       
       lastIndex = match.index + match[0].length
     }
@@ -174,7 +261,8 @@ export default function NotebookPage() {
   )
 
   return (
-    <div style={{
+    <App>
+      <div style={{
       minHeight: '100vh',
       background: '#0f2741',
       padding: '20px'
@@ -326,9 +414,9 @@ export default function NotebookPage() {
                           position: 'absolute',
                           top: '12px',
                           right: '12px',
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          border: 'none',
-                          color: note.is_pinned ? '#4ecdc4' : '#666',
+                          background: getContrastingColors(note.color).backgroundColor,
+                          border: `1px solid ${getContrastingColors(note.color).borderColor}`,
+                          color: note.is_pinned ? getContrastingColors(note.color).pinColor : getContrastingColors(note.color).iconColor,
                           fontSize: '14px',
                           cursor: 'pointer',
                           padding: '6px',
@@ -337,10 +425,12 @@ export default function NotebookPage() {
                           zIndex: 10
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(78, 205, 196, 0.2)'
+                          e.currentTarget.style.background = note.is_pinned 
+                            ? getContrastingColors(note.color).pinHoverBackgroundColor
+                            : getContrastingColors(note.color).hoverBackgroundColor
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
+                          e.currentTarget.style.background = getContrastingColors(note.color).backgroundColor
                         }}
                       >
                         <PushpinOutlined />
@@ -460,18 +550,20 @@ export default function NotebookPage() {
                         overlayStyle={{
                           background: 'rgba(0, 0, 0, 0.6)'
                         }}
-                        overlayInnerStyle={{
-                          background: '#1f2937',
-                          borderRadius: '12px',
-                          border: '1px solid #374151',
-                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)'
+                        styles={{
+                          body: {
+                            background: '#1f2937',
+                            borderRadius: '12px',
+                            border: '1px solid #374151',
+                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)'
+                          }
                         }}
                       >
                         <button
                           onClick={(e) => e.stopPropagation()}
                           style={{
-                            background: 'rgba(255, 77, 79, 0.1)',
-                            border: '1px solid rgba(255, 77, 79, 0.3)',
+                            background: getContrastingColors(note.color).deleteBackgroundColor,
+                            border: `1px solid ${getContrastingColors(note.color).deleteBorderColor}`,
                             cursor: 'pointer',
                             padding: '6px',
                             borderRadius: '6px',
@@ -481,15 +573,15 @@ export default function NotebookPage() {
                             transition: 'all 0.2s ease'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 77, 79, 0.2)'
+                            e.currentTarget.style.backgroundColor = getContrastingColors(note.color).deleteHoverBackgroundColor
                             e.currentTarget.style.transform = 'scale(1.1)'
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 77, 79, 0.1)'
+                            e.currentTarget.style.backgroundColor = getContrastingColors(note.color).deleteBackgroundColor
                             e.currentTarget.style.transform = 'scale(1)'
                           }}
                         >
-                          <DeleteFilled style={{ color: '#ff4d4f', fontSize: '14px' }} />
+                          <DeleteFilled style={{ color: getContrastingColors(note.color).deleteIconColor, fontSize: '14px' }} />
                         </button>
                       </Popconfirm>
                     </div>
@@ -531,5 +623,6 @@ export default function NotebookPage() {
         }
       `}</style>
     </div>
+    </App>
   )
 }

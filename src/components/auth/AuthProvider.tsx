@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ROUTES } from '@/utils/routes'
 import { SupabaseAPI } from '@/services/supabase-api'
+import { cacheService } from '@/services/cache-service'
 
 interface AuthContextType {
   user: User | null
@@ -57,6 +58,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session ? 'exists' : 'none')
+      if (session?.user) {
+        console.log('User metadata:', session.user.user_metadata)
+        console.log('User email:', session.user.email)
+      }
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -142,6 +147,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
           router.replace(ROUTES.dashboard)
         } else {
           console.log('Already on protected route, no redirect needed:', currentPath)
+        }
+
+        // Warm caches for offline live tracker after login
+        try {
+          await Promise.all([
+            cacheService.getRoster().catch(() => {}),
+            cacheService.getEvents().catch(() => {}),
+          ])
+          console.log('Offline caches warmed: roster and events')
+        } catch (e) {
+          console.warn('Failed to warm offline caches:', e)
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('User signed out - redirecting to login')

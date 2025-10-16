@@ -46,12 +46,69 @@ const EventSelector: React.FC<EventSelectorProps> = ({
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [pendingEventId, setPendingEventId] = useState<number | null>(null);
   
-  // Fetch events
+  // Fetch events with offline fallback
   const { data: eventsResponse, error, isLoading } = useSWR('/api/events', fetcher);
-  // Normalize events: handle both array and { data: [] } shapes
-  const allEvents: Event[] = Array.isArray(eventsResponse)
-    ? (eventsResponse as Event[])
-    : (Array.isArray((eventsResponse as any)?.data) ? (eventsResponse as any).data : []);
+  
+  // Get events from API or offline cache
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        // Try to get events from API response first
+        let events: Event[] = [];
+        
+        if (eventsResponse) {
+          // Normalize events: handle both array and { data: [] } shapes
+          const rawEvents = Array.isArray(eventsResponse)
+            ? (eventsResponse as any[])
+            : (Array.isArray((eventsResponse as any)?.data) ? (eventsResponse as any).data : []);
+          
+          // Transform events to match expected interface
+          events = rawEvents.map((event: any) => ({
+            ...event,
+            eventType: event.event_types ? {
+              name: event.event_types.name,
+              color: event.event_types.color
+            } : null
+          }));
+        }
+        
+        // If no events from API or API failed, try offline cache
+        if (events.length === 0) {
+          try {
+            const { offlineStorage } = await import('../../../src/services/offline-storage');
+            const cachedEvents = offlineStorage.getEventsCache();
+            if (cachedEvents && Array.isArray(cachedEvents)) {
+              console.log('📱 Using cached events from offline storage');
+              events = cachedEvents;
+              setIsOfflineMode(true);
+            }
+          } catch (offlineError) {
+            console.warn('⚠️ Failed to load events from offline storage:', offlineError);
+          }
+        } else {
+          // Cache events when successfully fetched from API
+          try {
+            const { offlineStorage } = await import('../../../src/services/offline-storage');
+            offlineStorage.saveEventsCache(events);
+            console.log('💾 Events cached for offline use');
+            setIsOfflineMode(false);
+          } catch (cacheError) {
+            console.warn('⚠️ Failed to cache events:', cacheError);
+          }
+        }
+        
+        setAllEvents(events);
+      } catch (error) {
+        console.error('❌ Failed to load events:', error);
+        setAllEvents([]);
+      }
+    };
+    
+    loadEvents();
+  }, [eventsResponse, error]);
   
   // Filter events to only show Game and Scrimmage types
   const filteredEvents: Event[] = useMemo(() => {
@@ -69,9 +126,20 @@ const EventSelector: React.FC<EventSelectorProps> = ({
     eventIds.length > 0 ? '/api/events/check-data' : null,
     async (url) => {
       console.log('🔍 SWR: Fetching events data for IDs:', eventIds);
+      
+      // Get authentication token
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      const authHeaders: HeadersInit = session?.access_token ? {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      } : {
+        'Content-Type': 'application/json'
+      };
+      
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ eventIds })
       });
       const result = await response.json();
@@ -231,7 +299,14 @@ const EventSelector: React.FC<EventSelectorProps> = ({
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
         {/* Event Selection Dropdown */}
         <div>
-          <Text strong style={{ color: '#ffffff' }}>Choose an event:</Text>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <Text strong style={{ color: '#ffffff' }}>Choose an event:</Text>
+            {isOfflineMode && (
+              <Tag color="orange" style={{ fontSize: '11px' }}>
+                📱 Offline Mode
+              </Tag>
+            )}
+          </div>
           <Select
             placeholder="Select an event to track stats for..."
             style={{ width: '100%', marginTop: 4, backgroundColor: '#0f2e52', color: '#ffffff', border: '1px solid #295a8f', borderRadius: 8, height: 40 }}
@@ -254,13 +329,6 @@ const EventSelector: React.FC<EventSelectorProps> = ({
             placement="bottomLeft"
             popupMatchSelectWidth={true}
             getPopupContainer={(triggerNode) => triggerNode.parentNode as HTMLElement}
-            dropdownStyle={{
-              backgroundColor: '#0f2e52',
-              color: '#ffffff',
-              border: '1px solid #295a8f',
-              borderRadius: '8px',
-              zIndex: 1050
-            }}
             filterOption={(input, option) =>
               (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
             }
@@ -366,14 +434,19 @@ const EventSelector: React.FC<EventSelectorProps> = ({
         {/* No Events Message */}
         {!isLoading && events.length === 0 && (
           <Alert
-            message="No events found"
-            description="Create your first event to start tracking stats."
-            type="info"
+            message={isOfflineMode ? "No cached events available" : "No events found"}
+            description={isOfflineMode 
+              ? "You're offline and no events are cached. Connect to the internet to load events, or create a new event when online."
+              : "Create your first event to start tracking stats."
+            }
+            type={isOfflineMode ? "warning" : "info"}
             showIcon
             action={
-              <Button size="small" type="primary" onClick={handleCreateEvent}>
-                Create Event
-              </Button>
+              !isOfflineMode && (
+                <Button size="small" type="primary" onClick={handleCreateEvent}>
+                  Create Event
+                </Button>
+              )
             }
           />
         )}
@@ -474,7 +547,34 @@ const EventSelector: React.FC<EventSelectorProps> = ({
   );
 };
 
-// Helper function for SWR
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+// Helper function for SWR with authentication
+const fetcher = async (url: string) => {
+  try {
+    // Import supabase client
+    const { supabase } = await import('@/lib/supabase');
+    
+    // Get authentication token
+    const { data: { session } } = await supabase.auth.getSession();
+    const authHeaders: HeadersInit = session?.access_token ? {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
+    } : {
+      'Content-Type': 'application/json'
+    };
+    
+    const response = await fetch(url, {
+      headers: authHeaders
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('Fetcher error:', error);
+    throw error;
+  }
+};
 
 export default EventSelector;

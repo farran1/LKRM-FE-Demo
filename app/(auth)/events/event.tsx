@@ -28,13 +28,52 @@ import CalendarView from './components/calendar'
 import dayjs, { Dayjs } from 'dayjs'
 import LeftIcon from '@/components/icon/left.svg'
 import RightIcon from '@/components/icon/right.svg'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
+import ColumnEditor from './components/column-editor'
+import { DashboardRefreshProvider, useDashboardRefresh } from '@/contexts/DashboardRefreshContext'
 
-function Event() {
+function EventContent() {
   const searchParams = useSearchParams()
   const queryParams = convertSearchParams(searchParams)
-  const API_KEY = `/api/events?${stringify(queryParams)}`
+  const { refreshAll } = useDashboardRefresh()
+  
+  // Create API params excluding eventTypeName sorting
+  const apiParams = { ...queryParams }
+  if (apiParams.sortBy === 'eventTypeName') {
+    delete apiParams.sortBy
+    delete apiParams.sortDirection
+  }
+  
+  const API_KEY = `/api/events?${stringify(apiParams)}`
+  console.log('Events page - API call:', { apiParams, API_KEY })
   const {data: response, isLoading, isValidating, mutate} = useSWR(API_KEY)
-  const dataSource = response?.data || []
+  const rawDataSource = response?.data || []
+  
+  // Apply client-side sorting for event type
+  const dataSource = useMemo(() => {
+    console.log('Current sortBy:', queryParams.sortBy, 'sortDirection:', queryParams.sortDirection)
+    
+    if (!queryParams.sortBy || queryParams.sortBy !== 'eventTypeName') {
+      console.log('Not sorting by eventTypeName, returning raw data')
+      return rawDataSource
+    }
+    
+    console.log('Applying client-side sorting for eventTypeName:', queryParams.sortDirection)
+    
+    const sortedData = [...rawDataSource].sort((a, b) => {
+      const aType = a.event_types?.name || 'Unknown'
+      const bType = b.event_types?.name || 'Unknown'
+      
+      if (queryParams.sortDirection === 'asc') {
+        return aType.localeCompare(bType)
+      } else {
+        return bType.localeCompare(aType)
+      }
+    })
+    
+    console.log('Sorted event types:', sortedData.map(item => item.event_types?.name))
+    return sortedData
+  }, [rawDataSource, queryParams.sortBy, queryParams.sortDirection])
   
   // Debug: Log the data being returned
   useEffect(() => {
@@ -57,15 +96,36 @@ function Event() {
   const [currentDate, setCurrentDate] = useState(dayjs())
   const [isShowEventDetail, showEventDetail] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
-  const [isSort, enableSort] = useState(false)
   const { notification } = App.useApp()
   const [loadingSearch, setLoadingSearch] = useState(false)
-  const [searchkey, setSearchKey] = useState('')
   const [eventDefaultVals, setEventDefaultVals] = useState({})
+  const [columnConfig, setColumnConfig] = useState([
+    { key: 'name', title: 'Title', visible: true, sortable: true },
+    { key: 'startTime', title: 'Date & Time', visible: true, sortable: true },
+    { key: 'type', title: 'Type', visible: true, sortable: true },
+    { key: 'location', title: 'Location', visible: true, sortable: false },
+    { key: 'details', title: 'Details', visible: true, sortable: false },
+  ])
 
-  useEffect(() => {
-    setSearchKey(queryParams?.name)
-  }, [queryParams?.name])
+  // Debounced search functionality
+  const handleDebouncedSearch = useCallback((searchTerm: string) => {
+    const currentParams = convertSearchParams(searchParams);
+    if (searchTerm.trim()) {
+      currentParams.name = searchTerm
+    } else {
+      delete currentParams.name
+    }
+    const newQuery = stringify(currentParams)
+    router.push(`?${newQuery}`)
+  }, [searchParams, router])
+
+  const {
+    searchTerm: searchkey,
+    setSearchTerm: setSearchKey,
+    isSearching,
+    handleImmediateSearch,
+    clearSearch
+  } = useDebouncedSearch(queryParams?.name || '', 500, handleDebouncedSearch);
 
   const viewMode = queryParams.viewMode || 'list'
   const setViewMode = useCallback((mode: string) => {
@@ -101,8 +161,6 @@ function Event() {
   }, [queryParams])
 
   const renderHeader = useCallback((title: string, dataIndex: string) => {
-    if (!isSort) return title
-
     return (
       <Flex className={style.header} justify='space-between' align='center'>
         <span>{title}</span>
@@ -111,73 +169,95 @@ function Event() {
         {(queryParams.sortBy === dataIndex && queryParams.sortDirection === 'asc') && <ArrowDownOutlined onClick={() => sort(dataIndex, 'desc')} />}
       </Flex>
     )
-  }, [queryParams.sortBy, queryParams.sortDirection, isSort])
+  }, [queryParams.sortBy, queryParams.sortDirection])
 
-  const columns = useMemo(() => [
-    {
-      title: renderHeader('Title', 'name'),
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: renderHeader('Date & Time', 'startTime'),
-      key: 'startTime',
-      render: (data: any) => {
-        return moment(data.startTime).format('MMM D, h:mm A')
-      }
-    },
-    {
-      title: renderHeader('Type', 'eventType'),
-      key: 'type',
-      render: (data: any) => {
-        return <span className={style.eventType} style={{ backgroundColor: data.event_types?.color || '#1890ff', color: '#ffffff' }}>{data.event_types?.name || 'Unknown'}</span>
-      }
-    },
-    {
-      title: 'Location',
-      key: 'location',
-      render: (data: any) => {
-        return data.location + ' - ' + data.venue
-      }
-    },
-    {
-      title: 'Details',
-      key: 'details',
-      render: (data: any) => {
-        const eventType = data.event_types?.name?.toLowerCase()
-        const info = data.oppositionTeam || 'TBD'
-        const coaches = ''
-        const extra = data.notes || ''
+  const columns = useMemo(() => {
+    const columnDefinitions = {
+      name: {
+        title: renderHeader('Title', 'name'),
+        dataIndex: 'name',
+        key: 'name',
+        ellipsis: true,
+        width: '20%',
+      },
+      startTime: {
+        title: renderHeader('Date & Time', 'startTime'),
+        key: 'startTime',
+        ellipsis: true,
+        width: '18%',
+        render: (data: any) => {
+          return moment(data.startTime).format('MMM D, h:mm A')
+        }
+      },
+      type: {
+        title: renderHeader('Type', 'eventTypeName'),
+        key: 'type',
+        ellipsis: true,
+        width: '15%',
+        render: (data: any) => {
+          return <span className={style.eventType} style={{ backgroundColor: data.event_types?.color || '#1890ff', color: '#ffffff' }}>{data.event_types?.name || 'Unknown'}</span>
+        }
+      },
+      location: {
+        title: 'Location',
+        key: 'location',
+        ellipsis: true,
+        width: '20%',
+        render: (data: any) => {
+          return data.location + ' - ' + data.venue
+        }
+      },
+      details: {
+        title: 'Details',
+        key: 'details',
+        ellipsis: true,
+        width: '27%',
+        render: (data: any) => {
+          const eventType = data.event_types?.name?.toLowerCase()
+          const info = data.oppositionTeam || 'TBD'
+          const coaches = ''
+          const extra = data.notes || ''
 
-        if (eventType === 'meeting' || eventType === 'practice' || eventType === 'workout') {
-          return (
-            <div>
-              <strong>Attendees:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
-            </div>
-          )
-        } else if (eventType === 'game' || eventType === 'scrimmage') {
-          return (
-            <div>
-              <strong>Opponent:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
-            </div>
-          )
-        } else {
-          return (
-            <div>
-              <strong>Details:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
-            </div>
-          )
+          if (eventType === 'meeting' || eventType === 'practice' || eventType === 'workout') {
+            return (
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <strong>Coach Event:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
+              </div>
+            )
+          } else if (eventType === 'game' || eventType === 'scrimmage') {
+            return (
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <strong>Opponent:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
+              </div>
+            )
+          } else {
+            return (
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <strong>Details:</strong> {info}{extra ? (<><strong> | Notes: </strong>{extra}</>) : null}
+              </div>
+            )
+          }
         }
       }
     }
-  ], [queryParams.sortBy, queryParams.sortDirection, isSort])
+
+    return columnConfig
+      .filter(col => col.visible)
+      .map(col => columnDefinitions[col.key as keyof typeof columnDefinitions])
+  }, [queryParams.sortBy, queryParams.sortDirection, columnConfig])
 
   const openNewEvent = () => {
     showNewEvent(true)
   }
 
   const refreshEvent = () => {
-    mutate()
+    mutate() // Refresh the events list
+    refreshAll() // Refresh all dashboard components
+  }
+
+  const resetToDefaultView = () => {
+    // Reset to default view with no filters
+    router.push('/events')
   }
 
   const openFilter = () => {
@@ -209,8 +289,6 @@ function Event() {
     queryParams.sortDirection = 'asc'
     const newQuery = stringify(queryParams)
     router.push(`?${newQuery}`)
-
-    enableSort(false)
   }, [queryParams])
 
   const openEventDetail = useCallback((event: any) => {
@@ -230,45 +308,54 @@ function Event() {
     style: { cursor: 'pointer' }, // optional styling
   }), [])
 
-  const toggleSort = () => {
-    enableSort(!isSort)
-    // Turn off sort
-    if (isSort && viewMode === 'list' && queryParams.sortBy) {
-      delete queryParams.sortBy 
-      delete queryParams.sortDirection
-      const newQuery = stringify(queryParams)
-      router.push(`?${newQuery}`)
-    }
-  }
-
   const openEditEvent = () => {
     showEditEvent(true)
     showEventDetail(false)
   }
 
-  const handleSearch = async () => {
-    // if (!searchkey.trim()) {
-    //   notification.error({
-    //     message: null, // suppress default title
-    //     description: 'Please enter a search keyword',
-    //     style: {
-    //       backgroundColor: '#2c1618',
-    //       border: '1px solid #5b2526',
-    //       borderRadius: 8,
-    //       padding: '8px 16px 16px'
-    //     },
-    //     closeIcon: false
-    //   })
-    //   return
-    // }
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      const response = await fetch(`/api/events/${eventId}`, {
+        method: 'DELETE'
+      });
 
-    queryParams.name = searchkey
-    const newQuery = stringify(queryParams)
-    router.push(`?${newQuery}`)
-  }
+      if (response.ok) {
+        notification.success({
+          message: 'Event deleted successfully',
+          description: 'The event has been permanently removed.'
+        });
+        mutate(); // Refresh the events list
+        showEventDetail(false); // Close detail modal
+        setSelectedEvent(null);
+      } else {
+        const error = await response.json();
+        notification.error({
+          message: 'Failed to delete event',
+          description: error.error || 'An error occurred while deleting the event.'
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      notification.error({
+        message: 'Failed to delete event',
+        description: 'An error occurred while deleting the event.'
+      });
+    }
+  };
 
   const onChangeSearch = (e: any) => {
     setSearchKey(e.target.value)
+  }
+
+  const handleColumnsChange = (newColumns: any[]) => {
+    setColumnConfig(newColumns)
+  }
+
+  const handleColumnReorder = (fromIndex: number, toIndex: number) => {
+    const newColumns = [...columnConfig]
+    const [movedColumn] = newColumns.splice(fromIndex, 1)
+    newColumns.splice(toIndex, 0, movedColumn)
+    setColumnConfig(newColumns)
   }
 
   return (
@@ -276,7 +363,7 @@ function Event() {
       <div className={style.container}>
         <Flex justify="space-between" align="center" style={{ marginBottom: 10 }}>
           <Flex align='flex-end' gap={16}>
-            <div className={style.title}>Events</div>
+            <div className={style.title} onClick={resetToDefaultView} style={{ cursor: 'pointer' }}>Events</div>
             <Segmented
               value={viewMode}
               onChange={setViewMode}
@@ -295,8 +382,8 @@ function Event() {
               placeholder="Search"
               className={style.search}
               value={searchkey}
-              onChange={onChangeSearch}
-              onPressEnter={handleSearch}
+              onChange={(e) => setSearchKey(e.target.value)}
+              onPressEnter={handleImmediateSearch}
               allowClear
             />
             {viewMode === 'calendar' &&
@@ -309,8 +396,11 @@ function Event() {
           </Flex>
           <Flex align='center' gap={10}>
             <Button type="primary" className={classNames({[style.filter]: !hasFilter})} icon={<FunnelIcon />} onClick={openFilter}>Filters</Button>
-            <Button type="primary" className={classNames({[style.sort]: !isSort})} icon={<SortIcon />} onClick={toggleSort}>Sort</Button>
-            
+            <ColumnEditor 
+              columns={columnConfig}
+              onColumnsChange={handleColumnsChange}
+              onReorder={handleColumnReorder}
+            />
           </Flex>
         </Flex>
         {viewMode === 'list' &&
@@ -337,8 +427,22 @@ function Event() {
       <NewEvent isOpen={isOpenNewEvent} showOpen={showNewEvent} onRefresh={refreshEvent} defaultValues={eventDefaultVals} />
       <EditEvent event={selectedEvent} isOpen={isOpenEditEvent} showOpen={showEditEvent} onRefresh={refreshEvent} />
       <Filter isOpen={isOpenFilter} showOpen={showFilter} />
-      <EventDetailModal isShowModal={isShowEventDetail} onClose={onCloseEventDetail} event={selectedEvent} openEdit={openEditEvent} />
+      <EventDetailModal 
+        isShowModal={isShowEventDetail} 
+        onClose={onCloseEventDetail} 
+        event={selectedEvent} 
+        openEdit={openEditEvent}
+        onDelete={handleDeleteEvent}
+      />
     </>
+  )
+}
+
+function Event() {
+  return (
+    <DashboardRefreshProvider>
+      <EventContent />
+    </DashboardRefreshProvider>
   )
 }
 

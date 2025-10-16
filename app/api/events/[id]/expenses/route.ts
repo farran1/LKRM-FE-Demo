@@ -29,11 +29,13 @@ export async function GET(
         description,
         receiptUrl,
         budgetId,
+        eventId,
         createdAt,
         createdBy,
         updatedAt,
         updatedBy,
-        budgets (id, name)
+        budgets (id, name),
+        events (id, name)
       `)
       .eq('eventId', eventId)
       .order('date', { ascending: false })

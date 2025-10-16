@@ -1,47 +1,160 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
 import style from './style.module.scss'
 import { Flex } from 'antd'
 import TrashIcon from '@/components/icon/trash.svg'
 import { useAuthStore } from '@/store/auth'
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import api from '@/services/api'
+import { App } from 'antd'
 
 interface Note {
   id?: number;
-  note: string;
+  // For notes
+  note?: string;
+  // For goals
+  goal?: string;
+  goal_text?: string;
   createdUser?: {
-    profile: {
-      firstName: string;
-    };
+    id: number;
+    username: string;
+    email: string;
   };
 }
 
 interface NoteListProps {
   notes: Note[];
-  deleteNote: (index: number) => void;
+  // For player create page, allow local deletion callback
+  deleteNote?: (index: number) => void;
+  // For detail pages with persisted notes/goals
+  onNoteDeleted?: (noteId: number) => void;
+  playerId?: number;
+  itemType?: 'note' | 'goal';
 }
 
-function NoteList({ notes, deleteNote }: NoteListProps) {
+function NoteList({ notes, deleteNote, onNoteDeleted, playerId, itemType }: NoteListProps) {
   const { user } = useAuthStore()
+  const { message } = App.useApp()
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    note: Note | null;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    note: null,
+    loading: false
+  })
 
   const renderAuthor = useCallback((item: Note) => {
-    if (item?.createdUser) return <div className={style.createdBy}>By Coach {item?.createdUser.profile.firstName}</div>
-    return <div className={style.createdBy}>By Coach {user?.profile.firstName}</div>
+    // Try to get author from the note's createdUser
+    if (item?.createdUser?.username) {
+      return <div className={style.createdBy}>By Coach {item.createdUser.username}</div>
+    }
+    
+    if (item?.createdUser?.email) {
+      const emailName = item.createdUser.email.split('@')[0]
+      return <div className={style.createdBy}>By Coach {emailName}</div>
+    }
+    
+    // Fallback to current user
+    if (user?.profile?.firstName) {
+      return <div className={style.createdBy}>By Coach {user.profile.firstName}</div>
+    }
+    
+    // Fallback to email if no profile name
+    if (user?.email) {
+      const emailName = user.email.split('@')[0]
+      return <div className={style.createdBy}>By Coach {emailName}</div>
+    }
+    
+    // Final fallback
+    return <div className={style.createdBy}>By Coach</div>
   }, [user])
 
+  const handleDeleteClick = useCallback((note: Note) => {
+    setDeleteModal({
+      isOpen: true,
+      note,
+      loading: false
+    })
+  }, [])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteModal.note?.id) return
+
+    setDeleteModal(prev => ({ ...prev, loading: true }))
+
+    try {
+      const endpoint = itemType === 'note' 
+        ? `/api/players/${playerId}/notes/${deleteModal.note.id}`
+        : `/api/players/${playerId}/goals/${deleteModal.note.id}`
+      
+      console.log('Deleting item:', { endpoint, noteId: deleteModal.note.id, itemType })
+      
+      const response = await api.delete(endpoint)
+      console.log('Delete response:', response)
+      
+      // Check if the deletion was successful
+      if ((response as any)?.status && (response as any).status < 400) {
+        message.success(`${itemType === 'note' ? 'Note' : 'Goal'} deleted successfully`)
+        
+        console.log('Calling onNoteDeleted with:', deleteModal.note.id)
+        onNoteDeleted && onNoteDeleted(deleteModal.note.id)
+        
+        setDeleteModal({ isOpen: false, note: null, loading: false })
+      } else {
+        throw new Error('Delete operation failed')
+      }
+    } catch (error) {
+      console.error(`Error deleting ${itemType}:`, error)
+      message.error(`Failed to delete ${itemType}. Please try again.`)
+      setDeleteModal(prev => ({ ...prev, loading: false }))
+    }
+  }, [deleteModal.note, playerId, itemType, onNoteDeleted, message])
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteModal({ isOpen: false, note: null, loading: false })
+  }, [])
+
   return (
-    notes.map((item: Note, index: number) =>
-              <div className={style.cardNote} key={index + (item.id || 0)}>
-        <Flex justify='space-between'>
-          <div>
-            <div className={style.note}>{item.note}</div>
-            {renderAuthor(item)}
+    <>
+      {notes.map((item: Note, index: number) => {
+        // Create a unique key using item.id, created_at, and index as fallback
+        const uniqueKey = item.id 
+          ? `note-${item.id}` 
+          : `note-${index}-${item.note?.slice(0, 10) || 'unknown'}`
+        
+        // Pick the correct display text for notes vs goals
+        const displayText = item.note || item.goal || item.goal_text || ''
+        
+        return (
+          <div className={style.cardNote} key={uniqueKey}>
+            <Flex justify='space-between'>
+              <div>
+                <div className={style.note}>{displayText}</div>
+                {renderAuthor(item)}
+              </div>
+              <div>
+                {typeof deleteNote === 'function'
+                  ? <TrashIcon onClick={() => deleteNote(index)} />
+                  : <TrashIcon onClick={() => handleDeleteClick(item)} />}
+              </div>
+            </Flex>
           </div>
-          <div>
-            {/* <EditIcon style={{ marginRight: 8 }} /> */}
-            <TrashIcon onClick={() => deleteNote(index)} />
-          </div>
-        </Flex>
-      </div>
-    )
+        )
+      })}
+      
+      {!deleteNote && itemType && playerId && (
+        <DeleteConfirmationModal
+          isOpen={deleteModal.isOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title={`${itemType === 'note' ? 'Note' : 'Goal'} #${deleteModal.note?.id || ''}`}
+          content={deleteModal.note?.note || ''}
+          itemType={itemType}
+          loading={deleteModal.loading}
+        />
+      )}
+    </>
   )
 }
 

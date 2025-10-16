@@ -2,6 +2,7 @@
   font-weight: 500;
   font-size: 32px;
   line-height: 1.7rem;
+  text-decoration: underline;
 }
 .container {
   padding-top: 2px;
@@ -10,6 +11,16 @@
     border: unset;
     width: 281px;
     background-color: rgba(255, 255, 255, 0.1);
+  }
+  .myTasksActive {
+    background-color: #1D75D0 !important;
+    border-color: #1D75D0 !important;
+    color: white !important;
+    
+    &:hover {
+      background-color: #1c66b4 !important;
+      border-color: #1c66b4 !important;
+    }
   }
   .filter {
     background-color: rgba(255, 255, 255, 0.1);
@@ -30,14 +41,43 @@
 .priority {
   padding: 4px 8px;
   border-radius: 4px;
-  &.High {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: white;
+  
+  &.high {
     background-color: #DA2F36;
   }
-  &.Medium {
+  &.medium {
     background-color: #FF9800;
   }
-  &.Low {
+  &.low {
     background-color: #1D75D0;
+  }
+  &.no-priority {
+    background-color: #666;
+  }
+}
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: white;
+  
+  &.todo {
+    background-color: #6c757d;
+  }
+  &.in_progress {
+    background-color: #1D75D0;
+  }
+  &.done {
+    background-color: #28a745;
+  }
+  &.archive {
+    background-color: #6c757d;
   }
 }
 .header {

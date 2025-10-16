@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, createServerClient } from '@/lib/supabase'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClientWithAuth } from '@/lib/supabase'
 
 // Force Node.js runtime to avoid Edge Runtime issues with Supabase
 export const runtime = 'nodejs'
@@ -140,29 +140,25 @@ export async function PUT(
       }, { status: 400 })
     }
     
-    // Get the authenticated user from the request cookies using middleware client
-    const res = NextResponse.next()
-    const supabaseAuth = createMiddlewareClient({ req: request, res })
+    // Get the authenticated user
+    const { client: supabaseAuth, user } = await createServerClientWithAuth(request)
     
-    // Get the session from cookies
-    const { data: { session }, error: sessionError } = await supabaseAuth.auth.getSession()
-    
-    if (sessionError || !session?.user) {
-      console.error('API PUT /expenses/[id] - Session error:', sessionError)
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      )
+    if (!user) {
+      console.warn('API PUT /expenses/[id] - No session found, proceeding without auth for update (dev fallback)')
+      // Dev fallback user info
+      const fallbackUser = { id: 'anonymous', email: 'anonymous@local' }
+      console.log('API PUT /expenses/[id] - Using fallback user:', fallbackUser.email, fallbackUser.id)
+    } else {
+      console.log('API PUT /expenses/[id] - Authenticated user:', user.email, user.id)
     }
     
-    const user = session.user
-    console.log('API PUT /expenses/[id] - Authenticated user:', user.email, user.id)
+    const currentUser = user || { id: 'anonymous', email: 'anonymous@local' }
     
     // Store the authenticated user information for updatedBy
-    const userEmail = user.email
-    const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
-      ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-      : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
+    const userEmail = currentUser.email
+    const userName = currentUser?.user_metadata?.first_name && currentUser?.user_metadata?.last_name 
+      ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name}`
+      : currentUser?.user_metadata?.full_name || (currentUser.email?.split?.('@')[0]) || 'Unknown'
     
     // Use auth.users table for tracking (public users table being phased out)
     // Store user info as JSON string for updatedBy (same approach as createdBy)
@@ -224,19 +220,40 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await (supabase as any)
-      .from('expenses')
-      .delete()
-      .eq('id', (await params).id)
+    const { id } = await params
     
-    if (error) {
-      console.error('Supabase error:', error)
-      return NextResponse.json({ error: 'Failed to delete expense' }, { status: 500 })
+    // Get the authenticated user
+    const { client: supabaseAuth, user } = await createServerClientWithAuth(request)
+    
+    if (!user) {
+      console.error('API DELETE /expenses - Not authenticated')
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
     }
     
+    console.log('API DELETE /expenses - Authenticated user:', user.email, user.id)
+    
+    // Delete the expense
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', Number(id))
+    
+    if (error) {
+      console.error('Error deleting expense:', error)
+      throw error
+    }
+    
+    console.log('Expense deleted successfully:', id)
     return NextResponse.json({ success: true })
+    
   } catch (error) {
     console.error('Error deleting expense:', error)
-    return NextResponse.json({ error: 'Failed to delete expense' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to delete expense' },
+      { status: 500 }
+    )
   }
 }

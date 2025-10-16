@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import { App, Modal, List, Typography, Progress, Flex } from 'antd';
+import { App, Modal, List, Typography, Progress, Flex, Button } from 'antd';
+import { ExclamationCircleFilled } from '@ant-design/icons';
 import style from './budget-detail-modal.module.scss'
 import CloseIcon from '@/components/icon/close.svg'
+import TrashIcon from '@/components/icon/trash.svg'
+import EditIcon from '@/components/icon/edit.svg'
 import { useRouter } from 'next/navigation'
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 
 interface BudgetDetailModalProps {
   open: boolean;
@@ -15,7 +19,14 @@ interface BudgetDetailModalProps {
     totalBudget: number;
     spent: number;
     percentage: number;
+    period: string;
+    description?: string;
+    autoRepeat: boolean;
+    season: string;
+    is_pinned: boolean;
   } | null;
+  onDelete?: (budgetId: number) => void;
+  onEdit?: (budget: any) => void;
 }
 
 interface ExpenseItem {
@@ -28,10 +39,12 @@ interface ExpenseItem {
   date?: string;
 }
 
-export default function BudgetDetailModal({ open, onClose, budget }: BudgetDetailModalProps) {
+export default function BudgetDetailModal({ open, onClose, budget, onDelete, onEdit }: BudgetDetailModalProps) {
   const { message } = App.useApp();
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
 
   const remaining = useMemo(() => {
@@ -59,10 +72,40 @@ export default function BudgetDetailModal({ open, onClose, budget }: BudgetDetai
     load();
   }, [open, budget?.id]);
 
-  const progressColor = budget && budget.percentage >= 80 ? '#ff6b6b' : budget && budget.percentage >= 60 ? '#ffb020' : '#1d75d0';
+  // Determine progress bar color based on spending percentage
+  const progressColor = useMemo(() => {
+    if (!budget) return '#34c759';
+    const percentage = budget.percentage;
+    
+    if (percentage >= 100) {
+      return '#f5222d'; // Red for over budget
+    } else if (percentage >= 80) {
+      return '#ff3b30'; // Red for high spending
+    } else if (percentage >= 60) {
+      return '#ff9500'; // Orange for medium spending
+    } else {
+      return '#34c759'; // Green for low spending
+    }
+  }, [budget?.percentage]);
 
   const openExpenseDetail = (expenseId: number) => {
     router.push(`/expenses/${expenseId}`);
+  };
+
+  const handleDeleteBudget = async () => {
+    if (!budget || !onDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      await onDelete(budget.id);
+      setShowDeleteModal(false);
+      onClose(); // Close the detail modal after successful deletion
+    } catch (error) {
+      console.error('Error deleting budget:', error);
+      message.error('Failed to delete budget');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   return (
@@ -81,19 +124,61 @@ export default function BudgetDetailModal({ open, onClose, budget }: BudgetDetai
       {budget && (
         <>
           <Flex className={style.header} justify="space-between" align='center'>
-            <div className={style.title}>{budget.title}</div>
+            <Flex align="center" gap={12}>
+              <div className={style.title}>{budget.title}</div>
+              <Flex align="center" gap={8}>
+                {onEdit && (
+                  <EditIcon 
+                    onClick={() => onEdit(budget)}
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: '#1890ff',
+                      width: '16px',
+                      height: '16px'
+                    }}
+                  />
+                )}
+                {onDelete && (
+                  <TrashIcon 
+                    onClick={() => setShowDeleteModal(true)}
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: '#ff4d4f',
+                      width: '16px',
+                      height: '16px'
+                    }}
+                  />
+                )}
+              </Flex>
+            </Flex>
             <CloseIcon onClick={onClose} />
           </Flex>
 
           <Flex justify="space-between" align="stretch" className={style.metrics} gap={24}>
             <Flex align="center" gap={20} className={style.metricsLeft}>
-              <Progress
-                type="dashboard"
-                percent={Math.min(budget.percentage, 100)}
-                strokeColor={progressColor}
-                trailColor="rgba(255,255,255,0.15)"
-                size={120}
-              />
+              <div style={{ position: 'relative' }}>
+                <Progress
+                  type="dashboard"
+                  percent={Math.min(budget.percentage, 100)}
+                  strokeColor={progressColor}
+                  trailColor="rgba(255,255,255,0.15)"
+                  size={120}
+                  format={() => null}
+                />
+                {/* Show warning sign for over-budget instead of checkmark */}
+                {budget.percentage > 100 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: '24px',
+                    color: '#ff4d4f'
+                  }}>
+                    <ExclamationCircleFilled />
+                  </div>
+                )}
+              </div>
               <div>
                 <div className={style.label}>Total Budget</div>
                 <div className={style.valueLarge}>${budget.totalBudget.toLocaleString()}</div>
@@ -104,6 +189,15 @@ export default function BudgetDetailModal({ open, onClose, budget }: BudgetDetai
             <div className={style.metricsRight}>
               <div className={style.label}>Spent</div>
               <div className={style.valueLarge}>${budget.spent.toLocaleString()}</div>
+              <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '8px' }}>
+                {budget.percentage > 100 ? (
+                  <span style={{ color: '#ff4d4f' }}>
+                    {budget.percentage.toFixed(1)}% used (Over Budget)
+                  </span>
+                ) : (
+                  `${budget.percentage.toFixed(1)}% used`
+                )}
+              </div>
             </div>
           </Flex>
 
@@ -116,7 +210,14 @@ export default function BudgetDetailModal({ open, onClose, budget }: BudgetDetai
             renderItem={(item) => (
               <List.Item className={style.expenseItem} onClick={() => openExpenseDetail(item.id)}>
                 <List.Item.Meta
-                  title={<span className={style.expenseTitle}>{item.name || item.description || 'Expense'}</span>}
+                  title={
+                    <span className={style.expenseTitle}>
+                      {(() => {
+                        const title = item.name || item.description || 'Expense'
+                        return title.length > 60 ? `${title.substring(0, 60)}...` : title
+                      })()}
+                    </span>
+                  }
                   description={
                     <span className={style.expenseMeta}>
                       {item.merchant ? `${item.merchant} • ` : ''}
@@ -131,6 +232,16 @@ export default function BudgetDetailModal({ open, onClose, budget }: BudgetDetai
           />
         </>
       )}
+      
+      <DeleteConfirmationModal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteBudget}
+        title="Delete Budget"
+        itemName={budget?.title || ''}
+        itemType="budget bucket"
+        loading={deleteLoading}
+      />
     </Modal>
   );
 }

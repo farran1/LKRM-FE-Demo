@@ -9,6 +9,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import NewEventType from '../new-event-type'
 import { locations } from '@/utils/constants'
 import { supabase } from '@/lib/supabase'
+import { extractArrayFromApiResponse } from '@/utils/api-helpers'
 
 const { Title } = Typography
 
@@ -93,50 +94,51 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
 
   async function getCoaches() {
     try {
-      console.log('🔄 SUPABASE: Fetching coaches directly from Supabase users table...') // Debug log
+      console.log('🔄 API: Fetching all users from /api/users...') // Debug log
       
-      // Get authenticated users from session instead of public users table
-      const { data: { session } } = await supabase.auth.getSession()
+      // Fetch all users from the API endpoint
+      const response = await api.get('/api/users')
+      const raw: unknown = (response as any)?.data ?? response
+      const users = extractArrayFromApiResponse(raw)
       
-      if (!session?.user) {
-        console.error('No authenticated user found')
-        setCoaches([])
-        return
-      }
-      
-      // Create coach options from authenticated user
-      const user = session.user
-      const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
-        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-        : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
-      
-      const users = [{
-        id: user.id,
-        username: userName,
-        email: user.email,
-        role: 'COACH',
-        isActive: true
-      }]
+      console.log('🔄 API: Fetched users:', users) // Debug log
 
-      console.log('🔄 SUPABASE: Using authenticated user for coaches:', users) // Debug log
-
-      if (!users || users.length === 0) {
-        console.log('🔄 SUPABASE: No users found') // Debug log
+      if (!Array.isArray(users) || users.length === 0) {
+        console.log('🔄 API: No users found or invalid response format') // Debug log
         setCoaches([])
         return
       }
 
       // Process the users data
-      const processedUsers = users.map(user => ({
-        label: user.username || 'Unknown User',
-        value: user.username || 'Unknown User' // Use username as value, not ID
-      }))
+      const processedUsers = users.map((user: any) => {
+        // Extract name from user_metadata
+        const firstName = user.user_metadata?.first_name || ''
+        const lastName = user.user_metadata?.last_name || ''
+        const fullName = user.user_metadata?.full_name || ''
+        
+        // Create display name
+        let displayName = ''
+        if (fullName) {
+          displayName = fullName
+        } else if (firstName && lastName) {
+          displayName = `${firstName} ${lastName}`
+        } else if (firstName) {
+          displayName = firstName
+        } else {
+          displayName = user.email?.split('@')[0] || 'Unknown User'
+        }
+        
+        return {
+          label: displayName,
+          value: user.email || user.id // Use email as value for consistency
+        }
+      })
 
-      console.log('🔄 SUPABASE: Final processed users:', processedUsers) // Debug log
+      console.log('🔄 API: Final processed users:', processedUsers) // Debug log
       setCoaches(processedUsers)
     } catch (error) {
-      console.error('🔄 SUPABASE: Error in getCoaches:', error)
-      message.error('Failed to fetch coaches. Please try again.')
+      console.error('🔄 API: Error in getCoaches:', error)
+      message.error('Failed to fetch users. Please try again.')
       setCoaches([])
     }
   }
@@ -192,22 +194,60 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
         payload.occurence = Number(endAfterCount)
       } else if (endsType === 'on' && endOnDate && payload.startTime) {
         try {
-          // Roughly estimate occurrences by cadence difference + 1
+          // Calculate accurate occurrences based on repeat type and end date
           const start = new Date(payload.startTime)
           const end = new Date(endOnDate)
-          const diffMs = Math.max(0, end.getTime() - start.getTime())
-          const oneDay = 24 * 60 * 60 * 1000
-          const calcByRule = {
-            daily: Math.floor(diffMs / oneDay) + 1,
-            weekly: Math.floor(diffMs / (7 * oneDay)) + 1,
-            monthly: Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1),
-            yearly: Math.max(1, (end.getFullYear() - start.getFullYear()) + 1)
-          } as any
-          const count = calcByRule[repeatRule] ?? undefined
-          if (count && Number.isFinite(count)) {
-            payload.occurence = count
+          
+          // Ensure end date is not before start date
+          if (end < start) {
+            console.warn('End date is before start date, using start date as end date')
+            payload.endDate = payload.startTime
+            payload.occurence = 1
+            return
           }
-        } catch {}
+          
+          let count = 1 // Start with 1 for the initial occurrence
+          let currentDate = new Date(start)
+          
+          switch (repeatRule) {
+            case 'daily':
+              while (currentDate <= end) {
+                currentDate.setDate(currentDate.getDate() + 1)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            case 'weekly':
+              while (currentDate <= end) {
+                currentDate.setDate(currentDate.getDate() + 7)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            case 'monthly':
+              while (currentDate <= end) {
+                currentDate.setMonth(currentDate.getMonth() + 1)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            case 'yearly':
+              while (currentDate <= end) {
+                currentDate.setFullYear(currentDate.getFullYear() + 1)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            default:
+              count = 1
+          }
+          
+          payload.occurence = Math.max(1, count)
+          payload.endDate = endOnDate // Store the end date for validation
+        } catch (error) {
+          console.error('Error calculating occurrences:', error)
+          payload.occurence = 1
+        }
       }
     } else {
       payload.isRepeat = false
@@ -221,11 +261,24 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
     delete payload.endAfterCount
     delete payload.repeatRule // Remove repeatRule as it's not a database field
     // Keep daysOfWeek as it's needed for weekly repeats
-    delete payload.attendees // Remove attendees field as it's handled separately in the API
+    
+    // Convert attendees to members for API
+    if (payload.attendees && Array.isArray(payload.attendees)) {
+      payload.members = payload.attendees
+    }
+    delete payload.attendees // Remove attendees field as it's now members
 
-    // Ensure location is set (required field)
-    if (!payload.location) {
-      payload.location = 'HOME' // Default to HOME if not set
+    // Ensure location is set (required field) - but not for meetings
+    const selectedEventType = eventTypes.find(et => et.value === payload.eventTypeId)
+    const isMeeting = selectedEventType?.label?.toLowerCase() === 'meeting'
+    
+    if (!isMeeting && !payload.location) {
+      payload.location = 'HOME' // Default to HOME if not set (except for meetings)
+    }
+    
+    // For meetings, remove location field entirely
+    if (isMeeting) {
+      delete payload.location
     }
 
     console.log('Final payload before API call:', payload)
@@ -337,7 +390,7 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
           <CloseIcon onClick={onClose} />
         </Flex>
         {isOpen && (
-          <Form layout="vertical" onFinish={onSubmit} initialValues={{ repeatRule: 'none', endsType: 'never', endAfterCount: 1, location: 'HOME', venue: 'Home Court' }} form={form}>
+          <Form layout="vertical" onFinish={onSubmit} initialValues={{ repeatRule: 'none', endsType: 'never', endAfterCount: 1, venue: 'Home Court' }} form={form}>
           <Form.Item name="name" rules={[{ required: true, max: 255 }]} label="Name">
             <Input placeholder="Enter Event Name" />
           </Form.Item>
@@ -347,7 +400,7 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
               onChange={(val: any) => {
                 const numeric = typeof val === 'string' ? Number(val) : val
                 setSelectedTypeId(numeric)
-                // Auto-fill location rules: Workout -> HOME, Game -> keep prior, else untouched
+                // Auto-fill location rules: Workout -> HOME, Game -> keep prior, Meeting -> remove location, else untouched
                 const selectedLabel = eventTypes.find(et => et.value === numeric)?.label?.toLowerCase()
                 if (selectedLabel?.includes('workout')) {
                   form.setFieldsValue({ location: 'HOME' })
@@ -355,6 +408,10 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
                 if (selectedLabel === 'game') {
                   // Leave as-is but ensure field exists
                   if (!form.getFieldValue('location')) form.setFieldsValue({ location: 'HOME' })
+                }
+                if (selectedLabel === 'meeting') {
+                  // Remove location field for meetings
+                  form.setFieldsValue({ location: undefined })
                 }
               }}
             />
@@ -474,6 +531,12 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
               const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
               const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()
               const isGame = typeLabel === 'game'
+              const isMeeting = typeLabel === 'meeting'
+              
+              // Don't show location field for meetings
+              if (isMeeting) {
+                return null
+              }
               
               // Auto set HOME for non-game events if location is not set
               if (!isGame && !form.getFieldValue('location')) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClientWithAuth } from '@/lib/supabase'
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -43,13 +43,41 @@ export async function GET(
     }
 
     // Transform the task data to match frontend expectations
+    let assigneeDisplayName = 'Unassigned'
+    let assigneeEmail = null
+    
+    if (task.assigneeId) {
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('auth.users')
+          .select('email, user_metadata')
+          .eq('email', task.assigneeId)
+          .single()
+        
+        if (!userError && userData) {
+          assigneeEmail = userData.email
+          const userName = userData.user_metadata?.first_name && userData.user_metadata?.last_name 
+            ? `${userData.user_metadata.first_name} ${userData.user_metadata.last_name}`
+            : userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Unknown'
+          assigneeDisplayName = userName
+        } else {
+          assigneeDisplayName = task.assigneeId
+          assigneeEmail = task.assigneeId
+        }
+      } catch (error) {
+        console.error('Error fetching assignee info:', error)
+        assigneeDisplayName = task.assigneeId
+        assigneeEmail = task.assigneeId
+      }
+    }
+    
     const transformedTask = {
       ...task,
       id: task.userId, // Map userId to id for frontend compatibility
       // Create a users object for UI compatibility
       users: task.assigneeId ? {
-        username: task.assigneeId,
-        email: task.assigneeId
+        username: assigneeDisplayName,
+        email: assigneeEmail
       } : null,
     }
 
@@ -85,20 +113,15 @@ export async function PATCH(
       )
     }
 
-    // Get authenticated user from session
-    const res = NextResponse.next()
-    const supabaseAuth = createMiddlewareClient({ req: request, res })
-    const { data: { session }, error: sessionError } = await supabaseAuth.auth.getSession()
+    // Get authenticated user
+    const { client: supabaseAuth, user } = await createServerClientWithAuth(request)
     
-    if (sessionError || !session?.user) {
-      console.error('Task update - Session error:', sessionError)
+    if (!user) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       )
     }
-
-    const user = session.user
     const userEmail = user.email
     const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
       ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
@@ -160,26 +183,82 @@ export async function PATCH(
     if (fetchError) {
       console.error('Error fetching complete updated task:', fetchError)
       // Return the basic updated task if we can't fetch the complete one
+      let assigneeDisplayName = 'Unassigned'
+      let assigneeEmail = null
+      
+      if (updatedTask.assigneeId) {
+        try {
+          const { data: userData, error: userError } = await supabase
+            .from('auth.users')
+            .select('email, user_metadata')
+            .eq('email', updatedTask.assigneeId)
+            .single()
+          
+          if (!userError && userData) {
+            assigneeEmail = userData.email
+            const userName = userData.user_metadata?.first_name && userData.user_metadata?.last_name 
+              ? `${userData.user_metadata.first_name} ${userData.user_metadata.last_name}`
+              : userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Unknown'
+            assigneeDisplayName = userName
+          } else {
+            assigneeDisplayName = updatedTask.assigneeId
+            assigneeEmail = updatedTask.assigneeId
+          }
+        } catch (error) {
+          console.error('Error fetching assignee info in fallback:', error)
+          assigneeDisplayName = updatedTask.assigneeId
+          assigneeEmail = updatedTask.assigneeId
+        }
+      }
+      
       const transformedUpdatedTask = {
         ...updatedTask,
         id: updatedTask.userId, // Map userId to id for frontend compatibility
         // Create a users object for UI compatibility
         users: updatedTask.assigneeId ? {
-          username: updatedTask.assigneeId,
-          email: updatedTask.assigneeId
+          username: assigneeDisplayName,
+          email: assigneeEmail
         } : null,
       }
       return NextResponse.json({ data: { task: transformedUpdatedTask } }, { status: 200 })
     }
 
     // Transform the complete task data to match frontend expectations
+    let assigneeDisplayName = 'Unassigned'
+    let assigneeEmail = null
+    
+    if (completeTask.assigneeId) {
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('auth.users')
+          .select('email, user_metadata')
+          .eq('email', completeTask.assigneeId)
+          .single()
+        
+        if (!userError && userData) {
+          assigneeEmail = userData.email
+          const userName = userData.user_metadata?.first_name && userData.user_metadata?.last_name 
+            ? `${userData.user_metadata.first_name} ${userData.user_metadata.last_name}`
+            : userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Unknown'
+          assigneeDisplayName = userName
+        } else {
+          assigneeDisplayName = completeTask.assigneeId
+          assigneeEmail = completeTask.assigneeId
+        }
+      } catch (error) {
+        console.error('Error fetching assignee info in main case:', error)
+        assigneeDisplayName = completeTask.assigneeId
+        assigneeEmail = completeTask.assigneeId
+      }
+    }
+    
     const transformedCompleteTask = {
       ...completeTask,
       id: completeTask.userId, // Map userId to id for frontend compatibility
       // Create a users object for UI compatibility
       users: completeTask.assigneeId ? {
-        username: completeTask.assigneeId,
-        email: completeTask.assigneeId
+        username: assigneeDisplayName,
+        email: assigneeEmail
       } : null,
     }
 

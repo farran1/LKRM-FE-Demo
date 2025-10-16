@@ -1,122 +1,140 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import { createServerClientWithAuth } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    if (!url || !anon) {
-      return NextResponse.json(
-        { error: 'Supabase environment variables are missing' },
-        { status: 500 }
-      );
+    const { client: supabase, user } = await createServerClientWithAuth(request);
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const supabase = createClient(url, anon);
+    
     const { searchParams } = new URL(request.url);
     const season = searchParams.get('season') || '2024-25';
+    const timeRange = searchParams.get('timeRange') || 'season';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const gameIdsParam = searchParams.get('gameIds');
+    const selectedIds = gameIdsParam ? gameIdsParam.split(',').map(id => id.trim()).filter(id => id.length > 0) : [];
 
-    // Get all games for the season ordered by date
-    let query = supabase
-      .from('games')
-      .select('*')
-      .eq('season', season);
-
-    if (startDate) {
-      query = query.gte('gameDate', startDate);
-    }
-    if (endDate) {
-      query = query.lte('gameDate', endDate);
-    }
-
-    const { data: games, error: gamesError } = await query
-      .order('gameDate', { ascending: true });
-
-    if (gamesError) {
-      console.error('Error fetching games:', gamesError);
-      return NextResponse.json(
-        { error: 'Failed to fetch games' },
-        { status: 500 }
-      );
+    // Build date filter based on timeRange
+    let dateFilter = '2024-01-01'; // Default season start
+    if (timeRange === 'month') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      dateFilter = thirtyDaysAgo.toISOString().split('T')[0];
+    } else if (timeRange === 'week') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      dateFilter = sevenDaysAgo.toISOString().split('T')[0];
+    } else if (timeRange === 'custom' && startDate && endDate) {
+      dateFilter = startDate;
     }
 
-    // Get game stats for each game
-    const trendsPromises = games?.map(async (game, index) => {
-      const { data: stats, error: statsError } = await supabase
-        .from('game_stats')
-        .select('*')
-        .eq('gameId', game.id);
+    // Get game sessions ordered by date with proper date filtering
+    let sessionsQuery = (supabase as any)
+      .from('live_game_sessions' as any)
+      .select(`
+        id,
+        game_state,
+        created_at,
+        events (
+          startTime
+        ),
+        live_game_events (
+          event_type,
+          event_value,
+          player_id,
+          opponent_jersey,
+          is_opponent_event
+        )
+      `)
+      .gte('created_at', dateFilter)
+      .order('created_at', { ascending: true });
 
-      if (statsError) {
-        console.error(`Error fetching stats for game ${game.id}:`, statsError);
-        return null;
-      }
+    if (timeRange === 'selectGames' && selectedIds.length > 0) {
+      sessionsQuery = (sessionsQuery as any).in('id', selectedIds as any);
+    }
 
-      // Calculate game totals
-      const gameTotals = stats?.reduce((acc, stat) => ({
-        points: acc.points + (stat.points || 0),
-        fieldGoalsMade: acc.fieldGoalsMade + (stat.fieldGoalsMade || 0),
-        fieldGoalsAttempted: acc.fieldGoalsAttempted + (stat.fieldGoalsAttempted || 0),
-        threePointsMade: acc.threePointsMade + (stat.threePointsMade || 0),
-        threePointsAttempted: acc.threePointsAttempted + (stat.threePointsAttempted || 0),
-        freeThrowsMade: acc.freeThrowsMade + (stat.freeThrowsMade || 0),
-        freeThrowsAttempted: acc.freeThrowsAttempted + (stat.freeThrowsAttempted || 0),
-        rebounds: acc.rebounds + (stat.rebounds || 0),
-        assists: acc.assists + (stat.assists || 0),
-        steals: acc.steals + (stat.steals || 0),
-        blocks: acc.blocks + (stat.blocks || 0),
-        turnovers: acc.turnovers + (stat.turnovers || 0),
-        fouls: acc.fouls + (stat.fouls || 0)
-      }), {
-        points: 0,
-        fieldGoalsMade: 0,
-        fieldGoalsAttempted: 0,
-        threePointsMade: 0,
-        threePointsAttempted: 0,
-        freeThrowsMade: 0,
-        freeThrowsAttempted: 0,
-        rebounds: 0,
-        assists: 0,
-        steals: 0,
-        blocks: 0,
-        turnovers: 0,
-        fouls: 0
+    // Add end date filter if provided
+    if (timeRange === 'custom' && endDate) {
+      sessionsQuery = sessionsQuery.lte('created_at', endDate);
+    }
+
+    const { data: sessions, error: sessionsError } = await sessionsQuery;
+
+    if (sessionsError) {
+      console.error('Error fetching sessions:', sessionsError);
+      return NextResponse.json({ error: 'Failed to fetch trends data' }, { status: 500 });
+    }
+
+    // Generate trend data (points per game over time)
+    const trends = (sessions as any[])?.map((session: any, index: number) => {
+      // Calculate scores from events instead of relying on game_state
+      let teamScore = 0;
+      let opponentScore = 0;
+      
+      session.live_game_events?.forEach((event: any) => {
+        if (event.is_opponent_event) {
+          // Opponent events
+          switch (event.event_type) {
+            case 'fg_made':
+              opponentScore += event.event_value || 2;
+              break;
+            case 'three_made':
+              opponentScore += event.event_value || 3;
+              break;
+            case 'ft_made':
+              opponentScore += event.event_value || 1;
+              break;
+          }
+        } else {
+          // Team events
+          switch (event.event_type) {
+            case 'fg_made':
+              teamScore += event.event_value || 2;
+              break;
+            case 'three_made':
+              teamScore += event.event_value || 3;
+              break;
+            case 'ft_made':
+              teamScore += event.event_value || 1;
+              break;
+          }
+        }
       });
-
-      // Calculate percentages
-      const fgPct = gameTotals.fieldGoalsAttempted > 0 ? Math.round((gameTotals.fieldGoalsMade / gameTotals.fieldGoalsAttempted) * 1000) / 10 : 0;
-      const threePct = gameTotals.threePointsAttempted > 0 ? Math.round((gameTotals.threePointsMade / gameTotals.threePointsAttempted) * 1000) / 10 : 0;
-      const ftPct = gameTotals.freeThrowsAttempted > 0 ? Math.round((gameTotals.freeThrowsMade / gameTotals.freeThrowsAttempted) * 1000) / 10 : 0;
-
+      
       return {
         game: index + 1,
-        opponent: game.opponent,
-        date: game.gameDate,
-        ppg: gameTotals.points,
-        oppg: game.awayScore || 0,
-        fgPct,
-        threePct,
-        ftPct,
-        rebounds: gameTotals.rebounds,
-        assists: gameTotals.assists,
-        steals: gameTotals.steals,
-        blocks: gameTotals.blocks,
-        turnovers: gameTotals.turnovers
+        ppg: teamScore,
+        oppg: opponentScore,
+        date: session.events?.startTime || session.created_at,
+        margin: teamScore - opponentScore
       };
-    });
+    }) || [];
 
-    const trends = await Promise.all(trendsPromises);
-    const validTrends = trends.filter(Boolean);
-
-    return NextResponse.json(validTrends);
+    return NextResponse.json(trends);
   } catch (error) {
-    console.error('Error fetching performance trends:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch performance trends' },
-      { status: 500 }
-    );
+    console.error('Error in trends API:', error);
+    
+    // Check if it's an authentication error
+    if (error instanceof Error && error.message.includes('Authentication')) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+    
+    if (error instanceof Error && error.message.includes('permissions')) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+    
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : 'Unknown error' : undefined
+    }, { status: 500 });
   }
 }

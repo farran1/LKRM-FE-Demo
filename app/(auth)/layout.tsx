@@ -144,6 +144,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           width={212}
           collapsedWidth={56}
           breakpoint="md"
+          className="main-layout-sider"
         >
           {!collapsed && (
             <div className={style.logo}>
@@ -223,14 +224,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </Sider>
         <Layout className={style.main}>
           <Header
+            className="main-layout-header"
             style={{
               width: collapsed ? '100%' : 'calc(100% - 212px)',
               left: collapsed ? 0 : 212,
               transition: 'width 0.2s, left 0.2s',
               position: 'fixed',
-              zIndex: 1,
+              zIndex: 1000,
               display: 'flex',
               alignItems: 'center',
+              top: 0,
             }}
           >
             {collapsed && (

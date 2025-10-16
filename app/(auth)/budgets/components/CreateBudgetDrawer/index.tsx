@@ -36,17 +36,17 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
       });
 
       if (response.ok) {
-        message.success('Budget created successfully!');
+        message.success('Bucket created successfully!');
         form.resetFields();
         onSuccess();
         onClose();
       } else {
         const errorData = await response.json();
-        message.error(errorData.error || 'Failed to create budget');
+        message.error(errorData.error || 'Failed to create bucket');
       }
     } catch (error) {
-      console.error('Error creating budget:', error);
-      message.error('Failed to create budget');
+      console.error('Error creating bucket:', error);
+      message.error('Failed to create bucket');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
     <Drawer
       destroyOnHidden
       className={style.drawer}
-      width={548}
+      width={400}
       onClose={handleCancel}
       open={open}
       styles={{
@@ -71,7 +71,7 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
       }}
     >
       <Flex className={style.header} justify="space-between" align='flex-end' style={{ marginBottom: 24 }}>
-        <div className={style.title}>New Budget</div>
+        <div className={style.title}>New Bucket</div>
         <CloseIcon onClick={handleCancel} />
       </Flex>
       
@@ -80,22 +80,23 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
         layout="vertical"
         onFinish={handleSubmit}
         initialValues={{
-          period: 'Yearly',
-          autoRepeat: true
+          period: 'Season',
+          autoRepeat: true,
+          is_pinned: false
         }}
       >
         <Form.Item
           name="name"
-          label="Budget Name"
-          rules={[{ required: true, message: 'Please enter a budget name' }]}
+          label="Bucket Name"
+          rules={[{ required: true, message: 'Please enter a bucket name' }]}
         >
           <Input placeholder="e.g., Equipment Maintenance" />
         </Form.Item>
 
         <Form.Item
           name="amount"
-          label="Budget Amount"
-          rules={[{ required: true, message: 'Please enter the budget amount' }]}
+          label="Bucket Amount"
+          rules={[{ required: true, message: 'Please enter the bucket amount' }]}
         >
           <InputNumber
             style={{ width: '100%' }}
@@ -109,26 +110,19 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
         <Flex gap={16}>
           <Form.Item
             name="period"
-            label="Budget Period"
-            rules={[{ required: true, message: 'Please select a budget period' }]}
+            label="Bucket Period"
+            rules={[{ required: true, message: 'Please select a bucket period' }]}
             style={{ flex: 2 }}
           >
             <Select placeholder="Select a period">
               <Select.Option value="Monthly">Monthly</Select.Option>
               <Select.Option value="Quarterly">Quarterly</Select.Option>
               <Select.Option value="Semester">Semester</Select.Option>
-              <Select.Option value="Yearly">Yearly</Select.Option>
+              <Select.Option value="Season">Season</Select.Option>
             </Select>
           </Form.Item>
 
-          <Form.Item
-            name="autoRepeat"
-            label="Auto-Repeat"
-            valuePropName="checked"
-            style={{ flex: 1 }}
-          >
-            <Switch />
-          </Form.Item>
+
         </Flex>
 
         <Form.Item
@@ -137,7 +131,7 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
         >
           <TextArea 
             rows={3} 
-            placeholder="Optional description of what this budget covers..."
+            placeholder="Optional description of what this bucket covers..."
           />
         </Form.Item>
 
@@ -148,7 +142,7 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
           style={{ marginTop: 24 }} 
           loading={loading}
         >
-          Create Budget
+          Create Bucket
         </Button>
       </Form>
     </Drawer>

@@ -15,7 +15,7 @@ const locations = [{label: 'Home', value: 'HOME'}, {label: 'Away', value: 'AWAY'
 function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
   const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
-  const [users, setUsers] = useState<Array<{label: string, value: string}>>([])
+  const [coaches, setCoaches] = useState<Array<{label: string, value: string}>>([])
   const [priorities, setPriorities] = useState<Array<{label: string, value: number}>>([])
   const [events, setEvents] = useState<Array<{label: string, value: number}>>([])
   
@@ -24,7 +24,7 @@ function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
 
   useEffect(() => {
     if (isOpen) {
-      getUsers()
+      getCoaches()
       getPriorities()
       getEvents()
       // Reset form when opening
@@ -34,58 +34,60 @@ function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
     }
   }, [isOpen, form])
 
-  // Reset form when component unmounts or drawer closes
+  // Reset form when drawer closes
   useEffect(() => {
-    return () => {
-      if (form) {
-        form.resetFields()
-      }
+    if (!isOpen && form) {
+      form.resetFields()
     }
-  }, [form])
+  }, [isOpen, form])
 
-  async function getUsers() {
+  async function getCoaches() {
     setLoading(true)
     try {
-      console.log('Fetching users from Supabase...')
+      console.log('🔄 Fetching all users from /api/users...')
       
-      // Get authenticated users from session instead of public users table
-      const { data: { session } } = await supabase.auth.getSession()
+      // Fetch all users from the API endpoint
+      const response = await api.get('/api/users')
+      const users = (response as any)?.data?.data || (response as any)?.data || []
       
-      if (!session?.user) {
-        console.error('No authenticated user found')
-        setUsers([])
-        setLoading(false)
+      console.log('🔄 Fetched users:', users)
+
+      if (!Array.isArray(users) || users.length === 0) {
+        console.log('🔄 No users found or invalid response format')
+        setCoaches([])
         return
       }
-      
-      // Create user options from authenticated user
-      const user = session.user
-      const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
-        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-        : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
-      
-      const userData = [{
-        id: user.id,
-        username: userName,
-        email: user.email,
-        isActive: true,
-        role: 'COACH'
-      }]
-      
-      console.log('Using authenticated user for task assignment:', userData)
-      
-      // Map the data to the format expected by the Select component
-      const userOptions = userData?.map(userItem => ({
-        label: userItem.username,
-        value: userItem.username
-      })) || []
-      
-      console.log('Mapped user options:', userOptions)
-      setUsers(userOptions)
+
+      // Process the users data
+      const processedUsers = users.map((user: any) => {
+        // Extract name from user_metadata
+        const firstName = user.user_metadata?.first_name || ''
+        const lastName = user.user_metadata?.last_name || ''
+        const fullName = user.user_metadata?.full_name || ''
+        
+        // Create display name
+        let displayName = ''
+        if (fullName) {
+          displayName = fullName
+        } else if (firstName && lastName) {
+          displayName = `${firstName} ${lastName}`
+        } else if (firstName) {
+          displayName = firstName
+        } else {
+          displayName = user.email?.split('@')[0] || 'Unknown User'
+        }
+        
+        return {
+          label: displayName,
+          value: user.email || user.id // Use email as value for consistency
+        }
+      })
+
+      console.log('🔄 Final processed users:', processedUsers)
+      setCoaches(processedUsers)
     } catch (error) {
-      console.error('Error fetching users:', error)
-      // Fallback to default user if API fails
-      setUsers([{ label: 'default', value: 'default' }])
+      console.error('🔄 Error in getCoaches:', error)
+      setCoaches([])
     }
     setLoading(false)
   }
@@ -128,14 +130,9 @@ function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
       }
     } catch (error) {
       console.error('Error fetching priorities:', error)
-      // Fallback to default priorities
-      const defaults = [
-        { name: 'High', weight: 1, color: '#ff4d4f' },
-        { name: 'Medium', weight: 2, color: '#faad14' },
-        { name: 'Low', weight: 3, color: '#52c41a' },
-      ]
-      setPriorities(defaults.map((d, idx) => ({ label: d.name, value: -(idx + 1) })))
-      console.log('Using fallback priorities due to error')
+      // No fallback priorities - let user know priorities are unavailable
+      setPriorities([])
+      console.log('No priorities available')
     }
     setLoading(false)
   }
@@ -175,6 +172,12 @@ function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
     // Include eventId from defaultValues if provided
     if (defaultValues?.eventId) {
       payload.eventId = defaultValues.eventId
+    }
+    
+    // Convert assignee ID to email for backend
+    if (payload.assigneeId) {
+      // The assigneeId is now already an email from the coaches API
+      // No conversion needed
     }
     
     // Map assigneeId to createdBy for now (since we're not handling separate assignee yet)
@@ -295,9 +298,9 @@ function NewTask({ isOpen, showOpen, onRefresh, defaultValues } : any) {
           <Select 
             allowClear 
             showSearch 
-            options={users} 
+            options={coaches} 
             optionFilterProp="label"
-            placeholder="Select user to assign task to"
+            placeholder="Select coach to assign task to"
             loading={loading}
           />
         </Form.Item>

@@ -1,0 +1,282 @@
+{
+  "sessions": [
+    {
+      "id": "a1c96e9a-f482-4adb-ba07-d568ddb982f8",
+      "eventId": 5,
+      "sessionKey": "session_a1c96e9a-f482-4adb-ba07-d568ddb982f8",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-09T00:31:38.073Z"
+      },
+      "isActive": true,
+      "startedAt": "2025-10-09T00:31:38.073Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-09T00:31:38.073Z",
+      "version": 1,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b"
+    },
+    {
+      "id": "b159f6e6-49a9-4fe6-9470-bdd09bc1f682",
+      "eventId": 5,
+      "sessionKey": "session_b159f6e6-49a9-4fe6-9470-bdd09bc1f682",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-09T00:29:03.390Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-09T00:29:03.390Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-09T00:29:22.690Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-09T00:29:22.690Z"
+    },
+    {
+      "id": "39b9240b-6d17-4cb7-83e7-f2b3c1e0695e",
+      "eventId": 5,
+      "sessionKey": "session_39b9240b-6d17-4cb7-83e7-f2b3c1e0695e",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-09T00:26:36.697Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-09T00:26:36.697Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-09T00:26:58.668Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-09T00:26:58.668Z"
+    },
+    {
+      "id": "7acadfcc-d4a5-4ed6-93b2-3548f3414628",
+      "eventId": 4,
+      "sessionKey": "session_7acadfcc-d4a5-4ed6-93b2-3548f3414628",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-09T00:19:30.715Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-09T00:19:30.715Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-09T00:21:00.612Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-09T00:21:00.612Z"
+    },
+    {
+      "id": "49a53665-c0d7-428b-a3b6-05a59f537bb3",
+      "eventId": 4,
+      "sessionKey": "session_49a53665-c0d7-428b-a3b6-05a59f537bb3",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-09T00:00:29.989Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-09T00:00:29.989Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-09T00:00:52.297Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-09T00:00:52.297Z"
+    },
+    {
+      "id": "6b92c4a9-51a2-41ca-a887-18ed5bb6d7a6",
+      "eventId": 4,
+      "sessionKey": "session_6b92c4a9-51a2-41ca-a887-18ed5bb6d7a6",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:54:32.126Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:54:32.126Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:58:40.618Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:58:40.618Z"
+    },
+    {
+      "id": "50dab336-82be-49c1-a950-ceab453aff79",
+      "eventId": 4,
+      "sessionKey": "session_50dab336-82be-49c1-a950-ceab453aff79",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:53:20.551Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:53:20.551Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:53:40.498Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:53:40.498Z"
+    },
+    {
+      "id": "44de532c-cdb1-4c1b-8a32-ece75ef888ed",
+      "eventId": 4,
+      "sessionKey": "session_44de532c-cdb1-4c1b-8a32-ece75ef888ed",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:49:17.594Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:49:17.594Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:49:43.041Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:49:43.041Z"
+    },
+    {
+      "id": "d6ddb43e-3299-4c1d-85cf-a09f2933adf3",
+      "eventId": 4,
+      "sessionKey": "session_d6ddb43e-3299-4c1d-85cf-a09f2933adf3",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:47:24.972Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:47:24.972Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:48:00.999Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:48:00.999Z"
+    },
+    {
+      "id": "2a5d549f-3d71-414a-b6bb-e6b7b7b58c69",
+      "eventId": 4,
+      "sessionKey": "session_2a5d549f-3d71-414a-b6bb-e6b7b7b58c69",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:43:26.457Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:43:26.457Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:45:25.149Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:45:25.149Z"
+    },
+    {
+      "id": "55c2c1e7-57e3-4c73-ac5c-4ebccbff950c",
+      "eventId": 4,
+      "sessionKey": "session_55c2c1e7-57e3-4c73-ac5c-4ebccbff950c",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:41:03.340Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:41:03.341Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:41:42.650Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:41:42.650Z"
+    },
+    {
+      "id": "71f0da30-a728-4367-9f2e-59a474bfe1db",
+      "eventId": 4,
+      "sessionKey": "session_71f0da30-a728-4367-9f2e-59a474bfe1db",
+      "gameState": {
+        "currentQuarter": 1,
+        "gameTime": 0,
+        "homeScore": 0,
+        "awayScore": 0,
+        "isGameActive": false,
+        "isPaused": false,
+        "lastActionTime": "2025-10-08T23:37:44.274Z"
+      },
+      "isActive": false,
+      "startedAt": "2025-10-08T23:37:44.274Z",
+      "createdBy": "current_user",
+      "lastModified": "2025-10-08T23:38:42.534Z",
+      "version": 2,
+      "deviceId": "7fdd1051-eef7-409d-b9b6-86d1b45ee38b",
+      "endedAt": "2025-10-08T23:38:42.534Z"
+    }
+  ],
+  "cacheInfo": {
+    "roster": {
+      "lastUpdated": "2025-10-08T23:34:55.806Z",
+      "version": 1,
+      "itemCount": 13,
+      "sizeBytes": 7836
+    },
+    "events": {
+      "lastUpdated": "2025-10-09T00:26:37.046Z",
+      "version": 1,
+      "itemCount": 2,
+      "sizeBytes": 1217
+    },
+    "eventTypes": {
+      "lastUpdated": "2025-10-09T00:32:02.717Z",
+      "version": 1,
+      "itemCount": 11,
+      "sizeBytes": 1858
+    }
+  },
+  "storageUsage": {
+    "totalBytes": 0,
+    "sessionCount": 0,
+    "lastCleanup": "2025-10-09T00:32:02.717Z",
+    "quotaUsed": 0
+  },
+  "exportDate": "2025-10-09T00:32:02.717Z"
+}

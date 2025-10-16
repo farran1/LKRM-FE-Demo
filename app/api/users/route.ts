@@ -1,53 +1,103 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClientWithAuth } from '@/lib/supabase'
+import { auditLogger, AuditAction, AuditSeverity } from '@/lib/security/audit'
 
-// Initialize Supabase client with service role key for admin access
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+// Force Node.js runtime
+export const runtime = 'nodejs'
 
-if (!supabaseServiceKey) {
-  console.error('SUPABASE_SERVICE_ROLE_KEY is required for user management')
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
-
+// Allow all authenticated users to access this endpoint
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userIds = searchParams.get('ids')?.split(',').filter(Boolean) || []
-
-    if (userIds.length === 0) {
-      return NextResponse.json({ users: [] })
-    }
-
-    // Fetch users from auth.users
-    const { data: users, error } = await supabase.auth.admin.listUsers()
+    const { client: supabase, user } = await createServerClientWithAuth(request)
+    
+    // Use the authenticated client to fetch users from the public.users table
+    // This respects RLS policies and doesn't require service role key
+    const { data: users, error } = await supabase
+      .from('users')
+      .select(`
+        id,
+        email,
+        first_name,
+        last_name,
+        full_name,
+        avatar_url,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching users:', error)
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+      
+      await auditLogger.logSecurityEvent(
+        user.id,
+        user.email || 'unknown@example.com',
+        user.user_metadata?.role || 'user',
+        AuditAction.SUSPICIOUS_ACTIVITY,
+        {
+          endpoint: '/api/users',
+          error: error.message
+        },
+        AuditSeverity.HIGH
+      )
+
+      return NextResponse.json(
+        { error: 'Failed to fetch users' },
+        { status: 500 }
+      )
     }
 
-    // Filter users by the requested IDs and format the response
-    const filteredUsers = users.users
-      .filter((user: any) => userIds.includes(user.id))
-      .map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.first_name && user.user_metadata?.last_name 
-          ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-          : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Team Member',
-        username: user.user_metadata?.username || user.email?.split('@')[0] || 'user'
-      }))
+    // Log the user list access
+    await auditLogger.logUserAction(
+      user.id,
+      user.email || 'unknown@example.com',
+      user.user_metadata?.role || 'user',
+      AuditAction.USER_UPDATED,
+      'users',
+      undefined,
+      { userCount: users?.length || 0 },
+      AuditSeverity.LOW
+    )
 
-    return NextResponse.json({ users: filteredUsers })
+    return NextResponse.json({
+      success: true,
+      data: users || [],
+      count: users?.length || 0
+    })
+
   } catch (error) {
-    console.error('Error in GET /users:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error in GET /api/users:', error)
+    
+    // Check if it's an authentication error
+    if (error instanceof Error && error.message.includes('Authentication')) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+    
+    if (error instanceof Error && error.message.includes('permissions')) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+    
+    await auditLogger.logSecurityEvent(
+      'unknown',
+      'unknown',
+      'unknown',
+      AuditAction.SUSPICIOUS_ACTIVITY,
+      {
+        endpoint: '/api/users',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
+      AuditSeverity.HIGH
+    )
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

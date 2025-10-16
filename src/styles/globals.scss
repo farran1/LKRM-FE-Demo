@@ -21,6 +21,30 @@ body {
   overflow: hidden;
 }
 
+/* Global Link Styling - Make all clickable elements underlined */
+a {
+  color: #1890ff;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+a:hover {
+  color: #40a9ff;
+}
+
+/* Ant Design Link overrides */
+.ant-typography a,
+.ant-link {
+  text-decoration: underline !important;
+  color: #1890ff !important;
+  font-weight: 500 !important;
+}
+
+.ant-typography a:hover,
+.ant-link:hover {
+  color: #40a9ff !important;
+}
+
 /* Manual Layout Styles */
 .dashboard-container {
   max-width: 1400px;
@@ -33,4 +57,211 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
+}
+
+/* Mobile-specific global improvements */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Improve touch targets */
+  button, 
+  [role="button"], 
+  input[type="button"], 
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better mobile typography */
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.2;
+    margin-bottom: 0.5em;
+  }
+  
+  /* Improve form elements for mobile */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  /* Better mobile scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Improve modal behavior on mobile */
+  :global(.ant-modal) {
+    margin: 0 !important;
+    
+    @media (max-width: 768px) {
+      width: 95vw !important;
+      max-width: none !important;
+      top: 2.5vh !important;
+      height: 95vh !important;
+      max-height: none !important;
+    }
+  }
+  
+  /* Dashboard modal mobile styles */
+  :global(.gameday-status-modal),
+  :global(.priority-tasks-modal),
+  :global(.event-detail-modal) {
+    @media (max-width: 768px) {
+      width: 95vw !important;
+      max-width: none !important;
+      top: 2.5vh !important;
+      height: 95vh !important;
+      max-height: none !important;
+      
+      :global(.ant-modal-body) {
+        padding: 16px !important;
+        max-height: none !important;
+      }
+      
+      :global(.ant-modal-header) {
+        padding-bottom: 12px !important;
+      }
+    }
+  }
+  
+  /* Activity modal mobile styles */
+  :global(.recent-activity-modal),
+  :global(.recent-activity-module-modal) {
+    @media (max-width: 768px) {
+      width: 95vw !important;
+      max-width: none !important;
+      max-height: 95vh !important;
+      padding: 16px !important;
+    }
+  }
+  
+  /* Layout mobile styles */
+  :global(.main-layout-sider) {
+    @media (max-width: 768px) {
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      z-index: 1001 !important;
+      height: 100vh !important;
+      
+      &.ant-layout-sider-collapsed {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        overflow: hidden !important;
+      }
+    }
+  }
+  
+  :global(.main-layout-header) {
+    @media (max-width: 768px) {
+      width: 100% !important;
+      left: 0 !important;
+      padding: 0 16px !important;
+      height: 56px !important;
+    }
+  }
+  
+  /* Better mobile table responsiveness */
+  :global(.ant-table) {
+    font-size: 14px;
+    
+    :global(.ant-table-thead > tr > th) {
+      padding: 8px 4px;
+      font-size: 12px;
+    }
+    
+    :global(.ant-table-tbody > tr > td) {
+      padding: 8px 4px;
+      font-size: 13px;
+    }
+  }
+  
+  /* Improve mobile card layouts */
+  :global(.ant-card) {
+    margin-bottom: 12px;
+    
+    :global(.ant-card-body) {
+      padding: 16px;
+    }
+  }
+  
+  /* Better mobile button groups */
+  :global(.ant-btn-group) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    
+    :global(.ant-btn) {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+}
+
+/* Custom scrollbar styling for upcoming events */
+:global(.upcoming-events-scroll) {
+  /* Hide scrollbar completely but keep functionality */
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* Internet Explorer 10+ */
+  
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  &::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  &::-webkit-scrollbar-track {
+    display: none !important;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    display: none !important;
+  }
+  
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch !important;
+  
+  /* Add subtle fade effect at bottom when scrollable */
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(transparent, rgba(32, 44, 62, 0.95));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 1;
+  }
+  
+  /* Show fade when content overflows */
+  &:not(:hover)::after {
+    opacity: 1;
+  }
+}
+
+/* Additional fallback for any scrollbar visibility */
+.upcoming-events-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.upcoming-events-scroll::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+.upcoming-events-scroll::-webkit-scrollbar-thumb {
+  display: none !important;
 }

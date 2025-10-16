@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Statistic, Table, Tag, Button, Spin, Alert, Tabs, Card, Row, Col, Divider, Tooltip } from 'antd';
+import { Statistic, Table, Tag, Button, Spin, Alert, Tabs, Card, Row, Col, Divider, Tooltip, Input, Select, Modal, App } from 'antd';
 import { 
   ArrowLeftOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
   TrophyOutlined,
   UserOutlined,
   TeamOutlined,
@@ -19,19 +21,37 @@ import {
   StopOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  EditOutlined,
+  PlusOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import TeamComparisonTable, { ComparisonStats } from '../components/TeamComparisonTable';
+import PlayerLink from '@/components/PlayerLink';
+import EventEditor from '../components/EventEditor';
+// import BoxScoreEditor from '../components/BoxScoreEditor';
 
 export default function GameAnalysisPage() {
   const params = useParams();
   const router = useRouter();
   const gameId = params.gameId as string;
+  const { message } = App.useApp();
   
   const [gameAnalysisData, setGameAnalysisData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [filterQuarter, setFilterQuarter] = useState<number | 'all'>('all');
+  const [filterSide, setFilterSide] = useState<'all' | 'team' | 'opponent'>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [isEventEditorOpen, setIsEventEditorOpen] = useState(false);
+  // const [isBoxScoreEditorOpen, setIsBoxScoreEditorOpen] = useState(false);
+  const [players, setPlayers] = useState<any[]>([]);
+  const [deletingEvent, setDeletingEvent] = useState<any>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     if (gameId) {
@@ -54,6 +74,7 @@ export default function GameAnalysisPage() {
       setLoading(true);
       setError(null);
       
+      console.log('🎯 Fetching game analysis for gameId:', gameId);
       const response = await fetch(`/api/stats/game-analysis/${gameId}`);
       
       if (!response.ok) {
@@ -61,12 +82,22 @@ export default function GameAnalysisPage() {
       }
       
       const gameData = await response.json();
+      console.log('🎯 Game analysis data received:', gameData);
       
       if (gameData.error) {
         throw new Error(gameData.error);
       }
       
       setGameAnalysisData(gameData);
+      
+      // Fetch players for the event editor
+      const playersResponse = await fetch('/api/players');
+      if (playersResponse.ok) {
+        const playersData = await playersResponse.json();
+        // Check if data is wrapped or direct
+        const playersArray = playersData.data || playersData;
+        setPlayers(playersArray || []);
+      }
     } catch (error) {
       console.error('Failed to load game analysis:', error);
       setError(error instanceof Error ? error.message : 'Failed to load game analysis');
@@ -74,6 +105,104 @@ export default function GameAnalysisPage() {
       setLoading(false);
     }
   };
+
+  const handleEditEvent = (event: any) => {
+    setEditingEvent(event);
+    setIsEventEditorOpen(true);
+  };
+
+  const handleAddEvent = () => {
+    setEditingEvent({
+      session_id: gameAnalysisData?.gameId,
+      player_id: null,
+      event_type: '',
+      event_value: 0,
+      quarter: 1,
+      is_opponent_event: false,
+      opponent_jersey: null,
+      metadata: {}
+    });
+    setIsEventEditorOpen(true);
+  };
+
+  const handleEventSave = (updatedEvent: any) => {
+    // Refresh the game analysis data
+    fetchGameAnalysis();
+    setIsEventEditorOpen(false);
+    setEditingEvent(null);
+  };
+
+  const handleDeleteEvent = (event: any) => {
+    setDeletingEvent(event);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingEvent) return;
+    
+    try {
+      // Get the current session for authentication
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
+      const response = await fetch(`/api/live-game-events/${deletingEvent.id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete event: ${response.status}`);
+      }
+      
+      message.success('Event deleted successfully');
+      
+      // Close modal immediately
+      setIsDeleteModalOpen(false);
+      setDeletingEvent(null);
+      
+      // Force refresh the page to get updated event data with proper IDs
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      message.error('Failed to delete event');
+      // Close modal even on error
+      setIsDeleteModalOpen(false);
+      setDeletingEvent(null);
+    }
+  };
+
+  const handleEventDelete = (eventId: string) => {
+    // Refresh the game analysis data after deletion
+    fetchGameAnalysis();
+    setIsEventEditorOpen(false);
+    setEditingEvent(null);
+  };
+
+  // const handleBoxScoreEdit = () => {
+  //   console.log('Game analysis data:', gameAnalysisData);
+  //   console.log('Actual game ID:', gameAnalysisData?.actualGameId);
+  //   console.log('Session ID (gameId):', gameId);
+  //   setIsBoxScoreEditorOpen(true);
+  // };
+
+  // const handleBoxScoreSave = (updatedGame: any) => {
+  //   // Refresh the game analysis data
+  //   fetchGameAnalysis();
+  //   setIsBoxScoreEditorOpen(false);
+  // };
 
   if (loading) {
     return (
@@ -103,7 +232,177 @@ export default function GameAnalysisPage() {
     );
   }
 
-  const { gameInfo, teamStats, playerStats, playByPlay, standoutInfo, lineupComparison } = gameAnalysisData;
+  // Extract data from the API response
+  const gameInfo = {
+    opponent: gameAnalysisData.opponent,
+    date: gameAnalysisData.date,
+    result: gameAnalysisData.result,
+    score: gameAnalysisData.score,
+    margin: gameAnalysisData.margin
+  };
+  
+  const teamStats = gameAnalysisData.teamTotals;
+  const playerStats = gameAnalysisData.playerStats;
+  const quarterBreakdown = gameAnalysisData.quarterBreakdown;
+  const events = gameAnalysisData.events;
+  
+  // Calculate standout players from playerStats
+  type PS = { id: number; name?: string; points?: number; rebounds?: number; assists?: number; steals?: number; threeMade?: number; ftMade?: number };
+  const reduceSafe = <T extends PS>(list: T[] | undefined, fn: (max: T, player: T) => T, init: T): T => {
+    return (list && list.length > 0) ? list.reduce(fn) : init
+  }
+  const standoutInfo = {
+    topScorer: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.points || 0) > 0), 
+      (max, player) => ((player.points || 0) > (max.points || 0) ? player : max), 
+      { points: 0, name: 'N/A', id: -1 }
+    ),
+    topRebounder: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.rebounds || 0) > 0), 
+      (max, player) => ((player.rebounds || 0) > (max.rebounds || 0) ? player : max), 
+      { rebounds: 0, name: 'N/A', id: -1 }
+    ),
+    topAssister: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.assists || 0) > 0), 
+      (max, player) => ((player.assists || 0) > (max.assists || 0) ? player : max), 
+      { assists: 0, name: 'N/A', id: -1 }
+    ),
+    mostSteals: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.steals || 0) > 0), 
+      (max, player) => ((player.steals || 0) > (max.steals || 0) ? player : max), 
+      { steals: 0, name: 'N/A', id: -1 }
+    ),
+    highestFgPoints: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.points || 0) > 0), 
+      (max, player) => ((player.points || 0) > (max.points || 0) ? player : max), 
+      { points: 0, name: 'N/A', id: -1 }
+    ),
+    highest3ptPoints: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.threeMade || 0) > 0), 
+      (max, player) => (((player.threeMade || 0) * 3) > ((max.threeMade || 0) * 3) ? player : max), 
+      { threeMade: 0, name: 'N/A', id: -1 }
+    ),
+    highestFtPoints: reduceSafe(
+      (playerStats as PS[] | undefined)?.filter(p => (p.ftMade || 0) > 0), 
+      (max, player) => ((player.ftMade || 0) > (max.ftMade || 0) ? player : max), 
+      { ftMade: 0, name: 'N/A', id: -1 }
+    )
+  };
+  
+  // Create play-by-play from events (use realtime timestamp)
+  const getPointsForEvent = (type: string, value: any): number => {
+    const t = String(type || '').toLowerCase()
+    switch (t) {
+      case 'three_made':
+        return 3
+      case 'fg_made':
+        return 2
+      case 'ft_made':
+        return 1
+      case 'points':
+        return Number.isFinite(value) ? Number(value) : 0
+      default:
+        return 0
+    }
+  }
+
+  const playByPlay = events?.map((event: any, index: number) => {
+    const when = event.created_at ? new Date(event.created_at) : null
+    const timeStr = when ? when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'N/A'
+    const playerObj = event.player_id ? (playerStats?.find((p: any) => p.id === event.player_id) || null) : null
+    const playerName = playerObj?.name || 'N/A'
+    const isOpponent = !!event.is_opponent_event
+    const points = getPointsForEvent(event.event_type, event.event_value)
+    const score = points > 0 ? `+${points}` : ''
+    return {
+      id: event.id, // Use the actual database ID instead of index + 1
+      displayId: index + 1, // Keep the display ID for UI purposes
+      time: timeStr,
+      timestamp: when ? when.getTime() : 0,
+      quarter: event.quarter,
+      type: String(event.event_type || ''),
+      isOpponent,
+      opponentJersey: event.opponent_jersey || null,
+      description: `${isOpponent ? 'Opponent' : 'Team'} ${String(event.event_type || '').replace('_', ' ')}`,
+      player: playerName,
+      playerId: playerObj?.id ?? null,
+      points,
+      score
+    }
+  }) || [];
+
+  // Compute running score context (Team-Opponent) per event
+  const playByPlayWithScore = (() => {
+    let team = 0
+    let opponent = 0
+    
+    // Sort events chronologically by timestamp before calculating running score
+    const sortedPlayByPlay = [...(playByPlay || [])].sort((a, b) => a.timestamp - b.timestamp)
+    
+    return sortedPlayByPlay.map((p: any) => {
+      const pts = Number(p.points || 0)
+      if (pts > 0) {
+        if (p.isOpponent) {
+          opponent += pts
+        } else {
+          team += pts
+        }
+      }
+      return { ...p, runningScore: `(${team}-${opponent})` }
+    })
+  })()
+
+  const availableQuarters = Array.from(new Set((events || []).map((e: any) => e.quarter).filter((q: any) => q != null))).sort();
+  const availableTypes = Array.from(new Set((events || []).map((e: any) => String(e.event_type || '')).filter((t: string) => t))).sort();
+
+  const filteredPlayByPlay = (playByPlayWithScore || []).filter((p: any) => {
+    if (filterQuarter !== 'all' && p.quarter !== filterQuarter) return false;
+    if (filterSide !== 'all') {
+      const isOpp = filterSide === 'opponent';
+      if (Boolean(p.isOpponent) !== isOpp) return false;
+    }
+    if (filterType !== 'all' && p.type !== filterType) return false;
+    if (searchText) {
+      const hay = `${p.description || ''} ${p.player || ''}`.toLowerCase();
+      if (!hay.includes(searchText.toLowerCase())) return false;
+    }
+    return true;
+  }).sort((a: any, b: any) => sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp);
+
+  const formatPlayDescription = (p: any): { actorNode: React.ReactNode; text: string } => {
+    const t = String(p.type || '').toLowerCase()
+    const actorText = p.player && p.player !== 'N/A'
+      ? p.player
+      : (p.isOpponent ? (p.opponentJersey ? `#${p.opponentJersey}` : 'Opponent') : 'Team')
+    const actorNode = p.player && p.player !== 'N/A' && p.playerId
+      ? <PlayerLink id={p.playerId} name={p.player} />
+      : <span>{actorText}</span>
+    const text = (() => {
+      switch (t) {
+        case 'three_made': return 'made a 3-pointer'
+        case 'fg_made': return 'made a 2-pointer'
+        case 'ft_made': return 'made a free throw'
+        case 'three_missed': return 'missed a 3-pointer'
+        case 'fg_missed': return 'missed a 2-pointer'
+        case 'ft_missed': return 'missed a free throw'
+        case 'assist': return 'recorded an assist'
+        case 'rebound': return 'grabbed a rebound'
+        case 'steal': return 'made a steal'
+        case 'block': return 'made a block'
+        case 'turnover': return 'committed a turnover'
+        case 'foul': return 'committed a foul'
+        case 'substitution': return 'substitution'
+        default: return String(p.type || '').replace('_', ' ')
+      }
+    })()
+    return { actorNode, text }
+  }
+  
+  // Create lineup comparison (starters vs bench)
+  const lineupComparison = {
+    starters: (playerStats as any[] | undefined)?.filter((p: any) => (p.points || 0) > 0).slice(0, 5) || [],
+    bench: (playerStats as any[] | undefined)?.filter((p: any) => (p.points || 0) > 0).slice(5) || []
+  };
 
   return (
     <main style={{ padding: '0 24px 24px 0', minHeight: '100vh', background: '#202c3e' }}>
@@ -160,13 +459,13 @@ export default function GameAnalysisPage() {
           <Card style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: 4 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ color: '#b0b0b0', fontSize: 16 }}>Field Goals</span>
-              <span style={{ color: '#52c41a', fontSize: 16,fontWeight: 700 }}>{teamStats?.fieldGoals?.percentage || 0}%</span>
+              <span style={{ color: '#52c41a', fontSize: 16,fontWeight: 700 }}>{teamStats?.fgPct || 0}%</span>
             </div>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-              {(teamStats?.fieldGoals?.made || 0)}/{(teamStats?.fieldGoals?.attempted || 0)}
+              {(teamStats?.fgMade || 0)}/{(teamStats?.fgAttempted || 0)}
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{ width: `${teamStats?.fieldGoals?.percentage || 0}%`, height: '100%', background: '#52c41a' }} />
+              <div style={{ width: `${teamStats?.fgPct || 0}%`, height: '100%', background: '#52c41a' }} />
             </div>
           </Card>
         </Col>
@@ -174,13 +473,13 @@ export default function GameAnalysisPage() {
           <Card style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: 4 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ color: '#b0b0b0', fontSize: 16 }}>Three Pointers</span>
-              <span style={{ color: '#1890ff', fontSize: 16,fontWeight: 700 }}>{teamStats?.threePointers?.percentage || 0}%</span>
+              <span style={{ color: '#1890ff', fontSize: 16,fontWeight: 700 }}>{teamStats?.threePct || 0}%</span>
             </div>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-              {(teamStats?.threePointers?.made || 0)}/{(teamStats?.threePointers?.attempted || 0)}
+              {(teamStats?.threeMade || 0)}/{(teamStats?.threeAttempted || 0)}
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{ width: `${teamStats?.threePointers?.percentage || 0}%`, height: '100%', background: '#1890ff' }} />
+              <div style={{ width: `${teamStats?.threePct || 0}%`, height: '100%', background: '#1890ff' }} />
             </div>
           </Card>
         </Col>
@@ -188,13 +487,13 @@ export default function GameAnalysisPage() {
           <Card style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: 4 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ color: '#b0b0b0', fontSize: 16 }}>Free Throws</span>
-              <span style={{ color: '#faad14', fontSize: 16, fontWeight: 700 }}>{teamStats?.freeThrows?.percentage || 0}%</span>
+              <span style={{ color: '#faad14', fontSize: 16, fontWeight: 700 }}>{teamStats?.ftPct || 0}%</span>
             </div>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-              {(teamStats?.freeThrows?.made || 0)}/{(teamStats?.freeThrows?.attempted || 0)}
+              {(teamStats?.ftMade || 0)}/{(teamStats?.ftAttempted || 0)}
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{ width: `${teamStats?.freeThrows?.percentage || 0}%`, height: '100%', background: '#faad14' }} />
+              <div style={{ width: `${teamStats?.ftPct || 0}%`, height: '100%', background: '#faad14' }} />
             </div>
           </Card>
         </Col>
@@ -209,7 +508,7 @@ export default function GameAnalysisPage() {
               <TeamOutlined style={{ color: '#B58842', fontSize: 16 }} />
             </div>
             <div style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 700 }}>
-              {(teamStats?.rebounds?.offensive || 0) + (teamStats?.rebounds?.defensive || 0)}
+              {teamStats?.rebounds || 0}
             </div>
           </Card>
         </Col>
@@ -292,23 +591,23 @@ export default function GameAnalysisPage() {
                     <div style={{ marginTop: 16 }}>
                       <TeamComparisonTable 
                         teamStats={{
-                          fgMade: teamStats?.fieldGoals?.made,
-                          fgAttempted: teamStats?.fieldGoals?.attempted,
-                          fgPercentage: teamStats?.fieldGoals?.percentage,
-                          twoPointMade: (teamStats?.fieldGoals?.made || 0) - (teamStats?.threePointers?.made || 0),
-                          twoPointAttempted: (teamStats?.fieldGoals?.attempted || 0) - (teamStats?.threePointers?.attempted || 0),
+                          fgMade: teamStats?.fgMade,
+                          fgAttempted: teamStats?.fgAttempted,
+                          fgPercentage: teamStats?.fgPct,
+                          twoPointMade: (teamStats?.fgMade || 0) - (teamStats?.threeMade || 0),
+                          twoPointAttempted: (teamStats?.fgAttempted || 0) - (teamStats?.threeAttempted || 0),
                           twoPointPercentage: (() => {
-                            const made = (teamStats?.fieldGoals?.made || 0) - (teamStats?.threePointers?.made || 0);
-                            const attempted = (teamStats?.fieldGoals?.attempted || 0) - (teamStats?.threePointers?.attempted || 0);
+                            const made = (teamStats?.fgMade || 0) - (teamStats?.threeMade || 0);
+                            const attempted = (teamStats?.fgAttempted || 0) - (teamStats?.threeAttempted || 0);
                             return attempted > 0 ? Math.round((made / attempted) * 100) : 0;
                           })(),
-                          threePointMade: teamStats?.threePointers?.made,
-                          threePointAttempted: teamStats?.threePointers?.attempted,
-                          threePointPercentage: teamStats?.threePointers?.percentage,
-                          ftMade: teamStats?.freeThrows?.made,
-                          ftAttempted: teamStats?.freeThrows?.attempted,
-                          ftPercentage: teamStats?.freeThrows?.percentage,
-                          totalRebounds: (teamStats?.rebounds?.offensive || 0) + (teamStats?.rebounds?.defensive || 0),
+                          threePointMade: teamStats?.threeMade,
+                          threePointAttempted: teamStats?.threeAttempted,
+                          threePointPercentage: teamStats?.threePct,
+                          ftMade: teamStats?.ftMade,
+                          ftAttempted: teamStats?.ftAttempted,
+                          ftPercentage: teamStats?.ftPct,
+                          totalRebounds: teamStats?.rebounds || 0,
                           totalAssists: teamStats?.assists,
                           totalSteals: teamStats?.steals,
                           totalBlocks: teamStats?.blocks,
@@ -347,7 +646,7 @@ export default function GameAnalysisPage() {
                           pointsOffTurnovers: gameAnalysisData.opponentStats?.pointsOffTurnovers,
                           benchPoints: gameAnalysisData.opponentStats?.benchPoints,
                         }}
-                        teamName={gameInfo?.name || "TEAM"}
+                        teamName={"TEAM"}
                         opponentName={gameInfo?.opponent || "OPPONENT"}
                       />
                     </div>
@@ -367,6 +666,7 @@ export default function GameAnalysisPage() {
                 <div style={{ padding: '16px 0' }}>
                   <Table
                     dataSource={playerStats || []}
+                    rowKey={(record) => record.id || `player-${record.name}-${record.position}`}
                     columns={[
                       { 
                         title: (<Tooltip title="Player name"><span style={{ color: '#fff' }}>Player</span></Tooltip>),
@@ -376,8 +676,8 @@ export default function GameAnalysisPage() {
                         width: 150,
                         render: (text: string, record: any) => (
                           <div>
-                            <div style={{ color: '#fff', fontSize: '14px', fontWeight: '600' }}>
-                              {text}
+                            <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                              <PlayerLink id={record.id} name={text} />
                             </div>
                             <div style={{ color: '#b0b0b0', fontSize: '12px' }}>
                               {record.position} #{record.number}
@@ -386,19 +686,11 @@ export default function GameAnalysisPage() {
                         )
                       },
                       { 
-                        title: (<Tooltip title="Jersey number"><span style={{ color: '#fff' }}>#</span></Tooltip>),
-                        dataIndex: 'number', 
-                        key: 'number',
-                        sorter: (a: any, b: any) => Number(a.number) - Number(b.number),
-                        width: 60,
-                        render: (value: any) => <span style={{ color: '#fff' }}>{value}</span>
-                      },
-                      { 
-                        title: (<Tooltip title="Player position"><span style={{ color: '#fff' }}>Pos</span></Tooltip>),
+                        title: (<Tooltip title="Player Position"><span style={{ color: '#fff' }}>POS</span></Tooltip>),
                         dataIndex: 'position', 
                         key: 'position',
-                        sorter: (a: any, b: any) => (a.position || '').localeCompare(b.position || ''),
-                        width: 75,
+                        sorter: (a: any, b: any) => a.position.localeCompare(b.position),
+                        width: 60,
                         render: (value: any) => <span style={{ color: '#fff' }}>{value}</span>
                       },
                       { 
@@ -529,39 +821,19 @@ export default function GameAnalysisPage() {
                       </h3>
                       <Table
                         dataSource={gameAnalysisData?.opponentPlayerStats || []}
+                        rowKey={(record) => record.id || `opponent-${record.number}-${record.name}`}
                         columns={[
                           { 
-                            title: (<Tooltip title="Player name"><span style={{ color: '#fff' }}>Player</span></Tooltip>),
-                            dataIndex: 'name', 
-                            key: 'name',
-                            sorter: (a: any, b: any) => a.name.localeCompare(b.name),
-                            width: 150,
-                            render: (text: string, record: any) => (
-                              <div>
-                                <div style={{ color: '#ff7875', fontSize: '14px', fontWeight: '600' }}>
-                                  {text}
-                                </div>
-                                <div style={{ color: '#b0b0b0', fontSize: '12px' }}>
-                                  {record.position} #{record.number}
-                                </div>
-                </div>
-              )
-            },
-            {
                             title: (<Tooltip title="Jersey number"><span style={{ color: '#fff' }}>#</span></Tooltip>),
                             dataIndex: 'number', 
                             key: 'number',
                             sorter: (a: any, b: any) => Number(a.number) - Number(b.number),
-                            width: 60,
-                            render: (value: any) => <span style={{ color: '#fff' }}>{value}</span>
-                          },
-                          { 
-                            title: (<Tooltip title="Player position"><span style={{ color: '#fff' }}>Pos</span></Tooltip>),
-                            dataIndex: 'position', 
-                            key: 'position',
-                            sorter: (a: any, b: any) => (a.position || '').localeCompare(b.position || ''),
-                            width: 75,
-                            render: (value: any) => <span style={{ color: '#fff' }}>{value}</span>
+                            width: 80,
+                            render: (value: any) => (
+                              <div style={{ fontWeight: 600, color: '#ff4d4f', fontSize: '16px' }}>
+                                #{value}
+                              </div>
+                            )
                           },
                           { 
                             title: (<Tooltip title="Total points scored"><span style={{ color: '#fff' }}>PTS</span></Tooltip>), 
@@ -684,6 +956,31 @@ export default function GameAnalysisPage() {
                       />
                     </div>
                   )}
+                  
+                  {/* Edit Box Score Button - COMMENTED OUT */}
+                  {/* <div style={{ 
+                    marginTop: '24px', 
+                    display: 'flex', 
+                    justifyContent: 'center',
+                    padding: '16px 0'
+                  }}>
+                    <Button 
+                      type="primary"
+                      icon={<EditOutlined />}
+                      onClick={handleBoxScoreEdit}
+                      size="large"
+                      style={{ 
+                        background: 'rgba(24, 144, 255, 0.1)', 
+                        border: '1px solid rgba(24, 144, 255, 0.3)',
+                        color: '#1890ff',
+                        fontWeight: '600',
+                        padding: '8px 24px',
+                        height: 'auto'
+                      }}
+                    >
+                      Edit Box Score
+                    </Button>
+                  </div> */}
                 </div>
               )
             },
@@ -809,8 +1106,8 @@ export default function GameAnalysisPage() {
                     <Col span={24}>
                       <Card title="Quarter Performance" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)' }}>
                         <Row gutter={[16, 16]}>
-                          {gameAnalysisData?.quarterBreakdown?.quarters?.map((quarter: any) => (
-                            <Col span={6} key={quarter.quarter}>
+                          {gameAnalysisData?.quarterBreakdown?.quarters?.map((quarter: any, index: number) => (
+                            <Col span={6} key={quarter.quarter || index}>
                               <Card 
                                 style={{ 
                                   background: 'rgba(255,255,255,0.05)', 
@@ -822,13 +1119,13 @@ export default function GameAnalysisPage() {
                                   Q{quarter.quarter}
                                 </div>
                                 <div style={{ color: '#fff', fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
-                                  {quarter.points}
+                                  {quarter.points || 0}
                                 </div>
                                 <div style={{ color: '#b0b0b0', fontSize: '12px', marginBottom: '4px' }}>
-                                  {quarter.fgPct}% FG
+                                  {quarter.fgPct || 0}% FG
                                 </div>
                                 <div style={{ color: '#b0b0b0', fontSize: '12px', marginBottom: '4px' }}>
-                                  {quarter.turnovers} Turnovers
+                                  {quarter.turnovers || 0} Turnovers
                                 </div>
                                 <div style={{ color: '#b0b0b0', fontSize: '12px', marginBottom: '4px' }}>
                                   {quarter.timeouts || 0} Timeouts
@@ -1097,7 +1394,7 @@ export default function GameAnalysisPage() {
                               Top Scorer
                             </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#1890ff', marginBottom: '8px' }}>
-                              {standoutInfo?.topScorer?.name || 'N/A'}
+                              <PlayerLink id={standoutInfo?.topScorer?.id} name={standoutInfo?.topScorer?.name || 'N/A'} />
                             </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
                               {standoutInfo?.topScorer?.points || 0} points
@@ -1113,7 +1410,7 @@ export default function GameAnalysisPage() {
                               Top Rebounder
                             </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#52c41a', marginBottom: '8px' }}>
-                              {standoutInfo?.topRebounder?.name || 'N/A'}
+                              <PlayerLink id={standoutInfo?.topRebounder?.id} name={standoutInfo?.topRebounder?.name || 'N/A'} />
                             </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
                               {standoutInfo?.topRebounder?.rebounds || 0} rebounds
@@ -1129,7 +1426,7 @@ export default function GameAnalysisPage() {
                               Top Assister
                             </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#722ed1', marginBottom: '8px' }}>
-                              {standoutInfo?.topAssister?.name || 'N/A'}
+                              <PlayerLink id={standoutInfo?.topAssister?.id} name={standoutInfo?.topAssister?.name || 'N/A'} />
                             </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
                               {standoutInfo?.topAssister?.assists || 0} assists
@@ -1147,7 +1444,7 @@ export default function GameAnalysisPage() {
                             Most Steals
                           </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#fa8c16', marginBottom: '8px' }}>
-                            {standoutInfo?.mostSteals?.name || 'N/A'}
+                            <PlayerLink id={standoutInfo?.mostSteals?.id} name={standoutInfo?.mostSteals?.name || 'N/A'} />
                           </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
                             {standoutInfo?.mostSteals?.steals || 0} steals
@@ -1163,10 +1460,10 @@ export default function GameAnalysisPage() {
                             Highest FG Points
                             </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#13c2c2', marginBottom: '8px' }}>
-                            {standoutInfo?.highestFgPoints?.name || 'N/A'}
+                            <PlayerLink id={standoutInfo?.highestFgPoints?.id} name={standoutInfo?.highestFgPoints?.name || 'N/A'} />
                             </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
-                            {standoutInfo?.highestFgPoints?.fgPoints || 0} points
+                            {standoutInfo?.highestFgPoints?.points || 0} points
                           </div>
                             </div>
                       </Card>
@@ -1179,10 +1476,10 @@ export default function GameAnalysisPage() {
                             Highest 3PT Points
                             </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#eb2f96', marginBottom: '8px' }}>
-                            {standoutInfo?.highest3ptPoints?.name || 'N/A'}
+                            <PlayerLink id={standoutInfo?.highest3ptPoints?.id} name={standoutInfo?.highest3ptPoints?.name || 'N/A'} />
                           </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
-                            {standoutInfo?.highest3ptPoints?.threePointPoints || 0} points
+                            {(standoutInfo?.highest3ptPoints?.threeMade || 0) * 3} points
                           </div>
                         </div>
                       </Card>
@@ -1197,10 +1494,10 @@ export default function GameAnalysisPage() {
                             Highest FT Points
                             </div>
                           <div style={{ fontSize: '24px', fontWeight: '700', color: '#52c41a', marginBottom: '8px' }}>
-                            {standoutInfo?.highestFtPoints?.name || 'N/A'}
+                            <PlayerLink id={standoutInfo?.highestFtPoints?.id} name={standoutInfo?.highestFtPoints?.name || 'N/A'} />
                             </div>
                           <div style={{ color: '#b0b0b0', fontSize: '16px' }}>
-                            {standoutInfo?.highestFtPoints?.ftPoints || 0} points
+                            {standoutInfo?.highestFtPoints?.ftMade || 0} points
                           </div>
                         </div>
                       </Card>
@@ -1365,17 +1662,72 @@ export default function GameAnalysisPage() {
               ),
               children: (
                 <div style={{ padding: '16px 0' }}>
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+                    <Input.Search
+                      allowClear
+                      placeholder="Search description or player"
+                      onSearch={(v) => setSearchText(v)}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      style={{ width: 280 }}
+                    />
+                    <Select
+                      value={filterQuarter}
+                      onChange={setFilterQuarter as any}
+                      style={{ width: 140 }}
+                      options={[{ label: 'All Quarters', value: 'all' }, ...availableQuarters.map((q: any) => ({ label: `Q${q}`, value: q }))]}
+                    />
+                    <Select
+                      value={filterSide}
+                      onChange={setFilterSide}
+                      style={{ width: 160 }}
+                      options={[
+                        { label: 'All Sides', value: 'all' },
+                        { label: 'Team', value: 'team' },
+                        { label: 'Opponent', value: 'opponent' },
+                      ]}
+                    />
+                    <Select
+                      showSearch
+                      value={filterType}
+                      onChange={setFilterType}
+                      style={{ minWidth: 180 }}
+                      options={[{ label: 'All Types', value: 'all' }, ...availableTypes.map((t: any) => ({ label: String(t).replace('_', ' '), value: String(t) }))]}
+                      filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
+                    />
+                    <Button onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}>
+                      {sortOrder === 'asc' ? <ArrowUpOutlined /> : <ArrowDownOutlined />} Sort by Time
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />}
+                      onClick={handleAddEvent}
+                      style={{ 
+                        background: 'rgba(82, 196, 26, 0.1)', 
+                        border: '1px solid rgba(82, 196, 26, 0.3)',
+                        color: '#52c41a'
+                      }}
+                    >
+                      Add Event
+                    </Button>
+                  </div>
                   <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                    {playByPlay && playByPlay.length > 0 ? (
+                    {filteredPlayByPlay && filteredPlayByPlay.length > 0 ? (
                       <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '8px', padding: '16px' }}>
-                        {playByPlay.map((play: any, index: number) => {
+                        {filteredPlayByPlay.map((play: any, index: number) => {
                           const getTypeColor = (type: string) => {
                             switch (type) {
-                              case 'points':
-                              case 'scoring':
-                                return '#52c41a';
+                              case 'three_made':
+                                return '#faad14'; // gold for 3PT make
+                              case 'fg_made':
+                                return '#52c41a'; // green for FG make
+                              case 'ft_made':
+                                return '#1890ff'; // blue for FT make
+                              case 'three_missed':
+                              case 'fg_missed':
+                              case 'ft_missed':
+                                return '#ff4d4f'; // red for misses
                               case 'assist':
-                                return '#1890ff';
+                                return '#2f54eb';
                               case 'rebound':
                                 return '#faad14';
                               case 'steal':
@@ -1386,6 +1738,8 @@ export default function GameAnalysisPage() {
                                 return '#ff4d4f';
                               case 'foul':
                                 return '#fa8c16';
+                              case 'substitution':
+                                return '#8c8c8c';
                               default:
                                 return '#b0b0b0';
                             }
@@ -1393,23 +1747,32 @@ export default function GameAnalysisPage() {
 
                           const getTypeIcon = (type: string) => {
                             switch (type) {
-                              case 'points':
-                              case 'scoring':
-                                return <AimOutlined style={{ fontSize: '20px', color: '#52c41a' }} />;
+                              case 'three_made':
+                                return <StarOutlined style={{ fontSize: '20px', color: '#faad14' }} />; // star for 3PT make
+                              case 'fg_made':
+                                return <AimOutlined style={{ fontSize: '20px', color: '#52c41a' }} />; // target for FG make
+                              case 'ft_made':
+                                return <AimOutlined style={{ fontSize: '20px', color: '#1890ff' }} />; // target blue for FT make
+                              case 'three_missed':
+                              case 'fg_missed':
+                              case 'ft_missed':
+                                return <CloseCircleOutlined style={{ fontSize: '20px', color: '#ff4d4f' }} />; // red X for misses
                               case 'assist':
-                                return <AimOutlined style={{ fontSize: '20px', color: '#1890ff' }} />;
+                                return <TeamOutlined style={{ fontSize: '20px', color: '#2f54eb' }} />; // teamwork
                               case 'rebound':
-                                return <InboxOutlined style={{ fontSize: '20px', color: '#faad14' }} />;
+                                return <InboxOutlined style={{ fontSize: '20px', color: '#faad14' }} />; // inbox = board
                               case 'steal':
-                                return <ThunderboltOutlined style={{ fontSize: '20px', color: '#722ed1' }} />;
+                                return <ThunderboltOutlined style={{ fontSize: '20px', color: '#722ed1' }} />; // lightning
                               case 'block':
-                                return <StopOutlined style={{ fontSize: '20px', color: '#eb2f96' }} />;
+                                return <StopOutlined style={{ fontSize: '20px', color: '#eb2f96' }} />; // stop sign
                               case 'turnover':
-                                return <CloseCircleOutlined style={{ fontSize: '20px', color: '#ff4d4f' }} />;
+                                return <CloseCircleOutlined style={{ fontSize: '20px', color: '#ff4d4f' }} />; // red X
                               case 'foul':
-                                return <ExclamationCircleOutlined style={{ fontSize: '20px', color: '#fa8c16' }} />;
+                                return <ExclamationCircleOutlined style={{ fontSize: '20px', color: '#fa8c16' }} />; // alert
+                              case 'substitution':
+                                return <SwapOutlined style={{ fontSize: '20px', color: '#8c8c8c' }} />; // swap arrows
                               default:
-                                return <FileTextOutlined style={{ fontSize: '20px', color: '#b0b0b0' }} />;
+                                return <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#8c8c8c' }} />;
                             }
                           };
 
@@ -1424,16 +1787,17 @@ export default function GameAnalysisPage() {
                               marginBottom: '4px'
                             }}>
                               <div style={{ 
-                                width: '80px', 
+                                width: '110px', 
                                 fontSize: '14px', 
                                 fontWeight: '600', 
                                 color: '#1890ff',
-                                textAlign: 'center'
+                                textAlign: 'center',
+                                whiteSpace: 'nowrap'
                               }}>
                                 {play?.time || 'N/A'}
                               </div>
                               <div style={{ 
-                                width: '60px', 
+                                width: '50px', 
                                 fontSize: '14px', 
                                 color: '#b0b0b0',
                                 textAlign: 'center',
@@ -1441,38 +1805,66 @@ export default function GameAnalysisPage() {
                                 borderRadius: '4px',
                                 padding: '4px 8px'
                               }}>
-                                Q{play?.quarter || 'N/A'}
+                                {play?.quarter ? `Q${play.quarter}` : ''}
                               </div>
                               <div style={{ 
                                 width: '40px', 
+                                fontSize: '12px', 
+                                color: '#8c8c8c',
                                 textAlign: 'center',
-                                marginLeft: '16px',
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center'
+                                background: 'rgba(255,255,255,0.05)',
+                                borderRadius: '4px',
+                                padding: '2px 4px'
                               }}>
-                                {getTypeIcon(play?.type || '')}
+                                #{play?.displayId || index + 1}
                               </div>
-                              <div style={{ 
-                                flex: 1, 
-                                fontSize: '16px', 
-                                color: play?.isOpponent ? '#ff7875' : '#fff', 
-                                marginLeft: '12px',
-                                fontWeight: play?.isOpponent ? '500' : '400'
-                              }}>
-                                {play?.description || 'No description available'}
-                              </div>
-                              <div style={{ 
-                                width: '100px', 
-                                fontSize: '16px', 
-                                fontWeight: '700', 
-                                textAlign: 'right',
-                                color: play?.isOpponent ? '#ff4d4f' : '#52c41a',
-                                background: play?.isOpponent ? 'rgba(255,77,79,0.1)' : 'rgba(82, 196, 26, 0.1)',
-                                borderRadius: '8px',
-                                padding: '8px 12px'
-                              }}>
-                                {play?.score || 'N/A'}
+                              <div style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 12, marginLeft: 16 }}>
+                                <div style={{ width: 24, display: 'flex', justifyContent: 'center' }}>
+                                  {getTypeIcon(play?.type || '')}
+                                </div>
+                                <div style={{ flex: 1, fontSize: '16px', color: play?.isOpponent ? '#ff7875' : '#fff', fontWeight: play?.isOpponent ? '500' : '400', display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                  {formatPlayDescription(play).actorNode}
+                                  <span>{formatPlayDescription(play).text}</span>
+                                </div>
+                                {play?.score ? (
+                                  <div style={{ 
+                                    width: 64, 
+                                    fontSize: '16px', 
+                                    fontWeight: '700', 
+                                    textAlign: 'right',
+                                    color: play?.isOpponent ? '#ff4d4f' : '#52c41a',
+                                    background: play?.isOpponent ? 'rgba(255,77,79,0.1)' : 'rgba(82, 196, 26, 0.1)',
+                                    borderRadius: 8,
+                                    padding: '8px 12px'
+                                  }}>
+                                    {play?.score}
+                                  </div>
+                                ) : <div style={{ width: 64 }} />}
+                                <div style={{ width: 80, textAlign: 'right', color: '#b0b0b0', fontWeight: 600 }}>
+                                  {play?.runningScore || ''}
+                                </div>
+                                <div style={{ width: 100, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                  <Button
+                                    size="small"
+                                    icon={<EditOutlined />}
+                                    onClick={() => handleEditEvent(play)}
+                                    style={{ 
+                                      background: 'rgba(24, 144, 255, 0.1)', 
+                                      border: '1px solid rgba(24, 144, 255, 0.3)',
+                                      color: '#1890ff'
+                                    }}
+                                  />
+                                  <Button
+                                    size="small"
+                                    icon={<DeleteOutlined />}
+                                    danger
+                                    onClick={() => handleDeleteEvent(play)}
+                                    style={{ 
+                                      background: 'rgba(255, 77, 79, 0.1)', 
+                                      border: '1px solid rgba(255, 77, 79, 0.3)'
+                                    }}
+                                  />
+                                </div>
                               </div>
                             </div>
                           );
@@ -1501,6 +1893,47 @@ export default function GameAnalysisPage() {
           ]}
         />
       </Card>
+      
+      {/* Event Editor Modal */}
+      <EventEditor
+        event={editingEvent}
+        isOpen={isEventEditorOpen}
+        onClose={() => {
+          setIsEventEditorOpen(false);
+          setEditingEvent(null);
+        }}
+        onSave={handleEventSave}
+        onDelete={handleEventDelete}
+        players={players}
+        isPostGame={true}
+      />
+      
+      {/* Box Score Editor Modal - COMMENTED OUT */}
+      {/* <BoxScoreEditor
+        gameId={gameAnalysisData?.actualGameId || gameId}
+        isOpen={isBoxScoreEditorOpen}
+        onClose={() => setIsBoxScoreEditorOpen(false)}
+        onSave={handleBoxScoreSave}
+        gameData={gameAnalysisData}
+      /> */}
+      
+      {/* Delete Confirmation Modal */}
+      <Modal
+        title="Delete Event"
+        open={isDeleteModalOpen}
+        onOk={handleConfirmDelete}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingEvent(null);
+        }}
+        okText="Delete"
+        cancelText="Cancel"
+        okButtonProps={{ danger: true }}
+      >
+        <p>Are you sure you want to delete this event?</p>
+        <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>This action cannot be undone.</p>
+        
+      </Modal>
     </main>
   );
 }

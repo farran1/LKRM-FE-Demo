@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAPI } from '../../../../../src/services/supabase-api'
+import { createServerClientWithAuth } from '@/lib/supabase'
 
 // Force Node.js runtime to avoid Edge Runtime issues with Supabase
 export const runtime = 'nodejs'
@@ -8,35 +8,43 @@ export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
-	console.log('=== NOTES GET ROUTE CALLED ===')
-	console.log('Request URL:', request.url)
-	
 	try {
-		const { id } = await params
-		const playerId = parseInt(id)
+		// Use authenticated client with RLS
+		const { client: supabase, user } = await createServerClientWithAuth(request);
 		
-		console.log('Player ID parsed:', playerId)
+		if (!user) {
+			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+		}
+		
+		const resolvedParams = await params;
+		const playerId = parseInt(resolvedParams.id);
 		
 		if (isNaN(playerId)) {
-			console.log('Invalid player ID')
-			return NextResponse.json(
-				{ error: 'Invalid player ID' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Invalid player ID' }, { status: 400 });
 		}
 
-		console.log('API GET /players/[id]/notes - fetching notes for player:', playerId)
-		
-		const notes = await supabaseAPI.getPlayerNotes(playerId)
-		
-		console.log('API GET /players/[id]/notes - returning notes:', notes)
-		return NextResponse.json({ notes })
+		// Get player notes
+		const { data: notes, error } = await supabase
+			.from('player_notes')
+			.select(`
+				id,
+				note_text,
+				note,
+				created_at,
+				createdAt
+			`)
+			.eq('playerId', playerId)
+			.order('created_at', { ascending: false });
+
+		if (error) {
+			console.error('Error fetching player notes:', error);
+			return NextResponse.json({ error: 'Failed to fetch notes' }, { status: 500 });
+		}
+
+		return NextResponse.json({ notes: notes || [] });
 	} catch (error) {
-		console.error('Error fetching player notes:', error)
-		return NextResponse.json(
-			{ error: 'Failed to fetch player notes' },
-			{ status: 500 }
-		)
+		console.error('Error in notes GET:', error);
+		return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 	}
 }
 
@@ -44,48 +52,54 @@ export async function POST(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
-	console.log('=== NOTES POST ROUTE CALLED ===')
-	
 	try {
-		const { id } = await params
-		const playerId = parseInt(id)
+		// Use authenticated client with RLS
+		const { client: supabase, user } = await createServerClientWithAuth(request);
+		
+		if (!user) {
+			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+		}
+		
+		const resolvedParams = await params;
+		const playerId = parseInt(resolvedParams.id);
 		
 		if (isNaN(playerId)) {
-			return NextResponse.json(
-				{ error: 'Invalid player ID' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Invalid player ID' }, { status: 400 });
 		}
 
-		const body = await request.json()
-		console.log('API POST /players/[id]/notes - request body:', body)
-		console.log('API POST /players/[id]/notes - creating note for player:', playerId, 'with data:', body)
-		
-		// Check if we have the required note text
-		if (!body.note && !body.noteText) {
-			console.error('Missing note text in request body')
-			return NextResponse.json(
-				{ error: 'Missing note text' },
-				{ status: 400 }
-			)
+		const body = await request.json();
+		const { content } = body;
+
+		if (!content || content.trim().length === 0) {
+			return NextResponse.json({ error: 'Note content is required' }, { status: 400 });
 		}
-		
-		const note = await supabaseAPI.createPlayerNote({
-			playerId,
-			noteText: body.note || body.noteText
-		})
-		
-		console.log('API POST /players/[id]/notes - created note:', note)
-		return NextResponse.json({ note }, { status: 201 })
+
+		// Create new note
+		const { data: note, error } = await supabase
+			.from('player_notes')
+			.insert({
+				playerId: playerId,
+				note: content.trim(),
+				note_text: content.trim(),
+				createdBy: parseInt(user.id) || 0
+			})
+			.select(`
+				id,
+				note_text,
+				note,
+				created_at,
+				createdAt
+			`)
+			.single();
+
+		if (error) {
+			console.error('Error creating note:', error);
+			return NextResponse.json({ error: 'Failed to create note' }, { status: 500 });
+		}
+
+		return NextResponse.json({ note }, { status: 201 });
 	} catch (error) {
-		console.error('Error creating player note:', error)
-		console.error('Error details:', {
-			message: error instanceof Error ? error.message : 'Unknown error',
-			stack: error instanceof Error ? error.stack : 'No stack trace'
-		})
-		return NextResponse.json(
-			{ error: 'Failed to create player note' },
-			{ status: 500 }
-		)
+		console.error('Error in notes POST:', error);
+		return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 	}
 }

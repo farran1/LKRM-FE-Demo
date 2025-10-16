@@ -7,9 +7,9 @@ import CircleIcon from '@/components/icon/circle.svg'
 import TickIcon from '@/components/icon/circle-tick.svg'
 import classNames from 'classnames'
 import dayjs from 'dayjs'
+import api from '@/services/api'
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
-import api from '@/services/api'
 
 type ColumnType = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'ARCHIVE'
 
@@ -164,21 +164,15 @@ const Kanban = ({ dataSource, addTask, showEventDetail }: any) => {
 
       console.log(`Sending PATCH request to /api/tasks/${taskId} with payload:`, payload)
 
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
+      const response = await api.patch(`/api/tasks/${taskId}`, payload)
 
-      if (!response.ok) {
-        const errorText = await response.text()
+      if (response.status !== 200) {
+        const errorText = (response as any).data?.error || 'Unknown error'
         console.error(`API error response: ${errorText}`)
         throw new Error(`Failed to update task status: ${response.status} ${errorText}`)
       }
 
-      const result = await response.json()
+      const result = response.data
       console.log(`Task ${taskId} moved to ${targetColumn} successfully:`, result)
     } catch (err) {
       console.error('Update status failed:', err)
@@ -229,7 +223,7 @@ const Kanban = ({ dataSource, addTask, showEventDetail }: any) => {
               </div>
               <div className={style.content}>{task.description || 'No description'}</div>
               <div className={style.footer}>
-                <div>{task.users?.username ? `👤 ${task.users.username}` : 'Unassigned'}</div>
+                <div>{task.users?.username ? task.users.username : 'Unassigned'}</div>
                 <div className={style.duedate}>
                   {task.dueDate ? dayjs(task.dueDate).format('MM/DD/YY') : 'No due date'}
                 </div>

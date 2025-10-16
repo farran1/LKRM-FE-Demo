@@ -16,6 +16,25 @@ const { Title } = Typography
 // ['Workout', 'Meeting', 'Practice', 'Scrimmage', 'Tournament', 'Championship']
 const locations = [{label: 'Home', value: 'HOME'}, {label: 'Away', value: 'AWAY'}]
 
+type UserApi = {
+  id?: string
+  email?: string
+  user_metadata?: {
+    first_name?: string
+    last_name?: string
+    full_name?: string
+  }
+}
+
+function extractArrayFromApiResponse(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object' && 'data' in (value as Record<string, unknown>)) {
+    const inner = (value as { data?: unknown }).data
+    if (Array.isArray(inner)) return inner
+  }
+  return []
+}
+
 function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
   const [eventTypes, setEventTypes] = useState<Array<{ label: string; value: number }>>([])
@@ -69,49 +88,50 @@ function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
 
   async function getCoaches() {
     try {
-      console.log('🔄 SUPABASE EDIT: Fetching coaches directly from Supabase users table...') // Debug log
+      console.log('🔄 API EDIT: Fetching all users from /api/users...') // Debug log
       
-      // Get authenticated users from session instead of public users table
-      const { data: { session } } = await supabase.auth.getSession()
+      // Fetch all users from the API endpoint
+      const response = await api.get('/api/users')
+      const raw: unknown = (response as any)?.data ?? response
+      const users = extractArrayFromApiResponse(raw) as UserApi[]
       
-      if (!session?.user) {
-        console.error('No authenticated user found')
-        setCoaches([])
-        return
-      }
-      
-      // Create coach options from authenticated user
-      const user = session.user
-      const userName = user.user_metadata?.first_name && user.user_metadata?.last_name 
-        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-        : user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
-      
-      const users = [{
-        id: user.id,
-        username: userName,
-        email: user.email,
-        role: 'COACH',
-        isActive: true
-      }]
+      console.log('🔄 API EDIT: Fetched users:', users) // Debug log
 
-      console.log('🔄 SUPABASE EDIT: Using authenticated user for coaches:', users) // Debug log
-
-      if (!users || users.length === 0) {
-        console.log('🔄 SUPABASE EDIT: No users found') // Debug log
+      if (!Array.isArray(users) || users.length === 0) {
+        console.log('🔄 API EDIT: No users found or invalid response format') // Debug log
         setCoaches([])
         return
       }
 
       // Process the users data
-      const processedUsers = users.map(user => ({
-        label: user.username || 'Unknown User',
-        value: user.username || 'Unknown User'
-      }))
+      const processedUsers = users.map((user: any) => {
+        // Extract name from user_metadata
+        const firstName = user.user_metadata?.first_name || ''
+        const lastName = user.user_metadata?.last_name || ''
+        const fullName = user.user_metadata?.full_name || ''
+        
+        // Create display name
+        let displayName = ''
+        if (fullName) {
+          displayName = fullName
+        } else if (firstName && lastName) {
+          displayName = `${firstName} ${lastName}`
+        } else if (firstName) {
+          displayName = firstName
+        } else {
+          displayName = user.email?.split('@')[0] || 'Unknown User'
+        }
+        
+        return {
+          label: displayName,
+          value: user.email || user.id // Use email as value for consistency
+        }
+      })
 
-      console.log('🔄 SUPABASE EDIT: Final processed users:', processedUsers) // Debug log
+      console.log('🔄 API EDIT: Final processed users:', processedUsers) // Debug log
       setCoaches(processedUsers)
     } catch (error) {
-      console.error('🔄 SUPABASE EDIT: Error in getCoaches:', error)
+      console.error('🔄 API EDIT: Error in getCoaches:', error)
       setCoaches([])
     }
   }
@@ -166,22 +186,60 @@ function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
         payload.occurence = Number(endAfterCount)
       } else if (endsType === 'on' && endOnDate && payload.startTime) {
         try {
-          // Roughly estimate occurrences by cadence difference + 1
+          // Calculate accurate occurrences based on repeat type and end date
           const start = new Date(payload.startTime)
           const end = new Date(endOnDate)
-          const diffMs = Math.max(0, end.getTime() - start.getTime())
-          const oneDay = 24 * 60 * 60 * 1000
-          const calcByRule = {
-            daily: Math.floor(diffMs / oneDay) + 1,
-            weekly: Math.floor(diffMs / (7 * oneDay)) + 1,
-            monthly: Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1),
-            yearly: Math.max(1, (end.getFullYear() - start.getFullYear()) + 1)
-          } as any
-          const count = calcByRule[repeatRule] ?? undefined
-          if (count && Number.isFinite(count)) {
-            payload.occurence = count
+          
+          // Ensure end date is not before start date
+          if (end < start) {
+            console.warn('End date is before start date, using start date as end date')
+            payload.endDate = payload.startTime
+            payload.occurence = 1
+            return
           }
-        } catch {}
+          
+          let count = 1 // Start with 1 for the initial occurrence
+          let currentDate = new Date(start)
+          
+          switch (repeatRule) {
+            case 'daily':
+              while (currentDate <= end) {
+                currentDate.setDate(currentDate.getDate() + 1)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            case 'weekly':
+              while (currentDate <= end) {
+                currentDate.setDate(currentDate.getDate() + 7)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            case 'monthly':
+              while (currentDate <= end) {
+                currentDate.setMonth(currentDate.getMonth() + 1)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            case 'yearly':
+              while (currentDate <= end) {
+                currentDate.setFullYear(currentDate.getFullYear() + 1)
+                if (currentDate <= end) count++
+              }
+              break
+              
+            default:
+              count = 1
+          }
+          
+          payload.occurence = Math.max(1, count)
+          payload.endDate = endOnDate // Store the end date for validation
+        } catch (error) {
+          console.error('Error calculating occurrences:', error)
+          payload.occurence = 1
+        }
       }
     } else {
       payload.isRepeat = false
@@ -195,6 +253,21 @@ function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
     delete payload.endAfterCount
     delete payload.repeatRule // Remove repeatRule as it's not a database field
     // Keep daysOfWeek as it's needed for weekly repeats
+    
+    // Convert attendees to members for API
+    if (payload.attendees && Array.isArray(payload.attendees)) {
+      payload.members = payload.attendees
+    }
+    delete payload.attendees // Remove attendees field as it's now members
+
+    // Handle location field for meetings
+    const selectedEventType = eventTypes.find(et => et.value === payload.eventTypeId)
+    const isMeeting = selectedEventType?.label?.toLowerCase() === 'meeting'
+    
+    // For meetings, remove location field entirely
+    if (isMeeting) {
+      delete payload.location
+    }
 
     try {
       // Use originalEventId for recurring instances, otherwise use the regular id
@@ -407,6 +480,12 @@ function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
               const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
               const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()
               const isGame = typeLabel === 'game'
+              const isMeeting = typeLabel === 'meeting'
+              
+              // Don't show location field for meetings
+              if (isMeeting) {
+                return null
+              }
               
               // Auto set HOME for non-game events if location is not set
               if (!isGame && !form.getFieldValue('location')) {

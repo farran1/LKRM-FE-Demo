@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, Typography, Progress, Button, Table, Tag, Space, Statistic, Row, Col } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import TrashIcon from '@/components/icon/trash.svg';
 import styles from './style.module.scss';
 import ExpensesChart from './ExpensesChart';
 
@@ -176,19 +177,23 @@ export default function BucketDetailsPage({ params }: { params: Promise<{ slug: 
           <Link href="/budgets" className={styles.backLink}>
             <ArrowLeftOutlined /> Back
           </Link>
-          <Title level={1} className={styles.pageTitle}>
-            Budget / {budget.name}
-          </Title>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Title level={1} className={styles.pageTitle}>
+              Budget / {budget.name}
+            </Title>
+            <TrashIcon 
+              onClick={handleBudgetDeleted}
+              style={{ 
+                cursor: 'pointer', 
+                color: '#ff4d4f',
+                width: '20px',
+                height: '20px'
+              }}
+            />
+          </div>
         </div>
         <Space>
           <Button icon={<EditOutlined />}>Edit Budget</Button>
-          <Button 
-            danger 
-            icon={<DeleteOutlined />}
-            onClick={handleBudgetDeleted}
-          >
-            Delete Budget
-          </Button>
         </Space>
       </div>
 
@@ -291,10 +296,41 @@ export default function BucketDetailsPage({ params }: { params: Promise<{ slug: 
                 sorter: (a, b) => a.amount - b.amount,
               },
               {
+                title: 'Description',
+                dataIndex: 'description',
+                key: 'description',
+                ellipsis: true,
+                render: (description: string) => {
+                  if (!description) return '-'
+                  return description.length > 50 ? 
+                    `${description.substring(0, 50)}...` : 
+                    description
+                },
+              },
+              {
                 title: 'Event',
                 dataIndex: ['event', 'name'],
                 key: 'event',
-                render: (eventName: string) => eventName || 'N/A',
+                ellipsis: true,
+                render: (eventName: string, record: any) => {
+                  if (!record.event || !record.event.name) return 'N/A'
+                  return (
+                    <span 
+                      style={{ 
+                        color: '#1D75D0', 
+                        textDecoration: 'underline',
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        // Events use popup modals, not separate pages
+                        console.log('Event navigation disabled - events use popup modals')
+                      }}
+                    >
+                      {record.event.name}
+                    </span>
+                  )
+                },
               },
               {
                 title: 'Actions',
