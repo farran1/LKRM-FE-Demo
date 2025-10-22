@@ -38,6 +38,7 @@ export interface SyncQueueItem {
   timestamp: string
   retryCount: number
   maxRetries: number
+  priority?: 'low' | 'medium' | 'high'
 }
 
 export interface OfflineSession {
