@@ -83,18 +83,19 @@ export async function PUT(
 			return NextResponse.json({ error: 'Note content is required' }, { status: 400 });
 		}
 
-		// Update note
+		// Update note - use correct column and enforce ownership
 		const { data: note, error } = await supabase
 			.from('player_notes')
-      .update({
-        note: content.trim(),
-        updated_at: new Date().toISOString()
-      })
+	      .update({
+	        note_text: content.trim(),
+	        updated_at: new Date().toISOString()
+	      })
 			.eq('id', noteId)
 			.eq('player_id', playerId)
+			.eq('created_by', user.id)
 			.select(`
 				id,
-				content,
+				note_text,
 				created_at,
 				updated_at,
 				created_by,
@@ -136,12 +137,13 @@ export async function DELETE(
 			return NextResponse.json({ error: 'Invalid player ID or note ID' }, { status: 400 });
 		}
 
-		// Delete note
+		// Delete note - enforce ownership to satisfy RLS
 		const { error } = await supabase
 			.from('player_notes')
 			.delete()
 			.eq('id', noteId)
-			.eq('player_id', playerId);
+			.eq('player_id', playerId)
+			.eq('created_by', user.id);
 
 		if (error) {
 			console.error('Error deleting note:', error);
