@@ -7,7 +7,6 @@
 import { offlineStorage, OfflineSession, OfflineEvent } from './offline-storage'
 import { syncService, networkDetector } from './sync-service'
 import { cacheService, Player, Event } from './cache-service'
-import { generateUUID } from '../utils/uuid'
 
 export interface GameState {
   currentQuarter: number
@@ -242,7 +241,7 @@ class LiveGameDataService {
       console.log('🔄 Deactivated old session:', session.id)
     })
     
-    const sessionId = generateUUID()
+    const sessionId = crypto.randomUUID()
     console.log('🆕 Starting new session - sessionId:', sessionId)
     console.log('🆕 Starting new session - sessionId type:', typeof sessionId)
     console.log('🆕 Starting new session - currentSessionId before:', this.currentSessionId)
@@ -334,7 +333,7 @@ class LiveGameDataService {
     console.log('🎯 CurrentSessionId type:', typeof this.currentSessionId)
 
     const event: OfflineEvent = {
-      id: generateUUID(),
+      id: crypto.randomUUID(),
       sessionId: this.currentSessionId,
       eventType: eventData.eventType,
       eventValue: eventData.eventValue,

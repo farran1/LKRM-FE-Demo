@@ -5,7 +5,6 @@
 
 import { offlineStorage, OfflineSession } from './offline-storage'
 import { syncService } from './sync-service'
-import { generateUUID } from '../utils/uuid'
 
 export interface SessionConflict {
   localSession: OfflineSession
@@ -114,7 +113,7 @@ class MultiDeviceResumeService {
   ): Promise<OfflineSession> {
     const mergedSession: OfflineSession = {
       ...session1,
-      id: generateUUID(), // New ID for merged session
+      id: crypto.randomUUID(), // New ID for merged session
       version: Math.max(session1.version, session2.version) + 1,
       lastModified: new Date().toISOString(),
       deviceId: offlineStorage.getDeviceId()
@@ -345,7 +344,7 @@ class MultiDeviceResumeService {
     // Synchronous version of merge for immediate use
     const mergedSession: OfflineSession = {
       ...session1,
-      id: generateUUID(),
+      id: crypto.randomUUID(),
       version: Math.max(session1.version, session2.version) + 1,
       lastModified: new Date().toISOString(),
       deviceId: offlineStorage.getDeviceId()

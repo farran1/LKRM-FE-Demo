@@ -7914,7 +7914,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                     ? '2px solid #49aa19' 
                     : '1px solid #434343',
                   background: selectedLineupPlayers.includes(player.id)
-                    ? 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)'
+                    ? '#1a3a1a'
                     : '#262626',
                   transition: 'all 0.2s ease',
                   minHeight: '100px',
@@ -7934,13 +7934,13 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                   />
                 </div>
                 <div style={{ marginTop: '20px' }}>
-                  <Text strong style={{ color: selectedLineupPlayers.includes(player.id) ? '#262626' : '#f5f7fa', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>
                     #{player.number}
                   </Text>
-                  <Text strong style={{ color: selectedLineupPlayers.includes(player.id) ? '#262626' : '#f5f7fa', fontSize: '0.85rem', display: 'block', marginBottom: '4px', lineHeight: '1.2' }}>
+                  <Text strong style={{ color: '#f5f7fa', fontSize: '0.85rem', display: 'block', marginBottom: '4px', lineHeight: '1.2' }}>
                     {player.name}
                   </Text>
-                  <Text type="secondary" style={{ color: selectedLineupPlayers.includes(player.id) ? '#595959' : '#a6a6a6', fontSize: '0.75rem', display: 'block' }}>
+                  <Text type="secondary" style={{ color: '#a6a6a6', fontSize: '0.75rem', display: 'block' }}>
                     {player.position}
                   </Text>
                 </div>

@@ -65,16 +65,17 @@
     align-items: center;
     padding: 8px 10px;
     margin: 4px 0;
-    border: 2px solid #e8e8e8;
+    border: 2px solid #1890ff;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.3s ease;
-    background: white;
+    background: #f0f8ff;
     min-height: 40px;
 
     &:hover {
-      border-color: #1890ff;
-      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+      border-color: #096dd9;
+      background: #e6f7ff;
+      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
       transform: translateY(-1px);
     }
 
@@ -90,7 +91,7 @@
 
       .playerName {
         font-weight: 600;
-        color: #262626;
+        color: #0050b3;
         font-size: 0.9rem;
         line-height: 1.2;
         white-space: nowrap;
@@ -99,7 +100,7 @@
       }
 
       .playerNumber {
-        color: #8c8c8c;
+        color: #096dd9;
         font-size: 0.8rem;
       }
     }
@@ -816,17 +817,37 @@
     }
 
     .playerCard {
-      background: #262626;
-      border-color: #434343;
+      background: #1a365d;
+      border-color: #2563eb;
 
       &:hover {
-        border-color: #177ddc;
-        background: #303030;
+        border-color: #3b82f6;
+        background: #1e40af;
       }
 
       &.selected {
-        background: linear-gradient(135deg, #162312 0%, #274916 100%);
+        background: linear-gradient(135deg, #1a3a1a 0%, #2d5016 100%);
         border-color: #49aa19;
+        
+        .playerInfo {
+          .playerName {
+            color: #b7eb8f;
+          }
+          
+          .playerNumber {
+            color: #95de64;
+          }
+        }
+      }
+      
+      .playerInfo {
+        .playerName {
+          color: #dbeafe;
+        }
+        
+        .playerNumber {
+          color: #93c5fd;
+        }
       }
     }
 
@@ -1212,16 +1233,37 @@
     }
 
     .playerCard {
-      background: #1f1f1f;
-      border-color: #434343;
+      background: #1a365d;
+      border-color: #2563eb;
 
       &:hover {
-        border-color: #177ddc;
+        border-color: #3b82f6;
+        background: #1e40af;
       }
 
       &.selected {
-        background: linear-gradient(135deg, #162312 0%, #274916 100%);
+        background: linear-gradient(135deg, #1a3a1a 0%, #2d5016 100%);
         border-color: #49aa19;
+        
+        .playerInfo {
+          .playerName {
+            color: #b7eb8f;
+          }
+          
+          .playerNumber {
+            color: #95de64;
+          }
+        }
+      }
+      
+      .playerInfo {
+        .playerName {
+          color: #dbeafe;
+        }
+        
+        .playerNumber {
+          color: #93c5fd;
+        }
       }
     }
 
