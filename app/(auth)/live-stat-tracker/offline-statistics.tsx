@@ -49,14 +49,9 @@ const OfflineStatistics: React.FC<OfflineStatisticsProps> = ({
 
   // Handle exit with offline system
   const handleExit = async () => {
-    try {
-      // End the current session
-      await liveGameDataService.endGame()
-      console.log('✅ Game session ended via exit')
-    } catch (error) {
-      console.error('❌ Failed to end session on exit:', error)
-    }
-    
+    // Don't end the session here - let the handleEndGame function in track/page.tsx handle it
+    // This prevents "no active session" errors
+    console.log('✅ Exiting live stat tracker')
     onExit()
   }
 

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const endDate = searchParams.get('endDate');
 
     // Get player details
-    const { data: player, error: playerError } = await supabase
+    const { data: player, error: playerError } = await (supabase as any)
       .from('players')
       .select(`
         *,

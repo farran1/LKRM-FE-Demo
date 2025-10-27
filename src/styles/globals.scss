@@ -21,6 +21,11 @@ body {
   overflow: hidden;
 }
 
+/* Handle browser extension modifications that cause hydration mismatches */
+html.fusion-extension-loaded {
+  /* Suppress hydration warnings for browser extension modifications */
+}
+
 /* Global Link Styling - Make all clickable elements underlined */
 a {
   color: #1890ff;

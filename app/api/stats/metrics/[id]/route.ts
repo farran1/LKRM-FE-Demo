@@ -50,7 +50,7 @@ export async function PUT(
     if (event_types !== undefined) updateData.event_types = event_types;
     if (is_active !== undefined) updateData.is_active = is_active;
 
-    const { data: metric, error } = await supabase
+    const { data: metric, error } = await (supabase as any)
       .from('stat_metrics')
       .update(updateData)
       .eq('id', metricId)
@@ -92,7 +92,7 @@ export async function DELETE(
     }
 
     // Soft delete by setting is_active to false
-    const { data: metric, error } = await supabase
+    const { data: metric, error } = await (supabase as any)
       .from('stat_metrics')
       .update({ 
         is_active: false,

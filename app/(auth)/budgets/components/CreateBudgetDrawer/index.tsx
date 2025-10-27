@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Drawer, Form, Input, Select, InputNumber, Switch, Button, Flex, App } from 'antd';
 import CloseIcon from '@/components/icon/close.svg';
 import style from './style.module.scss';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 const { TextArea } = Input;
 
@@ -13,10 +14,11 @@ interface CreateBudgetDrawerProps {
   onSuccess: () => void;
 }
 
-export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateBudgetDrawerProps) {
+export default function CreateBudgetDrawer({ open, onClose, onSuccess }: any) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const { message } = App.useApp();
+  const { user } = useAuth();
 
   const handleSubmit = async (values: any) => {
     try {
@@ -29,9 +31,8 @@ export default function CreateBudgetDrawer({ open, onClose, onSuccess }: CreateB
         },
         body: JSON.stringify({
           ...values,
-          season: '2025-2026',
-          createdBy: 1, // TODO: Get from actual user context
-          updatedBy: 1
+          Season: '2025-2026',
+          // User data will be handled by the API route
         }),
       });
 

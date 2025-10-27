@@ -605,7 +605,7 @@ function NewEvent({ isOpen, showOpen, onRefresh, defaultValues } : any) {
             <Input.TextArea 
               placeholder="Enter event details..." 
               rows={3}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                 // Auto-populate based on event type when user starts typing
                 const typeId = selectedTypeId ?? form.getFieldValue('eventTypeId')
                 const typeLabel = eventTypes.find(et => et.value === typeId)?.label?.toLowerCase()

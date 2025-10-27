@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
 
     // Get all active goals with their metrics
-    const { data: goals, error: goalsError } = await supabase
+    const { data: goals, error: goalsError } = await (supabase as any)
       .from('team_goals')
       .select(`
         id,
@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get latest progress for each goal
-    const goalIds = goals.map(g => g.id);
-    const { data: latestProgress, error: progressError } = await supabase
+    const goalIds = goals.map((g: any) => g.id);
+    const { data: latestProgress, error: progressError } = await (supabase as any)
       .from('team_goal_progress')
       .select(`
         goal_id,
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get trend data (last N games) for each goal
-    const { data: trendData, error: trendError } = await supabase
+    const { data: trendData, error: trendError } = await (supabase as any)
       .from('team_goal_progress')
       .select(`
         goal_id,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     }
 
     // COMMENTED OUT: Get recent notifications
-    // const { data: notifications, error: notificationsError } = await supabase
+    // const { data: notifications, error: notificationsError } = await (supabase as any)
     //   .from('notifications')
     //   .select('id, type, title, message, data, createdAt')
     //   .in('type', ['GOAL_AT_RISK', 'GOAL_OFF_TRACK', 'GOAL_ACHIEVED', 'GOAL_TREND_IMPROVING'])
@@ -111,9 +111,9 @@ export async function GET(request: NextRequest) {
     // }
 
     // Process data to create dashboard summary
-    const goalsWithProgress = goals.map(goal => {
-      const latest = latestProgress?.find(p => p.goal_id === goal.id);
-      const trends = trendData?.filter(t => t.goal_id === goal.id).slice(0, limit) || [];
+    const goalsWithProgress = goals.map((goal: any) => {
+      const latest = latestProgress?.find((p: any) => p.goal_id === goal.id);
+      const trends = trendData?.filter((t: any) => t.goal_id === goal.id).slice(0, limit) || [];
 
       return {
         ...goal,
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
           status: latest.status,
           lastCalculated: latest.calculated_at
         } : null,
-        trends: trends.map(t => ({
+        trends: trends.map((t: any) => ({
           value: t.actual_value,
           date: t.calculated_at,
           game: t.live_game_sessions?.events?.name || 'Unknown Game',
@@ -136,9 +136,9 @@ export async function GET(request: NextRequest) {
     // Calculate summary statistics
     const summary = {
       totalGoals: goalsWithProgress.length,
-      onTrack: goalsWithProgress.filter(g => g.currentProgress?.status === 'on_track').length,
-      atRisk: goalsWithProgress.filter(g => g.currentProgress?.status === 'at_risk').length,
-      offTrack: goalsWithProgress.filter(g => g.currentProgress?.status === 'off_track').length
+      onTrack: goalsWithProgress.filter((g: any) => g.currentProgress?.status === 'on_track').length,
+      atRisk: goalsWithProgress.filter((g: any) => g.currentProgress?.status === 'at_risk').length,
+      offTrack: goalsWithProgress.filter((g: any) => g.currentProgress?.status === 'off_track').length
     };
 
     return NextResponse.json({

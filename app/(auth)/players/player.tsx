@@ -253,7 +253,7 @@ function Player() {
               placeholder="Search"
               className={style.search}
               value={searchkey}
-              onChange={(e) => setSearchKey(e.target.value)}
+              onChange={(e) => setSearchKey(e.target.value as string)}
               onPressEnter={handleImmediateSearch}
               allowClear
             />

@@ -25,7 +25,7 @@ interface BudgetCard {
   barColor: string;
   description?: string;
   autoRepeat: boolean;
-  season: string;
+  Season: string;
   is_pinned: boolean;
 }
 
@@ -46,7 +46,7 @@ export default function BudgetsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        season: '2025-2026',
+        Season: '2025-2026',
         ...(searchTerm && { search: searchTerm })
       });
       
@@ -234,7 +234,7 @@ export default function BudgetsPage() {
               className={styles.search}
               prefix={<SearchIcon />}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value as string)}
               onPressEnter={handleImmediateSearch}
               allowClear
             />
@@ -286,7 +286,7 @@ export default function BudgetsPage() {
             className={styles.search}
             prefix={<SearchIcon />}
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value as string)}
             onPressEnter={handleImmediateSearch}
             allowClear
           />

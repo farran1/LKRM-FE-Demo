@@ -19,7 +19,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid note ID' }, { status: 400 })
     }
 
-    const { data: note, error } = await supabase
+    const { data: note, error } = await (supabase as any)
       .from('quick_notes')
       .select(`
         *,
@@ -78,7 +78,7 @@ export async function PUT(
     if (position_y !== undefined) updateData.position_y = position_y
     if (is_pinned !== undefined) updateData.is_pinned = is_pinned
 
-    const { data: note, error: noteError } = await supabase
+    const { data: note, error: noteError } = await (supabase as any)
       .from('quick_notes')
       .update(updateData)
       .eq('id', noteId)
@@ -94,7 +94,7 @@ export async function PUT(
     // Update mentions if provided
     if (mentions !== undefined) {
       // Remove existing mentions
-      await supabase
+      await (supabase as any)
         .from('coach_mentions')
         .delete()
         .eq('note_id', noteId)
@@ -115,7 +115,7 @@ export async function PUT(
             end_position: mention.endPosition
           }))
 
-          const { error: mentionsError } = await supabase
+          const { error: mentionsError } = await (supabase as any)
             .from('coach_mentions')
             .insert(mentionInserts)
 
@@ -130,7 +130,7 @@ export async function PUT(
             mentioned_by: user.id
           }))
 
-          await supabase
+          await (supabase as any)
             .from('mention_notifications')
             .insert(notificationInserts)
         }
@@ -138,7 +138,7 @@ export async function PUT(
     }
 
     // Fetch the complete updated note
-    const { data: completeNote, error: fetchError } = await supabase
+    const { data: completeNote, error: fetchError } = await (supabase as any)
       .from('quick_notes')
       .select(`
         *,
@@ -182,33 +182,36 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid note ID' }, { status: 400 })
     }
 
-    // Fetch note to log prior to deletion
-    const { data: existingNote } = await supabase
-      .from('quick_notes')
-      .select('*')
-      .eq('id', noteId)
-      .eq('created_by', user.id)
-      .single()
+    // Log deletion attempt
+    console.log('🗑️ Deleting note:', noteId, 'by user:', user.id)
 
-    // Insert audit log (best-effort) before delete
+    // First, delete related records to avoid foreign key constraint issues
     try {
-      await supabase
-        .from('audit_logs')
-        .insert({
-          userId: null, // user.id is UUID; column is integer in current schema
-          action: 'DELETE',
-          table: 'quick_notes',
-          recordId: noteId,
-          oldData: existingNote || null,
-          newData: null,
-          ipAddress: request.headers.get('x-forwarded-for') || null,
-          userAgent: request.headers.get('user-agent') || null
-        })
-    } catch (logErr) {
-      console.error('Audit log insert failed (DELETE quick_note):', logErr)
+      await (supabase as any).from('coach_mentions').delete().eq('note_id', noteId)
+      console.log('✅ Deleted coach_mentions for note:', noteId)
+    } catch (err) {
+      console.error('⚠️ Error deleting coach_mentions:', err)
+      // Continue anyway
     }
 
-    const { error } = await supabase
+    try {
+      await (supabase as any).from('mention_notifications').delete().eq('note_id', noteId)
+      console.log('✅ Deleted mention_notifications for note:', noteId)
+    } catch (err) {
+      console.error('⚠️ Error deleting mention_notifications:', err)
+      // Continue anyway
+    }
+
+    try {
+      await (supabase as any).from('quick_note_tags').delete().eq('note_id', noteId)
+      console.log('✅ Deleted quick_note_tags for note:', noteId)
+    } catch (err) {
+      console.error('⚠️ Error deleting quick_note_tags:', err)
+      // Continue anyway
+    }
+
+    // Now delete the note itself
+    const { error } = await (supabase as any)
       .from('quick_notes')
       .delete()
       .eq('id', noteId)

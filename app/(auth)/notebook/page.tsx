@@ -312,7 +312,7 @@ export default function NotebookPage() {
             placeholder="Search notes..."
             prefix={<SearchOutlined style={{ color: '#999' }} />}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value as string)}
             style={{
               width: '300px',
               borderRadius: '8px',

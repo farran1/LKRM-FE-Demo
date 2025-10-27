@@ -85,7 +85,46 @@ class LiveGameDataService {
 
   private setupEventListeners(): void {
     // Listen for network status changes
-    networkDetector.addListener((status) => {
+    networkDetector.addListener(async (status) => {
+      // When coming back online, check if current session needs Supabase session created
+      if (status === 'online' && this.currentSessionId) {
+        const session = offlineStorage.getSession(this.currentSessionId)
+        if (session) {
+          const supabaseSessionId = offlineStorage.getSupabaseSessionMapping(session.sessionKey)
+          if (!supabaseSessionId) {
+            console.log('🌐 Back online - creating Supabase session for existing local session')
+            try {
+              const { supabaseAPI } = await import('./supabase-api')
+              const { cacheService } = await import('./cache-service')
+              const event = await cacheService.getEventById(session.eventId)
+              
+              if (event) {
+                const supabaseSession = await supabaseAPI.createLiveGameSession({
+                  event_id: session.eventId,
+                  session_key: session.sessionKey,
+                  game_id: null,
+                  started_at: session.startedAt,
+                  quarter: session.gameState.currentQuarter,
+                  home_score: session.gameState.homeScore,
+                  away_score: session.gameState.awayScore
+                })
+                
+                if (supabaseSession) {
+                  offlineStorage.storeSupabaseSessionMapping(session.sessionKey, supabaseSession.id)
+                  console.log('✅ Supabase session created after reconnecting:', supabaseSession.id)
+                  
+                  // Trigger sync now that session exists
+                  const { syncService } = await import('./sync-service')
+                  syncService.manualSync()
+                }
+              }
+            } catch (error) {
+              console.error('❌ Failed to create Supabase session after reconnecting:', error)
+            }
+          }
+        }
+      }
+      
       this.notifyDataListeners()
     })
 
@@ -129,20 +168,9 @@ class LiveGameDataService {
         }
       }
 
-      // Handle session creation/resume
-      if (choice === 'resume') {
-        await this.resumeExistingSession(eventId)
-      } else if (choice === 'startOver') {
-        await this.startNewSession(eventId)
-      } else {
-        // Check for existing session
-        const existingSession = this.findExistingSession(eventId)
-        if (existingSession) {
-          await this.resumeExistingSession(eventId)
-        } else {
-          await this.startNewSession(eventId)
-        }
-      }
+      // Handle session creation - always start new (resume disabled)
+      // Always start a new session - resume functionality commented out per user request
+      await this.startNewSession(eventId)
 
       this.isInitialized = true
       this.notifyDataListeners()
@@ -166,9 +194,53 @@ class LiveGameDataService {
     
     console.log('🔄 Resuming session - currentSessionId after:', this.currentSessionId)
     console.log('Resumed existing session:', existingSession.id)
+    
+    // Check if this session has a Supabase mapping, if not create one
+    if (networkDetector.isCurrentlyOnline()) {
+      const supabaseSessionId = offlineStorage.getSupabaseSessionMapping(existingSession.sessionKey)
+      if (!supabaseSessionId) {
+        console.log('⚠️ No Supabase session mapping found, creating one...')
+        try {
+          const { supabaseAPI } = await import('./supabase-api')
+          const { cacheService } = await import('./cache-service')
+          const event = await cacheService.getEventById(eventId)
+          
+          if (event) {
+            const supabaseSession = await supabaseAPI.createLiveGameSession({
+              event_id: eventId,
+              session_key: existingSession.sessionKey,
+              game_id: null,
+              started_at: existingSession.startedAt,
+              quarter: existingSession.gameState.currentQuarter,
+              home_score: existingSession.gameState.homeScore,
+              away_score: existingSession.gameState.awayScore
+            })
+            
+            if (supabaseSession) {
+              offlineStorage.storeSupabaseSessionMapping(existingSession.sessionKey, supabaseSession.id)
+              console.log('✅ Supabase session created for resumed session:', supabaseSession.id)
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to create Supabase session on resume:', error)
+        }
+      }
+    }
   }
 
   private async startNewSession(eventId: number): Promise<void> {
+    // Deactivate any existing sessions for this event (cleanup old sessions)
+    const existingSessions = offlineStorage.getAllSessions().filter(s => s.eventId === eventId && s.isActive)
+    existingSessions.forEach(session => {
+      const deactivatedSession = {
+        ...session,
+        isActive: false,
+        endedAt: new Date().toISOString()
+      }
+      offlineStorage.saveSession(deactivatedSession)
+      console.log('🔄 Deactivated old session:', session.id)
+    })
+    
     const sessionId = crypto.randomUUID()
     console.log('🆕 Starting new session - sessionId:', sessionId)
     console.log('🆕 Starting new session - sessionId type:', typeof sessionId)
@@ -199,13 +271,39 @@ class LiveGameDataService {
     
     console.log('🆕 Starting new session - currentSessionId after:', this.currentSessionId)
 
-    // Add to sync queue if online
+    // Create session in Supabase immediately if online
     if (networkDetector.isCurrentlyOnline()) {
-      offlineStorage.addToSyncQueue({
-        type: 'session',
-        data: session,
-        maxRetries: 3
-      })
+      try {
+        const { supabaseAPI } = await import('./supabase-api')
+        const { cacheService } = await import('./cache-service')
+        const event = await cacheService.getEventById(eventId)
+        
+        if (event) {
+          const supabaseSession = await supabaseAPI.createLiveGameSession({
+            event_id: eventId,
+            session_key: session.sessionKey,
+            game_id: null,
+            started_at: session.startedAt,
+            quarter: session.gameState.currentQuarter,
+            home_score: session.gameState.homeScore,
+            away_score: session.gameState.awayScore
+          })
+          
+          if (supabaseSession) {
+            // Store the Supabase session ID mapping
+            offlineStorage.storeSupabaseSessionMapping(session.sessionKey, supabaseSession.id)
+            console.log('✅ Session created in Supabase:', supabaseSession.id)
+          }
+        }
+      } catch (error) {
+        console.error('❌ Failed to create Supabase session, will retry:', error)
+        // Add to sync queue as fallback
+        offlineStorage.addToSyncQueue({
+          type: 'session',
+          data: session,
+          maxRetries: 3
+        })
+      }
     }
 
     console.log('Started new session:', sessionId)
@@ -593,13 +691,55 @@ class LiveGameDataService {
 
     offlineStorage.saveSession(endedSession)
 
-    // Add to sync queue if online
+    // Always add to sync queue so it syncs when online
+    offlineStorage.addToSyncQueue({
+      type: 'session',
+      data: endedSession,
+      maxRetries: 3
+    })
+
+    // If online, create Supabase session if needed and trigger immediate sync
     if (networkDetector.isCurrentlyOnline()) {
-      offlineStorage.addToSyncQueue({
-        type: 'session',
-        data: endedSession,
-        maxRetries: 3
-      })
+      const supabaseSessionId = offlineStorage.getSupabaseSessionMapping(session.sessionKey)
+      
+      // If no Supabase session exists, create one before syncing
+      if (!supabaseSessionId) {
+        console.log('🌐 Creating Supabase session before ending game...')
+        try {
+          const { supabaseAPI } = await import('./supabase-api')
+          const { cacheService } = await import('./cache-service')
+          const event = await cacheService.getEventById(session.eventId)
+          
+          if (event) {
+            const supabaseSession = await supabaseAPI.createLiveGameSession({
+              event_id: session.eventId,
+              session_key: session.sessionKey,
+              game_id: null,
+              started_at: session.startedAt,
+              quarter: session.gameState.currentQuarter,
+              home_score: session.gameState.homeScore,
+              away_score: session.gameState.awayScore
+            })
+            
+            if (supabaseSession) {
+              offlineStorage.storeSupabaseSessionMapping(session.sessionKey, supabaseSession.id)
+              console.log('✅ Supabase session created before ending game:', supabaseSession.id)
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to create Supabase session before ending game:', error)
+        }
+      }
+      
+      // Trigger immediate sync to push all data to database
+      try {
+        await syncService.manualSync()
+        console.log('🔄 Game ended - data synced to database')
+      } catch (error) {
+        console.warn('⚠️ Sync after endGame failed:', error)
+      }
+    } else {
+      console.log('📴 Offline - session queued for sync when back online')
     }
 
     this.currentSessionId = null

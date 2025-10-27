@@ -17,7 +17,7 @@ export async function GET(
     console.log(`Fetching task ${taskId}`)
 
     // Fetch the task using the correct primary key 'userId'
-    const { data: task, error } = await supabase
+    const { data: task, error } = await (supabase as any)
       .from('tasks')
       .select(`
         *,
@@ -48,7 +48,7 @@ export async function GET(
     
     if (task.assigneeId) {
       try {
-        const { data: userData, error: userError } = await supabase
+        const { data: userData, error: userError } = await (supabase as any)
           .from('auth.users')
           .select('email, user_metadata')
           .eq('email', task.assigneeId)
@@ -154,7 +154,7 @@ export async function PATCH(
     console.log('Update data being sent to Supabase:', updateData)
 
     // Update the task using the correct primary key 'userId'
-    const { data: updatedTask, error: updateError } = await supabase
+    const { data: updatedTask, error: updateError } = await (supabase as any)
       .from('tasks')
       .update(updateData)
       .eq('userId', parseInt(taskId)) // Using 'userId' as primary key per actual schema
@@ -170,7 +170,7 @@ export async function PATCH(
     }
 
     // Fetch the complete updated task with relationships
-    const { data: completeTask, error: fetchError } = await supabase
+    const { data: completeTask, error: fetchError } = await (supabase as any)
       .from('tasks')
       .select(`
         *,
@@ -188,7 +188,7 @@ export async function PATCH(
       
       if (updatedTask.assigneeId) {
         try {
-          const { data: userData, error: userError } = await supabase
+          const { data: userData, error: userError } = await (supabase as any)
             .from('auth.users')
             .select('email, user_metadata')
             .eq('email', updatedTask.assigneeId)
@@ -229,7 +229,7 @@ export async function PATCH(
     
     if (completeTask.assigneeId) {
       try {
-        const { data: userData, error: userError } = await supabase
+        const { data: userData, error: userError } = await (supabase as any)
           .from('auth.users')
           .select('email, user_metadata')
           .eq('email', completeTask.assigneeId)
@@ -267,14 +267,14 @@ export async function PATCH(
     try {
       if (assigneeId) {
         let assigneeUuid: string | null = null
-        const { data: byId } = await supabase
+        const { data: byId } = await (supabase as any)
           .from('auth.users')
           .select('id, email')
           .eq('id', assigneeId)
           .limit(1)
         if (byId && byId.length > 0) assigneeUuid = (byId[0] as any).id
         if (!assigneeUuid) {
-          const { data: byEmail } = await supabase
+          const { data: byEmail } = await (supabase as any)
             .from('auth.users')
             .select('id, email')
             .eq('email', assigneeId)
@@ -283,7 +283,7 @@ export async function PATCH(
           if (!assigneeUuid) {
             // Try matching on email prefix
             const emailPrefix = String(assigneeId).split('@')[0]
-            const { data: allUsers } = await supabase
+            const { data: allUsers } = await (supabase as any)
               .from('auth.users')
               .select('id, email')
               .limit(1000)

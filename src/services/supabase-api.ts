@@ -104,6 +104,39 @@ export class SupabaseAPI {
         return data || []
     }
 
+    async createLiveGameSession(session: {
+        event_id: number
+        session_key: string
+        game_id?: number | null
+        started_at: string
+        quarter: number
+        home_score: number
+        away_score: number
+    }) {
+        const client = this.getClient()
+        const { data, error } = await (client as any)
+            .from('live_game_sessions')
+            .insert({
+                event_id: session.event_id,
+                session_key: session.session_key,
+                game_id: session.game_id ?? null,
+                game_state: {
+                    quarter: session.quarter,
+                    home_score: session.home_score,
+                    away_score: session.away_score
+                },
+                started_at: session.started_at,
+                is_active: true
+            })
+            .select()
+            .single()
+        if (error) {
+            console.error('createLiveGameSession error:', error)
+            return null
+        }
+        return data
+    }
+
     async createLiveGameEvent(event: {
         session_id: number
         game_id?: number

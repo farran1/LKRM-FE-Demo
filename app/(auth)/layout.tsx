@@ -13,6 +13,7 @@ import { menus } from '@/utils/menu'
 import { MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons';
 import { useAuth } from '@/components/auth/AuthProvider'
 import { Spin } from 'antd'
+import { useIsClient } from '@/hooks/useClientSide'
 
 const { Header, Sider, Content, Footer } = Layout
 
@@ -29,6 +30,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
   const [collapsed, setCollapsed] = useState(false);
+  const isClient = useIsClient();
 
   // Helper function for breadcrumbs (MUST be defined before useMemo)
   const findBreadcrumb = (key: string, items: any[]): { label: string; icon?: React.ReactNode }[] => {
@@ -67,27 +69,27 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // Initialize collapsed state from localStorage (client-only)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isClient) {
       const stored = localStorage.getItem('sidebar-collapsed');
       if (stored === 'true') setCollapsed(true);
     }
-  }, []);
+  }, [isClient]);
 
   // Listen for custom sidebar toggle events from other components
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleSidebarToggle = () => {
-        const stored = localStorage.getItem('sidebar-collapsed');
-        setCollapsed(stored === 'true');
-      };
+    if (!isClient) return;
 
-      window.addEventListener('sidebar-toggle', handleSidebarToggle);
-      
-      return () => {
-        window.removeEventListener('sidebar-toggle', handleSidebarToggle);
-      };
-    }
-  }, []);
+    const handleSidebarToggle = () => {
+      const stored = localStorage.getItem('sidebar-collapsed');
+      setCollapsed(stored === 'true');
+    };
+
+    window.addEventListener('sidebar-toggle', handleSidebarToggle);
+    
+    return () => {
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle);
+    };
+  }, [isClient]);
 
   // Show loading while checking auth
   if (authLoading) {
@@ -111,7 +113,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleCollapse = (value: boolean) => {
     setCollapsed(value);
-    if (typeof window !== 'undefined') {
+    if (isClient) {
       localStorage.setItem('sidebar-collapsed', value ? 'true' : 'false');
     }
   };

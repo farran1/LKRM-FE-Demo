@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
         events (
           name,
           startTime,
-          eventTypeId
+          eventTypeId,
+          oppositionTeam
         ),
         live_game_events (
           event_type,
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: session.id,
-        opponent: session.events?.name || 'Unknown',
+        opponent: session.events?.oppositionTeam || 'Unknown',
         date: session.events?.startTime || session.created_at,
         result,
         score: `${teamScore}-${opponentScore}`,

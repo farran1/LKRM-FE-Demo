@@ -24,7 +24,7 @@ export async function GET(
 		}
 
 		// Get specific goal
-		const { data: goal, error } = await supabase
+		const { data: goal, error } = await (supabase as any)
 			.from('player_goals')
 			.select(`
 				id,
@@ -84,7 +84,7 @@ export async function PUT(
 		const { title, description, target_value, current_value, status, priority, deadline } = body;
 
 		// Update goal
-		const { data: goal, error } = await supabase
+		const { data: goal, error } = await (supabase as any)
 			.from('player_goals')
 			.update({
 				goal: title?.trim(),
@@ -145,7 +145,7 @@ export async function DELETE(
 		}
 
 		// Delete goal
-		const { error } = await supabase
+		const { error } = await (supabase as any)
 			.from('player_goals')
 			.delete()
 			.eq('id', goalId)

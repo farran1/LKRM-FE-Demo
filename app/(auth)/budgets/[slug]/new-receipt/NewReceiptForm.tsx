@@ -49,11 +49,11 @@ export default function NewReceiptForm({ slug }: { slug?: string }) {
 
       <div className={styles.fieldRow}>
         <label>Merchant Name</label>
-        <input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="ProTools Supply" />
+        <input value={merchant} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMerchant(e.target.value)} placeholder="ProTools Supply" />
       </div>
       <div className={styles.fieldRow}>
         <label>Amount</label>
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="$450" />
+        <input value={amount} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAmount(e.target.value)} placeholder="$450" />
       </div>
       <div className={styles.fieldRow}>
         <label>Category</label>
@@ -70,11 +70,11 @@ export default function NewReceiptForm({ slug }: { slug?: string }) {
       </div>
       <div className={styles.fieldRow}>
         <label>Date</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input type="date" value={date} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)} />
       </div>
       <div className={styles.fieldRow}>
         <label>Event</label>
-        <input value={event} onChange={(e) => setEvent(e.target.value)} placeholder="Team Workout" />
+        <input value={event} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEvent(e.target.value)} placeholder="Team Workout" />
       </div>
       </div>
     </form>

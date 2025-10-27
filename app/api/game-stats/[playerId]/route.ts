@@ -22,7 +22,7 @@ export async function PUT(
     }
 
     // Verify the game exists and user has permission
-    const { data: game, error: gameError } = await supabase
+    const { data: game, error: gameError } = await (supabase as any)
       .from('games')
       .select(`
         id,
@@ -39,12 +39,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    if (game.events.createdBy !== user.id) {
+    // Handle nested event relation (could be an array in some cases)
+    const event = Array.isArray(game.events) ? game.events[0] : game.events;
+    
+    if (!event || event.createdBy !== user.id) {
       return NextResponse.json({ error: 'Unauthorized to edit this game' }, { status: 403 });
     }
 
     // Check if game stats record exists
-    const { data: existingStats, error: statsError } = await supabase
+    const { data: existingStats, error: statsError } = await (supabase as any)
       .from('game_stats')
       .select('*')
       .eq('game_id', game_id)
@@ -67,7 +70,7 @@ export async function PUT(
     let result;
     if (existingStats) {
       // Update existing stats
-      const { data: updatedStats, error: updateError } = await supabase
+      const { data: updatedStats, error: updateError } = await (supabase as any)
         .from('game_stats')
         .update(statsData)
         .eq('id', existingStats.id)
@@ -81,7 +84,7 @@ export async function PUT(
       result = updatedStats;
     } else {
       // Create new stats record
-      const { data: newStats, error: insertError } = await supabase
+      const { data: newStats, error: insertError } = await (supabase as any)
         .from('game_stats')
         .insert(statsData)
         .select()
@@ -95,7 +98,7 @@ export async function PUT(
     }
 
     // Log the change for audit trail
-    await supabase
+    await (supabase as any)
       .from('audit_logs')
       .insert({
         userid: user.id,

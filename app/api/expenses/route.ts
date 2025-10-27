@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     console.log('Expenses API - Search params:', { description, merchant, budgetId, eventId })
 
-    let query = supabase.from('expenses').select(`
+    let query = (supabase as any).from('expenses').select(`
       id,
       merchant,
       amount,
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
     
     console.log('🔧 Prepared expense data:', JSON.stringify(expenseData, null, 2))
     
-    const { data: newExpense, error } = await supabaseAuth
+    const { data: newExpense, error } = await (supabaseAuth as any)
       .from('expenses')
       .insert([expenseData])
       .select()

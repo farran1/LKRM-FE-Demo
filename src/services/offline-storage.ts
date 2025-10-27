@@ -14,7 +14,8 @@ const STORAGE_KEYS = {
   EVENTS_CACHE: 'events_cache',
   SYNC_QUEUE: 'sync_queue',
   STORAGE_USAGE: 'storage_usage',
-  DEVICE_ID: 'device_id'
+  DEVICE_ID: 'device_id',
+  SESSION_MAPPINGS: 'supabase_session_mappings' // Mapping from session_key to supabase_session_id
 } as const
 
 // Storage limits (in bytes)
@@ -337,6 +338,20 @@ class OfflineStorageService {
       return this.set(STORAGE_KEYS.SYNC_QUEUE, queue)
     }
     return false
+  }
+
+  // Supabase session mapping management
+  public storeSupabaseSessionMapping(sessionKey: string, supabaseSessionId: number): void {
+    if (typeof window === 'undefined') return
+    const mappings = this.get(STORAGE_KEYS.SESSION_MAPPINGS) || {}
+    mappings[sessionKey] = supabaseSessionId
+    this.set(STORAGE_KEYS.SESSION_MAPPINGS, mappings)
+  }
+
+  public getSupabaseSessionMapping(sessionKey: string): number | null {
+    if (typeof window === 'undefined') return null
+    const mappings = this.get(STORAGE_KEYS.SESSION_MAPPINGS) || {}
+    return mappings[sessionKey] || null
   }
 
   // Cleanup methods

@@ -33,7 +33,7 @@ export async function GET(
 		}
 
 		// Verify player exists
-		const { data: player, error: playerError } = await supabase
+		const { data: player, error: playerError } = await (supabase as any)
 			.from('players')
 			.select('id')
 			.eq('id', playerId)
@@ -44,7 +44,7 @@ export async function GET(
 		}
 
 		// Get player goals
-		const { data: goals, error } = await supabase
+		const { data: goals, error } = await (supabase as any)
 			.from('player_goals')
 			.select(`
 				id,
@@ -88,7 +88,7 @@ export async function POST(
 		}
 
 		// Verify player exists
-		const { data: player, error: playerError } = await supabase
+		const { data: player, error: playerError } = await (supabase as any)
 			.from('players')
 			.select('id')
 			.eq('id', playerId)
@@ -103,7 +103,7 @@ export async function POST(
 		const { title, description, target_value, priority, deadline } = validatedData
 
 		// Create new goal
-		const { data: goal, error } = await supabase
+		const { data: goal, error } = await (supabase as any)
 			.from('player_goals')
 			.insert({
 				playerId: playerId,

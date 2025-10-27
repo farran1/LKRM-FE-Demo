@@ -22,7 +22,7 @@ interface BudgetDetailModalProps {
     period: string;
     description?: string;
     autoRepeat: boolean;
-    season: string;
+    Season: string;
     is_pinned: boolean;
   } | null;
   onDelete?: (budgetId: number) => void;
@@ -39,7 +39,7 @@ interface ExpenseItem {
   date?: string;
 }
 
-export default function BudgetDetailModal({ open, onClose, budget, onDelete, onEdit }: BudgetDetailModalProps) {
+export default function BudgetDetailModal({ open, onClose, budget, onDelete, onEdit }: any) {
   const { message } = App.useApp();
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [loading, setLoading] = useState(false);

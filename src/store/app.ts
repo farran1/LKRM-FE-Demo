@@ -1,13 +1,13 @@
-import { create } from 'zustand'
+import { create } from 'zustand';
 
 interface AppState {
   loading: boolean
   setLoading: (loading: boolean) => void
 }
 
-const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set: any) => ({
   loading: false,
   setLoading: (loading: boolean) => set({ loading })
-}))
+}));
 
-export default useAppStore 
+export default useAppStore; 

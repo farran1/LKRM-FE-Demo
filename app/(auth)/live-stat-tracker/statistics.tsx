@@ -467,7 +467,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
   const [serviceStatus, setServiceStatus] = useState<'connecting' | 'connected' | 'error'>('connected') // Always connected for UI
   const [hasUserStarted, setHasUserStarted] = useState(autoStart) // If autoStart is true, consider it already started
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [isResuming, setIsResuming] = useState(false)
 
   // Simplified start tracking - UI only
@@ -581,28 +580,36 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
 
   // Helper function to convert position names to abbreviations
   const getPositionAbbreviation = (positionName: string): string => {
-    const position = positionName?.toLowerCase() || ''
+    if (!positionName) return 'N/A'
+    const position = positionName.toLowerCase()
     if (position.includes('guard')) return 'G'
     if (position.includes('center')) return 'C'
     if (position.includes('forward')) return 'F'
-    return positionName?.substring(0, 2)?.toUpperCase() || 'N/A'
+    if (position.includes('point')) return 'PG'
+    if (position.includes('shooting')) return 'SG'
+    if (position.includes('power')) return 'PF'
+    if (position.includes('small')) return 'SF'
+    // If we can't match, return first 2 chars or full abbreviation
+    return positionName.substring(0, 2).toUpperCase() || 'N/A'
   }
 
-  // Fetch real player data from API
+  // Fetch real player data from cache service (handles offline scenarios)
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        console.log('Live Stat Tracker: Fetching players from API...')
-        const response: any = await api.get('/api/players')
-        const playersData = (response as any).data?.data || (response as any).data || []
+        console.log('Live Stat Tracker: Fetching players from cache service...')
         
-        console.log('Live Stat Tracker: Received players:', response.data)
+        // Use cache service which handles offline scenarios
+        const { cacheService } = await import('@/services/cache-service')
+        const playersData = await cacheService.getRoster()
+        
+        console.log('Live Stat Tracker: Received players:', playersData)
         console.log('Live Stat Tracker: Players array:', playersData)
         
-        // Transform API data to match the Player interface
+        // Transform cache data to match the Player interface
         const transformedPlayers: Player[] = playersData.map((dbPlayer: any) => {
-          // Get position name, abbreviation, or fallback
-          const positionName = dbPlayer.position?.name || 'N/A'
+          // Get position name, abbreviation, or fallback (check both 'position' and 'positions' properties)
+          const positionName = dbPlayer.positions?.name || dbPlayer.position?.name || 'N/A'
           const positionAbbr = getPositionAbbreviation(positionName)
           
           // Construct player name
@@ -627,6 +634,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             turnovers: 0,
             fgAttempted: 0,
             fgMade: 0,
+            twoPointAttempted: 0,
+            twoPointMade: 0,
             threeAttempted: 0,
             threeMade: 0,
             ftAttempted: 0,
@@ -668,6 +677,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     overtimeNumber: 0,
     regulationQuarters: defaultSettings.totalQuarters
   }))
+
+  // When resuming a game that's already in Q2, Q3, or Q4, set hasGameStarted to true
+  useEffect(() => {
+    if (choice === 'resume' && gameState.quarter > 1) {
+      console.log(`Resuming game in Q${gameState.quarter} - marking game as started`)
+      setHasGameStarted(true)
+    }
+  }, [choice, gameState.quarter])
 
   const [players, setPlayers] = useState<Player[]>([])
 
@@ -959,6 +976,47 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // Opponent hot hand over all events so far
     const hotOpponent = findHotOpponent(events.filter(e => e.opponentEvent));
 
+    // Calculate opponent player highlights (similar to timeout insights)
+    const opponentPlayers = events.filter(e => e.opponentEvent && e.opponentJersey);
+    const opponentPlayerStats: Record<string, any> = {};
+    
+    opponentPlayers.forEach(e => {
+      const jersey = e.opponentJersey || 'Unknown';
+      if (!opponentPlayerStats[jersey]) {
+        opponentPlayerStats[jersey] = {
+          number: jersey,
+          name: e.playerName || `#${jersey}`,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          efficiency: 0
+        };
+      }
+      
+      if (e.eventType.includes('made') || e.eventType === 'points') {
+        opponentPlayerStats[jersey].points += e.value || (e.eventType === 'three_made' ? 3 : e.eventType === 'ft_made' ? 1 : 2);
+      } else if (e.eventType.includes('rebound')) {
+        opponentPlayerStats[jersey].rebounds += 1;
+      } else if (e.eventType === 'assist') {
+        opponentPlayerStats[jersey].assists += 1;
+      }
+    });
+    
+    const opponentPlayersList = Object.values(opponentPlayerStats);
+    const opponentTopScorer = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.points > max.points ? p : max, opponentPlayersList[0]) : null;
+    const opponentTopRebounder = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.rebounds > max.rebounds ? p : max, opponentPlayersList[0]) : null;
+    const opponentTopAssister = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.assists > max.assists ? p : max, opponentPlayersList[0]) : null;
+    
+    // Calculate efficiency for opponents
+    opponentPlayersList.forEach(p => {
+      const fgMissed = events.filter(e => e.opponentEvent && e.opponentJersey === p.number && (e.eventType === 'fg_attempt' || e.eventType === 'fg_miss')).length;
+      const ftMissed = events.filter(e => e.opponentEvent && e.opponentJersey === p.number && e.eventType === 'ft_miss').length;
+      const turnovers = events.filter(e => e.opponentEvent && e.opponentJersey === p.number && e.eventType === 'turnover').length;
+      p.efficiency = p.points + p.rebounds + p.assists - fgMissed - ftMissed - turnovers;
+    });
+    
+    const opponentMostEfficient = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.efficiency > max.efficiency ? { player: p, efficiency: p.efficiency } : max, { player: opponentPlayersList[0], efficiency: opponentPlayersList[0].efficiency }) : null;
+
     const halftimeData = {
       topScorer,
       topRebounder,
@@ -969,6 +1027,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       recommendations: [] as string[],
       recentOpponentRun,
       hotOpponent,
+      opponentTopScorer,
+      opponentTopRebounder,
+      opponentTopAssister,
+      opponentMostEfficient,
     };
     halftimeData.recommendations = generateHalftimeRecommendations(
       teamStats,
@@ -1100,22 +1162,23 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           projectedFinal: 0,
           fgPercentage: 0
         },
+        opponentStats: calculateOpponentStats(),
         momentum: 'neutral',
         recommendations: []
       };
     }
 
-    // Last 2 minutes of events
-    // Use the last 2 minutes of wall-clock time from last timeout
-    const recentEvents = events.filter(e => e.timestamp >= (lastTimeoutTs - 120000));
-    const recentScoring = recentEvents.filter(e => e.eventType.includes('made') || e.eventType === 'points');
-    const recentTurnovers = recentEvents.filter(e => e.eventType === 'turnover');
+    // Use ALL events from the game start up to this point (not just last 2 minutes)
+    // Show cumulative game progress, not just recent window
+    const allGameEvents = events;
+    const recentScoring = allGameEvents.filter(e => e.eventType.includes('made') || e.eventType === 'points');
+    const recentTurnovers = allGameEvents.filter(e => e.eventType === 'turnover');
     const momentum = recentScoring.length > recentTurnovers.length ? 'positive' : 'negative';
 
-    // Player highlights (last 2 min)
+    // Player highlights (cumulative game stats)
     const playersInWindow = players.map(p => {
-      // Aggregate stats for this player in recentEvents
-      const stats = recentEvents.filter(e => e.playerId === p.id);
+      // Aggregate stats for this player from all game events
+      const stats = allGameEvents.filter(e => e.playerId === p.id);
       const points = stats.filter(e => e.eventType.includes('made') || e.eventType === 'points').reduce((sum, e) => sum + (e.value || (e.eventType === 'three_made' ? 3 : e.eventType === 'ft_made' ? 1 : 2)), 0);
       const rebounds = stats.filter(e => e.eventType.includes('rebound')).length;
       const assists = stats.filter(e => e.eventType === 'assist').length;
@@ -1150,14 +1213,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       return efficiency > max.efficiency ? { player: p, efficiency } : max;
     }, { player: playersInWindow[0], efficiency: playersInWindow[0].points + playersInWindow[0].rebounds + playersInWindow[0].assists - playersInWindow[0].turnovers - playersInWindow[0].fouls });
 
-    // Team stats (last 2 min)
+    // Team stats (cumulative from all game progress)
     const teamStats = {
       totalPoints: playersInWindow.reduce((sum, p) => sum + p.points, 0),
       totalRebounds: playersInWindow.reduce((sum, p) => sum + p.rebounds, 0),
       totalAssists: playersInWindow.reduce((sum, p) => sum + p.assists, 0),
       totalTurnovers: playersInWindow.reduce((sum, p) => sum + (p.turnovers || 0), 0),
-      fgAttempted: recentEvents.filter(e => e.eventType === 'fg_attempt' || e.eventType === 'fg_made').length,
-      fgMade: recentEvents.filter(e => e.eventType === 'fg_made').length,
+      fgAttempted: allGameEvents.filter(e => e.eventType === 'fg_attempt' || e.eventType === 'fg_made').length,
+      fgMade: allGameEvents.filter(e => e.eventType === 'fg_made').length,
       assistToTurnoverRatio: playersInWindow.reduce((sum, p) => sum + p.assists, 0) / (playersInWindow.reduce((sum, p) => sum + (p.turnovers || 0), 0) || 1),
       pace: Math.round((playersInWindow.reduce((sum, p) => sum + p.points, 0) + gameState.opponentScore) / (120 / 60) * 40),
       projectedFinal: Math.round(((playersInWindow.reduce((sum, p) => sum + p.points, 0) + gameState.opponentScore) / (120 / 60)) * (settings.quarterDuration * settings.totalQuarters)),
@@ -1165,13 +1228,52 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     };
     teamStats.fgPercentage = teamStats.fgAttempted > 0 ? Math.round((teamStats.fgMade / teamStats.fgAttempted) * 100) : 0;
 
-    // Opponent run/hot hand (last 2 min)
-    const opponentStats = {
-      totalRebounds: recentEvents.filter(e => e.opponentEvent && (e.eventType === 'defensive_rebound' || e.eventType === 'offensive_rebound')).length,
-      totalTurnovers: recentEvents.filter(e => e.opponentEvent && e.eventType === 'turnover').length,
-    };
-    const recentOpponentRun = calculateOpponentRun(recentEvents);
-    const hotOpponent = findHotOpponent(recentEvents);
+    // Use the same comprehensive opponent stats calculation as the analytics page
+    const opponentStats = calculateOpponentStats();
+    // Use recent events for run/hot hand (last 2 min)
+    const recentOpponentRun = calculateOpponentRun(events.filter(e => e.timestamp >= (lastTimeoutTs - 120000)));
+    const hotOpponent = findHotOpponent(events.filter(e => e.opponentEvent));
+
+    // Calculate opponent player highlights (cumulative from all game events)
+    const opponentPlayers = allGameEvents.filter(e => e.opponentEvent && e.opponentJersey);
+    const opponentPlayerStats: Record<string, any> = {};
+    
+    opponentPlayers.forEach(e => {
+      const jersey = e.opponentJersey || 'Unknown';
+      if (!opponentPlayerStats[jersey]) {
+        opponentPlayerStats[jersey] = {
+          number: jersey,
+          name: e.playerName || `#${jersey}`,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          efficiency: 0
+        };
+      }
+      
+      if (e.eventType.includes('made') || e.eventType === 'points') {
+        opponentPlayerStats[jersey].points += e.value || (e.eventType === 'three_made' ? 3 : e.eventType === 'ft_made' ? 1 : 2);
+      } else if (e.eventType.includes('rebound')) {
+        opponentPlayerStats[jersey].rebounds += 1;
+      } else if (e.eventType === 'assist') {
+        opponentPlayerStats[jersey].assists += 1;
+      }
+    });
+    
+    const opponentPlayersList = Object.values(opponentPlayerStats);
+    const opponentTopScorer = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.points > max.points ? p : max, opponentPlayersList[0]) : null;
+    const opponentTopRebounder = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.rebounds > max.rebounds ? p : max, opponentPlayersList[0]) : null;
+    const opponentTopAssister = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.assists > max.assists ? p : max, opponentPlayersList[0]) : null;
+    
+    // Calculate efficiency for opponents (using all game events)
+    opponentPlayersList.forEach(p => {
+      const fgMissed = allGameEvents.filter(e => e.opponentEvent && e.opponentJersey === p.number && (e.eventType === 'fg_attempt' || e.eventType === 'fg_miss')).length;
+      const ftMissed = allGameEvents.filter(e => e.opponentEvent && e.opponentJersey === p.number && e.eventType === 'ft_miss').length;
+      const turnovers = allGameEvents.filter(e => e.opponentEvent && e.opponentJersey === p.number && e.eventType === 'turnover').length;
+      p.efficiency = p.points + p.rebounds + p.assists - fgMissed - ftMissed - turnovers;
+    });
+    
+    const opponentMostEfficient = opponentPlayersList.length > 0 ? opponentPlayersList.reduce((max, p) => p.efficiency > max.efficiency ? { player: p, efficiency: p.efficiency } : max, { player: opponentPlayersList[0], efficiency: opponentPlayersList[0].efficiency }) : null;
 
     // Recommendations (reuse halftime logic, but pass windowed stats)
     const recommendations = generateHalftimeRecommendations(
@@ -1183,17 +1285,22 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     );
 
     return {
-      recentEvents,
+      allGameEvents: allGameEvents,
       momentum,
       keyPlayer: topScorer, // or mostEfficient
       recommendations,
       teamStats,
+      opponentStats,
       topScorer,
       topRebounder,
       topAssister,
       mostEfficient,
       recentOpponentRun,
       hotOpponent,
+      opponentTopScorer,
+      opponentTopRebounder,
+      opponentTopAssister,
+      opponentMostEfficient,
       pace: teamStats.pace,
       projectedFinal: teamStats.projectedFinal,
       lead: gameState.homeScore - gameState.opponentScore,
@@ -1484,14 +1591,46 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       console.warn('Failed to queue event sync:', error)
     })
 
-    // Update player stats
-    setPlayers(prev => prev.map(p => {
-      if (p.id !== playerId) return p;
-      const updated = { ...p };
+    // Update player stats - only update +/- if player is on court
+    // (player already declared above, just check isOnCourt status)
+    const isPlayerOnCourt = player?.isOnCourt ?? false
+    
+    // First update the individual player's stats
+    setPlayers(prev => {
+      const updatedPlayers = prev.map(p => {
+        if (p.id !== playerId) return p;
+      const updated = { 
+        ...p,
+        // Ensure all stat fields are initialized as numbers
+        twoPointAttempted: p.twoPointAttempted ?? 0,
+        twoPointMade: p.twoPointMade ?? 0,
+        fgAttempted: p.fgAttempted ?? 0,
+        fgMade: p.fgMade ?? 0,
+        threeAttempted: p.threeAttempted ?? 0,
+        threeMade: p.threeMade ?? 0,
+        ftAttempted: p.ftAttempted ?? 0,
+        ftMade: p.ftMade ?? 0,
+        points: p.points ?? 0,
+        rebounds: p.rebounds ?? 0,
+        offensiveRebounds: p.offensiveRebounds ?? 0,
+        defensiveRebounds: p.defensiveRebounds ?? 0,
+        assists: p.assists ?? 0,
+        steals: p.steals ?? 0,
+        blocks: p.blocks ?? 0,
+        fouls: p.fouls ?? 0,
+        turnovers: p.turnovers ?? 0,
+        plusMinus: p.plusMinus ?? 0,
+        chargesTaken: p.chargesTaken ?? 0,
+        deflections: p.deflections ?? 0,
+        minutesPlayed: p.minutesPlayed ?? 0
+      };
       switch (eventType) {
         case 'points':
           updated.points += value || 2;
-          updated.plusMinus += value || 2;
+          // Only update +/- if player is on court
+          if (isPlayerOnCourt) {
+            updated.plusMinus += value || 2;
+          }
           break;
         case 'rebound':
           updated.rebounds += 1;
@@ -1509,7 +1648,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           break;
         case 'steal':
           updated.steals += 1;
-          updated.plusMinus += 2;
+          // Note: +/- is updated for all on-court players after the switch statement
           break;
         case 'block':
           updated.blocks += 1;
@@ -1519,11 +1658,11 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           break;
         case 'turnover':
           updated.turnovers += 1;
-          updated.plusMinus -= 2;
+          // Note: +/- is updated for all on-court players after the switch statement
           break;
         case 'charge_taken':
           updated.chargesTaken += 1;
-          updated.plusMinus += 2;
+          // Note: +/- is updated for all on-court players after the switch statement
           break;
         case 'deflection':
           updated.deflections += 1;
@@ -1538,8 +1677,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           updated.twoPointMade += 1;
           updated.twoPointAttempted += 1;
           updated.points += 2;
-          updated.plusMinus += 2;
           // Add PIP if metadata indicates it
+          // Note: +/- is updated for all on-court players after the switch statement
           if (metadata?.pip) {
             updated.pointsInPaint = (updated.pointsInPaint || 0) + 2;
           }
@@ -1561,7 +1700,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           updated.fgMade += 1;
           updated.fgAttempted += 1;
           updated.points += 3;
-          updated.plusMinus += 3;
+          // Note: +/- is updated for all on-court players after the switch statement
           break;
         case 'three_missed':
           console.log('🔍 handleStatEvent - Processing three_missed for player:', player.name, 'Current stats:', { threeAttempted: updated.threeAttempted, fgAttempted: updated.fgAttempted })
@@ -1576,14 +1715,41 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           updated.ftMade += 1;
           updated.ftAttempted += 1;
           updated.points += 1;
-          updated.plusMinus += 1;
+          // Note: +/- is updated for all on-court players after the switch statement
           break;
         case 'ft_missed':
           updated.ftAttempted += 1;
           break;
       }
-      return updated;
-    }));
+      
+        return updated;
+      });
+      
+      // After updating individual player stats, update +/- for ALL players on court
+      // Basketball rule: Plus/minus ONLY changes when points are scored (by either team)
+      // It does NOT change for steals, turnovers, blocks, or other non-scoring plays
+      if (eventType.includes('made') || eventType === 'points') {
+        // Calculate the +/- change based on points scored
+        let pmChange = 0
+        if (eventType === 'points' || eventType.includes('made')) {
+          pmChange = eventType === 'three_made' ? 3 : eventType === 'ft_made' ? 1 : value || 2
+        }
+        
+        // Update +/- for all players on court (not just the one who scored)
+        // This ensures all teammates get the same +/- change
+        if (pmChange !== 0 && isPlayerOnCourt) {
+          return updatedPlayers.map(p => {
+            if (p.isOnCourt) {
+              // Update +/- for all players on court when team scores
+              return { ...p, plusMinus: p.plusMinus + pmChange }
+            }
+            return p
+          })
+        }
+      }
+      
+      return updatedPlayers;
+    });
 
     // Update team score for points
     if (willScore) {
@@ -1727,6 +1893,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
               ...prev,
               opponentScore: prev.opponentScore - points
             }))
+            
+            // Also restore plus/minus for all players on court
+            setPlayers(prev => prev.map(p => {
+              if (p.isOnCourt) {
+                return { ...p, plusMinus: p.plusMinus + points }
+              }
+              return p
+            }))
           } else {
             setGameState(prev => ({
               ...prev,
@@ -1851,6 +2025,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         setGameState(prev => ({
           ...prev,
           opponentScore: prev.opponentScore + points
+        }))
+        
+        // Also restore plus/minus for all players on court
+        setPlayers(prev => prev.map(p => {
+          if (p.isOnCourt) {
+            return { ...p, plusMinus: p.plusMinus - points }
+          }
+          return p
         }))
       } else {
         setGameState(prev => ({
@@ -2014,6 +2196,19 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     if (eventType.includes('made') || eventType === 'points') {
       const points = eventType === 'three_made' ? 3 : eventType === 'ft_made' ? 1 : value || 2
       setGameState(prev => ({ ...prev, opponentScore: prev.opponentScore + points }))
+      
+      // Update plus/minus for all home team players on court when opponent scores
+      setPlayers(prev => prev.map(p => {
+        if (p.isOnCourt) {
+          return { ...p, plusMinus: p.plusMinus - points }
+        }
+        return p
+      }))
+      
+      // Note: Opponent +/- tracking would require persistent on-court status for each jersey number
+      // Currently we only track the 5 active jerseys, not when each player is on/off court
+      // This is a design limitation of the simplified opponent tracking system
+      
       // Update analytics for away scoring
       const scp = (lastPossessionRef.current === 'away') && scpWindowAwayRef.current
       const pto = (lastPossessionRef.current === 'home') && ptoWindowAwayRef.current
@@ -2259,26 +2454,13 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             while (k < sortedEvents.length) {
               const scoreEvent = sortedEvents[k]
               
-              // If opponent does anything, break the chain
-              if (scoreEvent.opponentEvent && (
-                scoreEvent.eventType === 'fg_made' || 
-                scoreEvent.eventType === 'fg_missed' || 
-                scoreEvent.eventType === 'three_made' || 
-                scoreEvent.eventType === 'three_missed' ||
-                scoreEvent.eventType === 'ft_made' ||
-                scoreEvent.eventType === 'ft_missed' ||
-                scoreEvent.eventType === 'rebound' ||
-                scoreEvent.eventType === 'steal' ||
-                scoreEvent.eventType === 'block' ||
-                scoreEvent.eventType === 'turnover'
-              )) {
+              // If opponent does ANYTHING (possession changed), break the chain
+              if (scoreEvent.opponentEvent) {
                 break
               }
               
-              // If home team scores, count as second chance
-              if (!scoreEvent.opponentEvent && 
-                  (scoreEvent.eventType === 'fg_made' || scoreEvent.eventType === 'three_made')) {
-                
+              // If home team scores on a field goal (not free throw), count as second chance
+              if (scoreEvent.eventType === 'fg_made' || scoreEvent.eventType === 'three_made') {
                 const points = scoreEvent.eventType === 'three_made' ? 3 : 2
                 secondChancePoints += points
                 
@@ -2326,26 +2508,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         while (j < sortedEvents.length && !foundScore) {
           const nextEvent = sortedEvents[j]
           
-          // If opponent does anything (shot, rebound, steal, block, etc.), break the chain
-          if (nextEvent.opponentEvent && (
-            nextEvent.eventType === 'fg_made' || 
-            nextEvent.eventType === 'fg_missed' || 
-            nextEvent.eventType === 'three_made' || 
-            nextEvent.eventType === 'three_missed' ||
-            nextEvent.eventType === 'ft_made' ||
-            nextEvent.eventType === 'ft_missed' ||
-            nextEvent.eventType === 'rebound' ||
-            nextEvent.eventType === 'steal' ||
-            nextEvent.eventType === 'block' ||
-            nextEvent.eventType === 'turnover'
-          )) {
-            break // Opponent interrupted the possession
+          // If opponent does ANYTHING (gets possession back), break the chain
+          if (nextEvent.opponentEvent) {
+            break
           }
           
-          // If home team scores (field goal only, not free throws), count as points off turnover
-          if (!nextEvent.opponentEvent && 
-              (nextEvent.eventType === 'fg_made' || nextEvent.eventType === 'three_made')) {
-            
+          // Basketball rule: Points off turnovers only count for FIELD GOALS scored on the immediate possession after a turnover
+          // Must be scored before opponent gets possession back
+          if (nextEvent.eventType === 'fg_made' || nextEvent.eventType === 'three_made') {
             const points = nextEvent.eventType === 'three_made' ? 3 : 2
             pointsOffTurnovers += points
             foundScore = true
@@ -2354,11 +2524,106 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
               eventType: nextEvent.eventType,
               points,
               turnoverTime: event.timestamp,
-              shotTime: nextEvent.timestamp
+              shotTime: nextEvent.timestamp,
+              timeDifference: nextEvent.timestamp - event.timestamp
             })
+            break // Found the score, stop looking for this turnover
           }
           
           j++
+        }
+      }
+    }
+    
+    return pointsOffTurnovers
+  }
+
+  // Calculate second chance points for opponent events only
+  const calculateSecondChancePointsForOpponent = (opponentEvents: StatEvent[]) => {
+    let secondChancePoints = 0
+    
+    // Sort events by timestamp to process chronologically
+    const sortedEvents = [...opponentEvents].sort((a, b) => a.timestamp - b.timestamp)
+    
+    for (let i = 0; i < sortedEvents.length; i++) {
+      const event = sortedEvents[i]
+      
+      // Look for missed shots by opponent
+      if (event.eventType === 'fg_missed' || event.eventType === 'three_missed') {
+        // Look for the next rebound
+        let foundRebound = false
+        let j = i + 1
+        
+        while (j < sortedEvents.length && !foundRebound) {
+          const nextEvent = sortedEvents[j]
+          
+          // If opponent gets an offensive rebound
+          if (nextEvent.eventType === 'rebound') {
+            foundRebound = true
+            
+            // Now look for the next score by opponent
+            let k = j + 1
+            let foundScore = false
+            
+            while (k < sortedEvents.length && !foundScore) {
+              const scoreEvent = sortedEvents[k]
+              
+              // If opponent scores on a field goal, count as second chance
+              if (scoreEvent.eventType === 'fg_made' || scoreEvent.eventType === 'three_made') {
+                const points = scoreEvent.eventType === 'three_made' ? 3 : 2
+                secondChancePoints += points
+                foundScore = true
+                console.log('🔍 Opponent Second Chance Point:', {
+                  missedShot: event.eventType,
+                  rebound: nextEvent.eventType,
+                  score: scoreEvent.eventType,
+                  points
+                })
+                break
+              }
+              
+              k++
+            }
+            break
+          }
+          
+          j++
+        }
+      }
+    }
+    
+    return secondChancePoints
+  }
+
+  // Calculate points off turnovers for opponent (when opponent scores after our turnovers)
+  const calculatePointsOffTurnoversForOpponent = (ourTurnovers: StatEvent[], opponentEvents: StatEvent[]) => {
+    let pointsOffTurnovers = 0
+    
+    // Sort all opponent events by timestamp
+    const sortedOpponentEvents = [...opponentEvents].sort((a, b) => a.timestamp - b.timestamp)
+    
+    for (let i = 0; i < ourTurnovers.length; i++) {
+      const turnoverEvent = ourTurnovers[i]
+      const turnoverTime = turnoverEvent.timestamp
+      
+      // Look for the next opponent field goal after our turnover
+      for (let j = 0; j < sortedOpponentEvents.length; j++) {
+        const opponentEvent = sortedOpponentEvents[j]
+        
+        // Only count events that happen after the turnover
+        if (opponentEvent.timestamp <= turnoverTime) continue
+        
+        // If opponent scores on a field goal, count as points off turnover
+        if (opponentEvent.eventType === 'fg_made' || opponentEvent.eventType === 'three_made') {
+          const points = opponentEvent.eventType === 'three_made' ? 3 : 2
+          pointsOffTurnovers += points
+          console.log('🔍 Opponent Points Off Turnover:', {
+            eventType: opponentEvent.eventType,
+            points,
+            turnoverTime,
+            shotTime: opponentEvent.timestamp
+          })
+          break // Found the score for this turnover, move to next turnover
         }
       }
     }
@@ -2402,7 +2667,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // Count only non-opponent events with metadata.pip === true
     const pointsInPaint = events
       .filter(event => !event.opponentEvent && event.eventType === 'fg_made' && event.metadata?.pip === true)
-      .reduce((sum) => sum + 2, 0)
+      .reduce((sum, e) => sum + (e.value || 2), 0)
     
     // console.log('🔍 Points in Paint Calculation:', {
     //   totalFgMade,
@@ -2536,9 +2801,22 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // Calculate points in paint for OPPONENT only
     const pointsInPaint = events
       .filter(event => event.opponentEvent && event.eventType === 'fg_made' && event.metadata?.pip === true)
-      .reduce((sum) => sum + 2, 0)
-    const secondChancePoints = rebounds * 2 // Simplified calculation
-    const pointsOffTurnovers = steals * 2 // Simplified calculation
+      .reduce((sum, e) => {
+        // Use the event value or default to 2 points
+        return sum + (e.value || 2)
+      }, 0)
+    
+    // Calculate anc opponent second chance points using the same logic as home team
+    // Filter only opponent events and calculate second chance points
+    const opponentSecondChancePoints = calculateSecondChancePointsForOpponent(opp)
+    
+    // Calculate opponent points off turnovers (when opponent steals and scores)
+    // First find our turnovers, then see if opponent scored after them
+    const ourTurnovers = events.filter(e => !e.opponentEvent && e.eventType === 'turnover')
+    const opponentPointsOffTurnovers = calculatePointsOffTurnoversForOpponent(ourTurnovers, opp)
+    
+    const secondChancePoints = opponentSecondChancePoints
+    const pointsOffTurnovers = opponentPointsOffTurnovers
 
     const result = {
       // Basic stats
@@ -3130,6 +3408,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       ...p, 
       minutesPlayed: 0, points: 0, rebounds: 0, offensiveRebounds: 0, defensiveRebounds: 0, 
       assists: 0, steals: 0, blocks: 0, fouls: 0, turnovers: 0, fgAttempted: 0, fgMade: 0, 
+      twoPointAttempted: 0, twoPointMade: 0,
       threeAttempted: 0, threeMade: 0, ftAttempted: 0, ftMade: 0, plusMinus: 0, 
       chargesTaken: 0, deflections: 0, isOnCourt: false, isStarter: false, isMainRoster: false 
     })))
@@ -3166,22 +3445,81 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       isReportEnabled: isReportEnabled
     }
 
-    // If regulation completed and not in OT: only suggest OT; do not auto-end
-    if (gameState.quarter >= settings.totalQuarters && !gameState.isOvertime && gameState.homeScore !== gameState.opponentScore) {
-      // Not tied: leave end-of-game to the End Game button
-      message.info('Regulation finished. Use End Game to finalize or Overtime if tied.')
+    // Get current state values
+    const currentQuarter = gameState.quarter
+    const currentIsOT = gameState.isOvertime
+    const scoresTied = gameState.homeScore === gameState.opponentScore
+    
+    // If we're already in OT and scores are NOT tied, block further OT periods
+    if (currentIsOT && !scoresTied) {
+      message.info('Overtime complete - scores no longer tied. Use Exit Live Stat Tracking to finalize.')
+      return
+    }
+    
+    // If we're past regulation and not in OT, handle end-of-regulation logic
+    if (currentQuarter >= settings.totalQuarters && !currentIsOT) {
+      // After regulation: scores tied = start OT, scores not tied = block advancement
+      if (!scoresTied) {
+        message.info('Regulation finished. Use Exit Live Stat Tracking to finalize.')
+        return
+      }
+      
+      // Scores are tied - start overtime
+      const regulation = gameState.regulationQuarters || settings.totalQuarters
+      const nextQuarterNumber = regulation + 1
+      const otNum = 1
+      
+      const otEvent = {
+        id: `${Date.now()}_ot_start`,
+        timestamp: Date.now(),
+        playerId: 0,
+        playerName: 'GAME',
+        eventType: 'OT_START',
+        quarter: nextQuarterNumber,
+        gameTime: 0,
+        opponentEvent: false
+      }
+      setEvents(p => [otEvent, ...p])
+      
+      setGameState(prev => ({
+        ...prev,
+        quarter: nextQuarterNumber,
+        isOvertime: true,
+        overtimeNumber: otNum,
+        isPlaying: false
+      }))
+      
+      message.success('Overtime started! Scores are tied.')
       return
     }
 
+    // Normal progression: advance to next quarter
     setGameState(prev => {
       const next = prev.quarter + 1
       const isOT = next > (prev.regulationQuarters || settings.totalQuarters)
       const otNum = isOT ? (next - (prev.regulationQuarters || settings.totalQuarters)) : 0
+      
+      // If in OT, add OT start event
+      if (isOT) {
+        const otEvent = {
+          id: `${Date.now()}_ot${otNum}_start`,
+          timestamp: Date.now(),
+          playerId: 0,
+          playerName: 'GAME',
+          eventType: `OT${otNum}_START`,
+          quarter: next,
+          gameTime: 0,
+          opponentEvent: false
+        }
+        setEvents(p => [otEvent, ...p])
+      }
+      
       return {
         ...prev,
         quarter: isOT ? next : Math.min(next, settings.totalQuarters),
         isOvertime: isOT,
-        overtimeNumber: otNum
+        overtimeNumber: otNum,
+        isPlaying: false // Auto-pause at quarter/OT start
       }
     })
     
@@ -3601,6 +3939,45 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     const opponentEvents = events.filter(e => e.opponentEvent === true)
     const opponentStats: Record<string, any> = {}
     
+    // Build timeline of which opponent jerseys are on court
+    // Sort all events by timestamp
+    const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp)
+    
+    // Track which jerseys are on court at each point
+    let currentOpponentOnCourt: string[] = []
+    const opponentCourtTime: Record<string, { start: number, onCourt: boolean }> = {}
+    
+    // Process events chronologically to build court time
+    sortedEvents.forEach(event => {
+      // Handle substitutions to track on-court status
+      if (event.eventType === 'substitution' && event.opponentEvent) {
+        // Parse substitution: "Substitution: #XX → #YY"
+        const match = event.playerName?.match(/#(\d+)\s*→\s*#(\d+)/)
+        if (match) {
+          const oldJersey = match[1]
+          const newJersey = match[2]
+          
+          // Mark old jersey as off court
+          if (opponentCourtTime[oldJersey]) {
+            opponentCourtTime[oldJersey].onCourt = false
+          }
+          
+          // Mark new jersey as on court
+          if (!opponentCourtTime[newJersey]) {
+            opponentCourtTime[newJersey] = { start: event.timestamp, onCourt: true }
+          } else {
+            opponentCourtTime[newJersey].start = event.timestamp
+            opponentCourtTime[newJersey].onCourt = true
+          }
+        }
+      }
+      
+      // Initialize jerseys when they appear in events
+      if (event.opponentJersey && !opponentCourtTime[event.opponentJersey]) {
+        opponentCourtTime[event.opponentJersey] = { start: event.timestamp, onCourt: true }
+      }
+    })
+    
     console.log('🔍 Opponent Player Analytics - Processing events:', {
       totalOpponentEvents: opponentEvents.length,
       events: opponentEvents.map(e => ({ type: e.eventType, jersey: e.opponentJersey, value: e.value }))
@@ -3626,6 +4003,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           threePointAttempted: 0,
           ftMade: 0,
           ftAttempted: 0,
+          plusMinus: 0,
+          pointsInPaint: 0,
           efficiency: 0,
           trueShooting: 0,
           effectiveFg: 0
@@ -3645,6 +4024,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             opponentStats[jersey].twoPointMade += 1
             opponentStats[jersey].twoPointAttempted += 1
           }
+          // Track points in paint if metadata indicates it
+          if (event.metadata?.pip) {
+            opponentStats[jersey].pointsInPaint = (opponentStats[jersey].pointsInPaint || 0) + (event.value || 2)
+          }
           break
         case 'fg_missed':
           opponentStats[jersey].fgAttempted += 1
@@ -3660,6 +4043,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           opponentStats[jersey].fgAttempted += 1
           opponentStats[jersey].threePointMade += 1
           opponentStats[jersey].threePointAttempted += 1
+          // Track points in paint if metadata indicates it (unlikely for 3PT, but include for consistency)
+          if (event.metadata?.pip) {
+            opponentStats[jersey].pointsInPaint = (opponentStats[jersey].pointsInPaint || 0) + 3
+          }
           break
         case 'three_missed':
           opponentStats[jersey].fgAttempted += 1
@@ -3689,6 +4076,57 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
           opponentStats[jersey].turnovers += 1
           break
       }
+    })
+    
+    // Calculate +/- for opponent players based on when they were on court
+    // Go through all scoring events chronologically and update +/- for jerseys on court at that time
+    const opponentJerseys = new Set(Object.keys(opponentStats))
+    const opponentPlusMinus: Record<string, number> = {}
+    opponentJerseys.forEach(jersey => opponentPlusMinus[jersey] = 0)
+    
+    // Rebuild court status as we go through events
+    let currentOnCourt = new Set<string>()
+    
+    sortedEvents.forEach(event => {
+      // Update who's on court based on substitutions
+      if (event.eventType === 'substitution' && event.opponentEvent) {
+        const match = event.playerName?.match(/#(\d+)\s*→\s*#(\d+)/)
+        if (match) {
+          const oldJersey = match[1]
+          const newJersey = match[2]
+          currentOnCourt.delete(oldJersey)
+          currentOnCourt.add(newJersey)
+        }
+      }
+      
+      // Track when jerseys first appear (assume on court)
+      if (event.opponentJersey && !currentOnCourt.has(event.opponentJersey)) {
+        currentOnCourt.add(event.opponentJersey)
+      }
+      
+      // Update +/- when points are scored
+      if (event.eventType.includes('made') || event.eventType === 'points') {
+        const points = event.eventType === 'three_made' ? 3 : 
+                       event.eventType === 'ft_made' ? 1 : 
+                       event.value || 2
+        
+        if (event.opponentEvent) {
+          // Opponent scored - add to ALL opponent players on court
+          currentOnCourt.forEach(jersey => {
+            opponentPlusMinus[jersey] = (opponentPlusMinus[jersey] || 0) + points
+          })
+        } else {
+          // Home team scored - subtract from all opponent players on court
+          currentOnCourt.forEach(jersey => {
+            opponentPlusMinus[jersey] = (opponentPlusMinus[jersey] || 0) - points
+          })
+        }
+      }
+    })
+    
+    // Apply +/- to opponent stats
+    Object.keys(opponentStats).forEach(jersey => {
+      opponentStats[jersey].plusMinus = opponentPlusMinus[jersey] || 0
     })
     
     // Calculate advanced metrics for each opponent player
@@ -3811,18 +4249,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       sorter: (a: Player, b: Player) => a.name.localeCompare(b.name),
       width: 150
     },
-    ...(settings.showPlayerNumbers ? [{ 
-      title: (<Tooltip title={columnHelp.number}><span>#</span></Tooltip>),
-      dataIndex: 'number', key: 'number',
-      sorter: (a: Player, b: Player) => Number(a.number) - Number(b.number),
-      width: 60
-    }] : []),
-    { 
-      title: (<Tooltip title="Player Position"><span>POS</span></Tooltip>),
-      dataIndex: 'position', key: 'position',
-      sorter: (a: Player, b: Player) => a.position.localeCompare(b.position),
-      width: 60
-    },
     { 
       title: (<Tooltip title={columnHelp.points}><span>PTS</span></Tooltip>), 
       dataIndex: 'points', 
@@ -3894,7 +4320,19 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         const aPct = a.threeAttempted > 0 ? (a.threeMade || 0) / a.threeAttempted : 0
         const bPct = b.threeAttempted > 0 ? (b.threeMade || 0) / b.threeAttempted : 0
         return aPct - bPct
-      }
+      },
+      width: 70
+    },
+    { 
+      title: 'FT', 
+      key: 'ft',
+      render: (text: any, record: Player) => record.ftAttempted > 0 ? `${record.ftMade}/${record.ftAttempted}` : '0/0',
+      sorter: (a: Player, b: Player) => {
+        const aPct = a.ftAttempted > 0 ? a.ftMade / a.ftAttempted : 0
+        const bPct = b.ftAttempted > 0 ? b.ftMade / b.ftAttempted : 0
+        return aPct - bPct
+      },
+      width: 70
     },
     { 
       title: (<Tooltip title={columnHelp.plusMinus}><span>+/-</span></Tooltip>), 
@@ -4028,6 +4466,47 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         const aPct = a.ftAttempted > 0 ? a.ftMade / a.ftAttempted : 0
         const bPct = b.ftAttempted > 0 ? b.ftMade / b.ftAttempted : 0
         return aPct - bPct
+      },
+      width: 60
+    },
+    { 
+      title: '+/-', 
+      dataIndex: 'plusMinus', 
+      key: 'plusMinus', 
+      sorter: (a: any, b: any) => a.plusMinus - b.plusMinus,
+      render: (text: any, record: any) => record.plusMinus === 0 ? '' : record.plusMinus,
+      width: 60
+    },
+    { 
+      title: 'PIP', 
+      dataIndex: 'pointsInPaint', 
+      key: 'pointsInPaint', 
+      sorter: (a: any, b: any) => (a.pointsInPaint || 0) - (b.pointsInPaint || 0),
+      render: (text: any, record: any) => record.pointsInPaint || '',
+      width: 60
+    },
+    { 
+      title: 'EFF', 
+      key: 'efficiency',
+      render: (text: any, record: any) => {
+        // Calculate EFF (Efficiency Rating)
+        // EFF = PTS + REB + AST + STL + BLK - Missed FG - Missed FT - TO
+        const missedFg = (record.fgAttempted || 0) - (record.fgMade || 0)
+        const missedFt = (record.ftAttempted || 0) - (record.ftMade || 0)
+        const efficiency = (record.points || 0) + (record.rebounds || 0) + (record.assists || 0) + 
+                          (record.steals || 0) + (record.blocks || 0) - missedFg - missedFt - (record.turnovers || 0)
+        return efficiency
+      },
+      sorter: (a: any, b: any) => {
+        const aMissedFg = (a.fgAttempted || 0) - (a.fgMade || 0)
+        const aMissedFt = (a.ftAttempted || 0) - (a.ftMade || 0)
+        const aEff = (a.points || 0) + (a.rebounds || 0) + (a.assists || 0) + 
+                     (a.steals || 0) + (a.blocks || 0) - aMissedFg - aMissedFt - (a.turnovers || 0)
+        const bMissedFg = (b.fgAttempted || 0) - (b.fgMade || 0)
+        const bMissedFt = (b.ftAttempted || 0) - (b.ftMade || 0)
+        const bEff = (b.points || 0) + (b.rebounds || 0) + (b.assists || 0) + 
+                     (b.steals || 0) + (b.blocks || 0) - bMissedFg - bMissedFt - (b.turnovers || 0)
+        return aEff - bEff
       },
       width: 60
     }
@@ -4255,7 +4734,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                                 placeholder="Opp #"
                                 value={jersey}
                                 readOnly={opponentStarting5Set}
-                                onChange={(e) => {
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                   // Only allow editing if starting 5 hasn't been set yet
                                   if (!opponentStarting5Set) {
                                     const next = [...opponentOnCourt]
@@ -4519,7 +4998,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                 </Card>
                                                                    <Card title="Play by Play" styles={{ body: { padding: '2px 8px' } }} style={{ marginTop: 8, height: '221px', overflow: 'hidden' }}>
                   <div className={style.eventsFeed} style={{ height: '175px', overflowY: 'auto' }}> 
-                    {events.slice(0, 10).map(event => {
+                    {events.slice(0, 20).map(event => {
                       // Format event type for better readability
                       const formatEventType = (eventType: string) => {
                         switch (eventType) {
@@ -5020,7 +5499,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                           <div style={{ marginBottom: 8 }}>
                             <Input
                               value={editingLineupName}
-                              onChange={(e) => setEditingLineupName(e.target.value)}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingLineupName(e.target.value)}
                               onPressEnter={() => {
                                 // Update lineup name
                                 setLineups(prev => prev.map(l => 
@@ -5788,7 +6267,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       icon={gameState.isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />} 
                       onClick={toggleGame}
                       disabled={
-                        gameState.quarter >= settings.totalQuarters ||
                         (!gameState.isPlaying && !currentLineup)
                       }
                       style={{ marginBottom: 8, width: 110 }}
@@ -5806,7 +6284,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       size={'middle'}
                       icon={<StopOutlined />} 
                       onClick={undoLastAction}
-                      disabled={actionHistory.length === 0 || gameState.quarter >= settings.totalQuarters}
+                      disabled={actionHistory.length === 0}
                       style={{ marginBottom: 8, width: 110 }}
                     >
                       Undo
@@ -5817,7 +6295,11 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       icon={showReportButton ? <LockerIcon color={isReportEnabled ? '#b58842' : '#ccc'} /> : <ClockCircleOutlined />} 
                       onClick={showReportButton ? handleReportClick : nextQuarter} 
                       disabled={showReportButton ? !isReportEnabled : (() => {
-                        if (gameState.quarter >= settings.totalQuarters) return true
+                        // If regulation has ended and scores are NOT tied, disable the button
+                        // (Use Exit Live Stat Tracking instead)
+                        if (gameState.quarter >= settings.totalQuarters && !gameState.isOvertime && gameState.homeScore !== gameState.opponentScore) {
+                          return true
+                        }
                         if (!hasGameStarted) return true
                         const onCourt = players.filter(p => p.isOnCourt)
                         if (onCourt.length !== 5) return true
@@ -5834,9 +6316,11 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       {showReportButton
                         ? 'Report'
                         : (
-                          (gameState.quarter >= settings.totalQuarters && (gameState.homeScore === gameState.opponentScore) && !gameState.isPlaying)
-                            ? 'Overtime?'
-                            : (gameState.quarter >= settings.totalQuarters ? 'End Game' : 'Next Qtr')
+                          gameState.isOvertime 
+                            ? `Next OT`
+                            : (gameState.quarter >= settings.totalQuarters && gameState.homeScore === gameState.opponentScore && !gameState.isPlaying)
+                              ? 'Overtime?'
+                              : 'Next Qtr'
                         )}
                     </Button>
                   </Col>
@@ -5906,7 +6390,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                               type="dashed" 
                               size={'middle'}
                               onClick={() => handleTimeout('home')}
-                              disabled={gameState.timeoutHome <= 0 || gameState.quarter >= settings.totalQuarters}
+                              disabled={gameState.timeoutHome <= 0}
                               style={{ minWidth: 50 }}
                             >
                               HOME
@@ -5922,7 +6406,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                               type="dashed" 
                               size={'middle'}
                               onClick={() => handleTimeout('away')}
-                              disabled={gameState.timeoutAway <= 0 || gameState.quarter >= settings.totalQuarters}
+                              disabled={gameState.timeoutAway <= 0}
                               style={{ minWidth: 50 }}
                             >
                               OPP
@@ -5995,30 +6479,16 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             <Card 
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>🏀 HALFTIME REPORT</span>
+                  <span>HALFTIME REPORT</span>
                   <Button type="primary" onClick={handleHalftimeResume}>Continue Game</Button>
                 </div>
               }
               className={style.halftimeReport}
             >
               <Row gutter={[16, 16]}>
+                {/* Player Highlights - Left */}
                 <Col span={12}>
-                  <Card title="📊 Team Performance" className={style.insightCard}>
-                    <Row gutter={16}>
-                      {halftimeInsights.map((insight, index) => (
-                        <Col span={12} key={index}>
-                          <Statistic 
-                            title={insight.title} 
-                            value={insight.value}
-                            valueStyle={{ color: insight.status === 'error' ? '#ff4d4f' : insight.status === 'warning' ? '#faad14' : '#52c41a' }}
-                          />
-                        </Col>
-                      ))}
-                    </Row>
-                  </Card>
-                </Col>
-                <Col span={12}>
-                  <Card title="🏆 Player Highlights" className={style.insightCard}>
+                  <Card title="Player Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
                         <Text strong>Top Scorer:</Text> #{halftimeData.topScorer?.number ?? 'N/A'} {halftimeData.topScorer?.name ?? 'N/A'} ({halftimeData.topScorer?.points ?? 0} pts)
@@ -6035,7 +6505,27 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                     </div>
                   </Card>
                 </Col>
-                {/* Removed score context per request */}
+                {/* Opponent Highlights - Right */}
+                <Col span={12}>
+                  <Card title="Opponent Highlights" className={style.insightCard}>
+                    <div style={{ color: 'white' }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong>Top Scorer:</Text> #{(halftimeData as any).opponentTopScorer?.number ?? 'N/A'} ({(halftimeData as any).opponentTopScorer?.points ?? 0} pts)
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong>Top Rebounder:</Text> #{(halftimeData as any).opponentTopRebounder?.number ?? 'N/A'} ({(halftimeData as any).opponentTopRebounder?.rebounds ?? 0} reb)
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong>Top Assister:</Text> #{(halftimeData as any).opponentTopAssister?.number ?? 'N/A'} ({(halftimeData as any).opponentTopAssister?.assists ?? 0} ast)
+                      </div>
+                      <div>
+                        <Text strong>Most Efficient:</Text> #{(halftimeData as any).opponentMostEfficient?.player?.number ?? 'N/A'} (+{(halftimeData as any).opponentMostEfficient?.efficiency ?? 0})
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* Team Comparison */}
                 <Col span={24}>
                   <TeamComparisonTable 
                     teamStats={halftimeData.teamStats} 
@@ -6044,17 +6534,34 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                     opponentName={eventData?.oppositionTeam || "OPPONENT"}
                   />
                 </Col>
-                {/* {settings.showRecommendations && (
-                  <Col span={24}>
-                    <Card title="💡 Strategic Recommendations" className={style.recommendations}>
-                      <ul>
-                        {halftimeData.recommendations.map((rec, index) => (
-                          <li key={index}>{rec}</li>
-                        ))}
-                      </ul>
-                    </Card>
-                  </Col>
-                )} */}
+
+                {/* Box Score */}
+                <Col span={24}>
+                  <Card title="Box Score" className={style.playerPerformanceCard}>
+                    <Table 
+                      dataSource={playerAnalytics} 
+                      columns={playerColumns} 
+                      rowKey="id"
+                      pagination={false}
+                      scroll={{ y: 300 }}
+                      showSorterTooltip={false}
+                    />
+                  </Card>
+                </Col>
+
+                {/* Opponent Box Score */}
+                <Col span={24}>
+                  <Card title="Opponent Box Score" className={style.playerPerformanceCard}>
+                    <Table 
+                      dataSource={opponentPlayerAnalytics} 
+                      columns={opponentPlayerColumns} 
+                      rowKey="id"
+                      pagination={false}
+                      scroll={{ y: 300 }}
+                      showSorterTooltip={false}
+                    />
+                  </Card>
+                </Col>
               </Row>
             </Card>
           </Col>
@@ -6066,69 +6573,15 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             <Card 
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>⏰ TIMEOUT INSIGHTS</span>
+                  <span>TIMEOUT INSIGHTS</span>
                   <Button type="primary" onClick={() => setShowTimeoutReport(false)}>Resume Game</Button>
                 </div>
               }
               className={style.timeoutReport}
             >
               <Row gutter={[16, 16]}>
-                <Col span={12}>
-                  <Card title="📈 Recent Momentum" className={style.insightCard}>
-                    <div style={{ color: 'white' }}>
-                      <div style={{ marginBottom: 8 }}>
-                        <Text strong>Momentum:</Text> 
-                        <Badge 
-                          count={timeoutData.momentum === 'positive' ? 'POSITIVE' : 'NEGATIVE'} 
-                          style={{ 
-                            backgroundColor: timeoutData.momentum === 'positive' ? '#52c41a' : '#ff4d4f',
-                            marginLeft: 8
-                          }} 
-                        />
-                      </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <Text strong>Recent Events:</Text> {timeoutData.recentEvents?.length ?? 0} events
-                      </div>
-                      <div>
-                        <Text strong>Key Player:</Text> #{timeoutData.keyPlayer?.number ?? 'N/A'} {timeoutData.keyPlayer?.name ?? 'N/A'} (+{timeoutData.keyPlayer?.plusMinus ?? 0})
-                      </div>
-                    </div>
-                  </Card>
-                </Col>
-                {settings.showQuickActions && (
-                  <Col span={12}>
-                    <Card title="🎯 Quick Actions" size="small" className={style.insightCard}>
-                      <div style={{ color: 'white' }}>
-                        {timeoutData.recommendations.map((rec, index) => (
-                          <div key={index} style={{ marginBottom: 4 }}>
-                            • {rec}
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
-                  </Col>
-                )}
-                <Col span={24}>
-                  <Card title="📊 Score Update" className={style.insightCard}>
-                    <Row gutter={16}>
-                      <Col span={8}>
-                        <Statistic title="HOME" value={gameState.homeScore} />
-                      </Col>
-                      <Col span={8}>
-                        <Statistic title="OPPONENT" value={gameState.opponentScore} />
-                      </Col>
-                      <Col span={8}>
-                        <Statistic 
-                          title="DIFFERENCE" 
-                          value={gameState.homeScore - gameState.opponentScore}
-                          valueStyle={{ color: (gameState.homeScore - gameState.opponentScore) >= 0 ? '#52c41a' : '#ff4d4f' }}
-                        />
-                      </Col>
-                    </Row>
-                  </Card>
-                </Col>
-                <Col span={12}>
-                  <Card title="🏆 Player Highlights" className={style.insightCard}>
+              <Col span={12}>
+                  <Card title="Player Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
                         <Text strong>Top Scorer:</Text> #{timeoutData.topScorer?.number ?? 'N/A'} {timeoutData.topScorer?.name ?? 'N/A'} ({timeoutData.topScorer?.points ?? 0} pts)
@@ -6145,56 +6598,66 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                     </div>
                   </Card>
                 </Col>
+
+                {/* Opponent Highlights - Right */}
                 <Col span={12}>
-                  <Card title="📊 Team Performance" className={style.insightCard}>
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Statistic title="Shooting Efficiency" value={`${timeoutData.teamStats?.fgPercentage ?? 0}%`} />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic title="Rebound Rate" value={`${timeoutData.teamStats?.totalRebounds ?? 0}`} />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic title="A/T Ratio" value={(timeoutData.teamStats?.assistToTurnoverRatio ?? 0).toFixed(2)} />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic title="Points (2min)" value={timeoutData.teamStats?.totalPoints ?? 0} />
-                      </Col>
-                    </Row>
-                  </Card>
-                </Col>
-                <Col span={12}>
-                  <Card title="🔥 Opponent Run & Hot Hand" className={style.insightCard}>
+                  <Card title="Opponent Highlights" className={style.insightCard}>
                     <div style={{ color: 'white' }}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong>Opponent Run:</Text> {timeoutData.recentOpponentRun}
+                        <Text strong>Top Scorer:</Text> #{timeoutData.opponentTopScorer?.number ?? 'N/A'} ({timeoutData.opponentTopScorer?.points ?? 0} pts)
                       </div>
-                      {timeoutData.hotOpponent && (
-                        <div>
-                          <Text strong>Hot Opponent:</Text> {timeoutData.hotOpponent?.name ?? 'N/A'} ({timeoutData.hotOpponent?.points ?? 0} pts)
-                        </div>
-                      )}
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong>Top Rebounder:</Text> #{timeoutData.opponentTopRebounder?.number ?? 'N/A'} ({timeoutData.opponentTopRebounder?.rebounds ?? 0} reb)
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong>Top Assister:</Text> #{timeoutData.opponentTopAssister?.number ?? 'N/A'} ({timeoutData.opponentTopAssister?.assists ?? 0} ast)
+                      </div>
+                      <div>
+                        <Text strong>Most Efficient:</Text> #{timeoutData.opponentMostEfficient?.player?.number ?? 'N/A'} (+{timeoutData.opponentMostEfficient?.efficiency ?? 0})
+                      </div>
                     </div>
                   </Card>
                 </Col>
+
+
+                
+                
                 {/* Removed score context per request */}
                 <Col span={24}>
                   <TeamComparisonTable 
                     teamStats={timeoutData.teamStats || {}} 
-                    opponentStats={(timeoutData as any).opponentStats || {}} 
+                    opponentStats={timeoutData.opponentStats || {}} 
                     teamName={eventData?.name || "HOME"}
                     opponentName={eventData?.oppositionTeam || "OPPONENT"}
                   />
                 </Col>
-                {/* <Col span={24}>
-                  <Card title="💡 Strategic Recommendations" className={style.recommendations}>
-                    <ul>
-                      {timeoutData.recommendations.map((rec, index) => (
-                        <li key={index}>{rec}</li>
-                      ))}
-                    </ul>
+                {/* Box Score */}
+                <Col span={24}>
+                  <Card title="Box Score" className={style.playerPerformanceCard}>
+                    <Table 
+                      dataSource={playerAnalytics} 
+                      columns={playerColumns} 
+                      rowKey="id"
+                      pagination={false}
+                      scroll={{ y: 300 }}
+                      showSorterTooltip={false}
+                    />
                   </Card>
-                </Col> */}
+                </Col>
+
+                {/* Opponent Box Score */}
+                <Col span={24}>
+                  <Card title="Opponent Box Score" className={style.playerPerformanceCard}>
+                    <Table 
+                      dataSource={opponentPlayerAnalytics} 
+                      columns={opponentPlayerColumns} 
+                      rowKey="id"
+                      pagination={false}
+                      scroll={{ y: 300 }}
+                      showSorterTooltip={false}
+                    />
+                  </Card>
+                </Col>
               </Row>
             </Card>
           </Col>
@@ -7409,7 +7872,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             <Input
               placeholder="Lineup name (optional)"
               value={lineupName}
-              onChange={(e) => setLineupName(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLineupName(e.target.value)}
               style={{ marginTop: 8 }}
               allowClear
             />
@@ -7962,7 +8425,25 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             size="large"
             icon={<CloseOutlined />}
             onClick={async () => {
-              // Just trigger the exit - let the parent component handle the data processing
+              // COMMENTED OUT - Save functionality until we revisit resume for partially tracked games
+              // try {
+              //   // Save game data before exiting
+              //   saveGameData({ showToast: true });
+              //   
+              //   // Wait a moment for save to complete
+              //   await new Promise(resolve => setTimeout(resolve, 500));
+              //   
+              //   // Then exit
+              //   if (onExit) {
+              //     setSuppressNavigationGuard(true);
+              //     onExit();
+              //   }
+              // } catch (error) {
+              //   console.error('Failed to save game data on exit:', error);
+              //   message.error('Failed to save game data. Try saving manually before exiting.');
+              // }
+              
+              // Simple exit without saving
               if (onExit) {
                 setSuppressNavigationGuard(true);
                 onExit();
@@ -8062,50 +8543,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* End Game Confirmation Modal */}
-      <Modal
-        title={
-          <Space>
-            <ExclamationCircleOutlined style={{ color: '#faad14' }} />
-            <span style={{ color: '#f5f7fa' }}>End Game?</span>
-          </Space>
-        }
-        open={showEndGameModal}
-        onOk={async () => {
-          setShowEndGameModal(false);
-          try {
-            // Removed service game state update - UI only
-            saveGameData({ showToast: false })
-
-            // Removed service end game calls - UI only
-            message.success('Game ended and saved')
-          } catch (e) {
-            message.error('Failed to end game')
-          }
-        }}
-        onCancel={() => setShowEndGameModal(false)}
-        okText="Save and End"
-        cancelText="Cancel"
-        okButtonProps={{
-          type: 'primary',
-          icon: <StopOutlined />,
-          style: { backgroundColor: '#1677ff', borderColor: '#1677ff' }
-        }}
-        cancelButtonProps={{
-          style: { borderColor: '#334155', color: '#e6e6e6', background: '#0f2741' }
-        }}
-        styles={{
-          content: { backgroundColor: '#17375c', color: '#f5f7fa' },
-          header: { backgroundColor: '#17375c', color: '#f5f7fa' },
-          body: { backgroundColor: '#17375c', color: '#f5f7fa' }
-        }}
-        width={500}
-      >
-        <div style={{ color: '#f5f7fa', fontSize: '16px', lineHeight: '1.6' }}>
-          Do you want to save game data before ending? This will finalize the session.
-        </div>
       </Modal>
 
       {/* Confirmation Modal */}

@@ -21,7 +21,7 @@ interface Budget {
     name: string;
     color: string;
   };
-  season: string;
+  Season: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -203,7 +203,7 @@ export default function BucketDetailsPage({ params }: { params: Promise<{ slug: 
           <div className={styles.summaryHead}>
             <div className={styles.summaryTitle}>{budget.name}</div>
             <div className={styles.summaryCadence}>
-              {budget.period} ({budget.season})
+              {budget.period} ({budget.Season})
             </div>
           </div>
           <Paragraph className={styles.description}>

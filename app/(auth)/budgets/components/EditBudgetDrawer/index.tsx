@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Drawer, Form, Input, Select, InputNumber, Switch, Button, Flex, App } from 'antd';
 import CloseIcon from '@/components/icon/close.svg';
 import style from '../CreateBudgetDrawer/style.module.scss';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 const { TextArea } = Input;
 
@@ -18,15 +19,16 @@ interface EditBudgetDrawerProps {
     period: string;
     description?: string;
     autoRepeat: boolean;
-    season: string;
+    Season: string;
     is_pinned: boolean;
   } | null;
 }
 
-export default function EditBudgetDrawer({ open, onClose, onSuccess, budget }: EditBudgetDrawerProps) {
+export default function EditBudgetDrawer({ open, onClose, onSuccess, budget }: any) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const { message } = App.useApp();
+  const { user } = useAuth();
 
   // Populate form when budget changes
   useEffect(() => {
@@ -50,8 +52,8 @@ export default function EditBudgetDrawer({ open, onClose, onSuccess, budget }: E
       
       const requestData = {
         ...values,
-        season: budget.season,
-        updatedBy: 1 // TODO: Get from actual user context
+        Season: budget.Season,
+        // User data will be handled by the API route
       };
       
       console.log('EditBudgetDrawer - Sending data:', requestData);

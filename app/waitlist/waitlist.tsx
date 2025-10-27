@@ -16,9 +16,9 @@ import Twitter from '@/components/icon/logo-twitter.svg'
 
 const Waitlist = () => {
   const router = useRouter()
-  const {login} = useAuthStore()
+  const { login } = useAuthStore()
   const { message } = App.useApp()
-  const {loading, setLoading} = useAppStore()
+  const { loading, setLoading } = useAppStore()
   const [isShowResult, showResult] = useState(false)
 
   const onSubmit = async (payload: any) => {

@@ -201,15 +201,32 @@ function ExpenseDetail({ expenseId }: { expenseId: string }) {
 
   const fetchExpense = async () => {
     try {
+      console.log('🔍 Fetching expense with ID:', expenseId)
       const response = await fetch(`/api/expenses/${expenseId}`)
+      
+      console.log('📡 Response status:', response.status)
+      
       if (response.ok) {
         const expense = await response.json()
+        console.log('✅ Expense fetched:', expense)
         setExpense(expense)
       } else if (response.status === 404) {
+        console.error('❌ Expense not found (404)')
+        setExpense(null)
+      } else if (response.status === 403) {
+        console.error('🚫 Access denied (403)')
+        const errorData = await response.json()
+        console.error('Error details:', errorData)
+        setExpense(null)
+      } else {
+        console.error('❌ Failed to fetch expense, status:', response.status)
+        const errorData = await response.json()
+        console.error('Error details:', errorData)
         setExpense(null)
       }
     } catch (error) {
-      console.error('Error fetching expense:', error)
+      console.error('💥 Error fetching expense:', error)
+      setExpense(null)
     } finally {
       setLoading(false)
     }
@@ -273,7 +290,12 @@ function ExpenseDetail({ expenseId }: { expenseId: string }) {
   if (!expense) {
     return (
       <div className={style.container}>
-        <div>Expense not found</div>
+        <div style={{ color: '#ff4d4f', fontSize: '16px', marginBottom: '16px' }}>
+          Expense not found (ID: {expenseId})
+        </div>
+        <div style={{ color: '#fff', marginBottom: '16px' }}>
+          This expense may have been deleted or you may not have permission to view it.
+        </div>
         <Button onClick={goBack}>Go Back</Button>
       </div>
     )

@@ -24,7 +24,7 @@ export async function GET(
 		}
 
 		// Get player notes
-		const { data: notes, error } = await supabase
+		const { data: notes, error } = await (supabase as any)
 			.from('player_notes')
 			.select(`
 				id,
@@ -75,7 +75,7 @@ export async function POST(
 		}
 
 		// Create new note
-		const { data: note, error } = await supabase
+		const { data: note, error } = await (supabase as any)
 			.from('player_notes')
 			.insert({
 				playerId: playerId,

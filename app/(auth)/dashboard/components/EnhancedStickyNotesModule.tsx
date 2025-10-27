@@ -735,8 +735,8 @@ export default function EnhancedStickyNotesModule({ sidebarCollapsed = false }: 
                 <div style={{ position: 'relative', zIndex: 10 }}>
                   <textarea
                   value={editingContent}
-                  onChange={(e) => handleContentChange(note.id, e.target.value)}
-                  onInput={(e) => handleContentChange(note.id, e.currentTarget.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleContentChange(note.id, e.target.value)}
+                  onInput={(e: React.FormEvent<HTMLTextAreaElement>) => handleContentChange(note.id, e.currentTarget.value)}
                   onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()

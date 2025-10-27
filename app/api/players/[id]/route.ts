@@ -25,7 +25,7 @@ export async function GET(
 		console.log('API GET /players/[id] - fetching player:', playerId)
 		
 		// Fetch player with position relationship
-		const { data: player, error } = await supabase
+		const { data: player, error } = await (supabase as any)
 			.from('players')
 			.select(`
 				id,
@@ -99,7 +99,7 @@ export async function PUT(
 		const body = await request.json()
 		console.log('API PUT /players/[id] - updating player:', playerId, 'with data:', body)
 		
-		const { data: updatedPlayer, error } = await supabase
+		const { data: updatedPlayer, error } = await (supabase as any)
 			.from('players')
 			.update({
 				first_name: body.first_name,
@@ -174,7 +174,7 @@ export async function DELETE(
 
 		console.log('API DELETE /players/[id] - deleting player:', playerId)
 		
-		const { error } = await supabase
+		const { error } = await (supabase as any)
 			.from('players')
 			.delete()
 			.eq('id', playerId)

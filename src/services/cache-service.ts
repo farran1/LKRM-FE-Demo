@@ -73,11 +73,12 @@ class CacheService {
   public async getRoster(): Promise<Player[]> {
     const cachedRoster = offlineStorage.getRosterCache()
     
+    // If we have valid cached data, return it
     if (cachedRoster && this.isCacheValid('roster')) {
       return cachedRoster
     }
 
-    // Try to fetch fresh data if online
+    // Try to fetch fresh data if online and authenticated
     if (syncService.getNetworkDetector().isCurrentlyOnline()) {
       try {
         const freshRoster = await this.fetchRosterFromAPI()
@@ -86,8 +87,16 @@ class CacheService {
           return freshRoster
         }
       } catch (error) {
-        console.warn('Failed to fetch fresh roster, using cache:', error)
+        // Handle specific error types
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage === 'OFFLINE' || errorMessage === 'NO_SESSION' || errorMessage === 'AUTH_FAILED') {
+          console.log('📱 Skipping roster fetch due to:', errorMessage);
+        } else {
+          console.warn('Failed to fetch fresh roster, using cache:', error)
+        }
       }
+    } else {
+      console.log('📱 Offline detected, using cached roster');
     }
 
     // Return cached data even if stale, or empty array
@@ -96,7 +105,9 @@ class CacheService {
 
   public async refreshRoster(): Promise<Player[]> {
     if (!syncService.getNetworkDetector().isCurrentlyOnline()) {
-      throw new Error('Cannot refresh roster while offline')
+      console.log('📱 Cannot refresh roster while offline');
+      const cachedRoster = offlineStorage.getRosterCache()
+      return cachedRoster || []
     }
 
     try {
@@ -106,28 +117,63 @@ class CacheService {
         this.notifyRefreshCallbacks()
         return freshRoster
       }
-      throw new Error('Failed to fetch roster data')
+      // If fetch returns null, fall back to cached data
+      const cachedRoster = offlineStorage.getRosterCache()
+      console.log('No fresh roster data, using cached data');
+      return cachedRoster || []
     } catch (error) {
+      // Handle specific error types gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage === 'OFFLINE' || errorMessage === 'NO_SESSION' || errorMessage === 'AUTH_FAILED') {
+        console.log('📱 Roster refresh skipped due to:', errorMessage);
+        const cachedRoster = offlineStorage.getRosterCache()
+        return cachedRoster || []
+      }
       console.error('Roster refresh failed:', error)
-      throw error
+      // Fall back to cached data instead of throwing
+      const cachedRoster = offlineStorage.getRosterCache()
+      return cachedRoster || []
     }
   }
 
   private async fetchRosterFromAPI(): Promise<Player[] | null> {
     try {
+      // Check if we're offline first
+      if (!navigator.onLine) {
+        console.log('📱 Offline detected, skipping roster API call');
+        throw new Error('OFFLINE');
+      }
+
+      // Get authentication token
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Check if we have a valid session
+      if (!session?.access_token) {
+        console.log('🔐 No valid session, skipping roster API call');
+        throw new Error('NO_SESSION');
+      }
+
       const response = await fetch('/api/players', {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
         }
       })
 
       if (!response.ok) {
+        if (response.status === 401) {
+          console.log('🔐 Authentication failed for roster API call');
+          throw new Error('AUTH_FAILED');
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data = await response.json()
+      const json = await response.json()
+      // Handle both array responses and wrapped responses like { data: [...] }
+      const data = Array.isArray(json) ? json : (json.data || json.players || null)
       return Array.isArray(data) ? data : null
     } catch (error) {
       console.error('API fetch failed:', error)
@@ -139,11 +185,12 @@ class CacheService {
   public async getEvents(): Promise<Event[]> {
     const cachedEvents = offlineStorage.getEventsCache()
     
+    // If we have valid cached data, return it
     if (cachedEvents && this.isCacheValid('events')) {
       return cachedEvents
     }
 
-    // Try to fetch fresh data if online
+    // Try to fetch fresh data if online and authenticated
     if (syncService.getNetworkDetector().isCurrentlyOnline()) {
       try {
         const freshEvents = await this.fetchEventsFromAPI()
@@ -152,8 +199,16 @@ class CacheService {
           return freshEvents
         }
       } catch (error) {
-        console.warn('Failed to fetch fresh events, using cache:', error)
+        // Handle specific error types
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage === 'OFFLINE' || errorMessage === 'NO_SESSION' || errorMessage === 'AUTH_FAILED') {
+          console.log('📱 Skipping events fetch due to:', errorMessage);
+        } else {
+          console.warn('Failed to fetch fresh events, using cache:', error)
+        }
       }
+    } else {
+      console.log('📱 Offline detected, using cached events');
     }
 
     // Return cached data even if stale, or empty array
@@ -162,6 +217,7 @@ class CacheService {
 
   public async refreshEvents(): Promise<Event[]> {
     if (!syncService.getNetworkDetector().isCurrentlyOnline()) {
+      console.log('📱 Cannot refresh events while offline');
       throw new Error('Cannot refresh events while offline')
     }
 
@@ -174,6 +230,12 @@ class CacheService {
       }
       throw new Error('Failed to fetch events data')
     } catch (error) {
+      // Handle specific error types gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage === 'OFFLINE' || errorMessage === 'NO_SESSION' || errorMessage === 'AUTH_FAILED') {
+        console.log('📱 Events refresh skipped due to:', errorMessage);
+        throw error;
+      }
       console.error('Events refresh failed:', error)
       throw error
     }
@@ -181,15 +243,36 @@ class CacheService {
 
   private async fetchEventsFromAPI(): Promise<Event[] | null> {
     try {
+      // Check if we're offline first
+      if (!navigator.onLine) {
+        console.log('📱 Offline detected, skipping events API call');
+        throw new Error('OFFLINE');
+      }
+
+      // Get authentication token
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Check if we have a valid session
+      if (!session?.access_token) {
+        console.log('🔐 No valid session, skipping events API call');
+        throw new Error('NO_SESSION');
+      }
+
       const response = await fetch('/api/events', {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
         }
       })
 
       if (!response.ok) {
+        if (response.status === 401) {
+          console.log('🔐 Authentication failed for events API call');
+          throw new Error('AUTH_FAILED');
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 

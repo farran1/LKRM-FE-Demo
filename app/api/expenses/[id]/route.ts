@@ -10,23 +10,49 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { data: expense, error } = await (supabase as any)
+    const expenseId = Number((await params).id)
+    console.log('🔍 Fetching expense ID:', expenseId)
+    
+    // Get the authenticated Supabase client
+    const { client: supabaseAuth, user } = await createServerClientWithAuth(request)
+    console.log('🔐 Authenticated user:', user?.email || 'No user')
+    
+    const { data: expense, error } = await (supabaseAuth as any)
       .from('expenses')
       .select(`
         *,
         budgets (name),
         events (name)
       `)
-      .eq('id', (await params).id)
+      .eq('id', expenseId)
       .single()
     
     if (error) {
+      console.error('❌ Supabase error fetching expense:', error)
+      console.error('Error code:', error.code)
+      console.error('Error message:', error.message)
+      
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
       }
-      console.error('Supabase error:', error)
-      return NextResponse.json({ error: 'Failed to fetch expense' }, { status: 500 })
+      
+      // Check if it's an RLS (Row Level Security) issue
+      if (error.message?.includes('permission denied') || error.code === '42501') {
+        console.error('⚠️ RLS permission denied for expense:', expenseId)
+        return NextResponse.json({ 
+          error: 'Access denied', 
+          message: 'You do not have permission to view this expense' 
+        }, { status: 403 })
+      }
+      
+      return NextResponse.json({ 
+        error: 'Failed to fetch expense',
+        details: error.message,
+        code: error.code 
+      }, { status: 500 })
     }
+    
+    console.log('✅ Expense fetched successfully:', expense?.id)
 
     // Fetch user information for createdBy and updatedBy from auth.users
     let createdByUser = null
@@ -71,7 +97,7 @@ export async function GET(
     }
 
     // Fetch updatedBy user details - handle JSON, email, and integer formats
-    if (expense.updatedBy && expense.updatedBy !== 0) {
+    if (expense.updatedBy && expense.updatedBy !== '0' && expense.updatedBy !== '') {
       try {
         // Check if it's JSON format (new)
         if (typeof expense.updatedBy === 'string' && expense.updatedBy.startsWith('{')) {
@@ -185,11 +211,14 @@ export async function PUT(
     }
     
     console.log('🔧 Update data:', JSON.stringify(updateData, null, 2))
+    console.log('🎫 Receipt URL being saved:', body.receiptUrl)
     
-    const { data: updatedExpense, error } = await (supabase as any)
+    const expenseId = Number((await params).id)
+    
+    const { data: updatedExpense, error } = await (supabaseAuth as any)
       .from('expenses')
       .update(updateData)
-      .eq('id', (await params).id)
+      .eq('id', expenseId)
       .select()
       .single()
     
@@ -236,7 +265,7 @@ export async function DELETE(
     console.log('API DELETE /expenses - Authenticated user:', user.email, user.id)
     
     // Delete the expense
-    const { error } = await supabase
+    const { error } = await (supabaseAuth as any)
       .from('expenses')
       .delete()
       .eq('id', Number(id))

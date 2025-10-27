@@ -111,7 +111,7 @@ export class AuditLogger {
       }
       
       // Log to database
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('security_audit_logs')
         .insert({
           user_id: entry.userId,
@@ -203,7 +203,7 @@ export class AuditLogger {
   // Method to get audit logs with filtering
   async getAuditLogs(filter: AuditLogFilter = {}): Promise<AuditLogEntry[]> {
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('security_audit_logs')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -272,7 +272,7 @@ export class AuditLogger {
   // Method to get security events
   async getSecurityEvents(limit: number = 100): Promise<any[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('security_events')
         .select('*')
         .order('timestamp', { ascending: false })

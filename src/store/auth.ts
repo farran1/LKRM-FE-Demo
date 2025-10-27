@@ -8,7 +8,7 @@ interface AuthState {
   logout: () => void
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set: any) => ({
   user: undefined,
   token: undefined,
   company: undefined,

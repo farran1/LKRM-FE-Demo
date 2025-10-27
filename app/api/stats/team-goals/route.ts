@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'active';
     const visibility = searchParams.get('visibility');
 
-    let query = supabase
+    let query = (supabase as any)
       .from('team_goals')
       .select(`
         *,
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify metric exists
-    const { data: metric, error: metricError } = await supabase
+    const { data: metric, error: metricError } = await (supabase as any)
       .from('stat_metrics')
       .select('id, name')
       .eq('id', metric_id)
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid metric ID' }, { status: 400 });
     }
 
-    const { data: goal, error } = await supabase
+    const { data: goal, error } = await (supabase as any)
       .from('team_goals')
       .insert({
         metric_id,

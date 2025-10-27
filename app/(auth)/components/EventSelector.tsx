@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, Select, Typography, Space, Button, Tag, Alert, Modal, Divider } from 'antd';
-import { CalendarOutlined, TeamOutlined, TrophyOutlined, EnvironmentOutlined, UserOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Card, Select, Typography, Space, Button, Tag, Alert, Modal } from 'antd';
+import { CalendarOutlined, TeamOutlined, EnvironmentOutlined, UserOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -30,24 +31,40 @@ interface EventSelectorProps {
   onEventSelect: (eventId: number) => void;
   selectedEventId?: number;
   showTitle?: boolean;
-  onResumeGame?: (eventId: number) => void;
-  onStartOver?: (eventId: number) => void;
 }
 
 const EventSelector: React.FC<EventSelectorProps> = ({ 
   onEventSelect, 
   selectedEventId, 
-  showTitle = true,
-  onResumeGame,
-  onStartOver
+  showTitle = true
 }) => {
   const router = useRouter();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [pendingEventId, setPendingEventId] = useState<number | null>(null);
+  const { isOnline, isReconnecting } = useNetworkStatus();
   
   // Fetch events with offline fallback
-  const { data: eventsResponse, error, isLoading } = useSWR('/api/events', fetcher);
+  const { data: eventsResponse, error, isLoading } = useSWR(
+    isOnline ? '/api/events' : null, // Only fetch when online
+    createFetcher(isOnline),
+    {
+      // Don't retry when offline or auth failed
+      shouldRetryOnError: (error) => {
+        return !error.message.includes('OFFLINE') && 
+               !error.message.includes('NO_SESSION') && 
+               !error.message.includes('AUTH_FAILED');
+      },
+      // Reduce retry attempts for network errors
+      errorRetryCount: 2,
+      errorRetryInterval: 1000,
+      // Don't revalidate when offline
+      revalidateOnFocus: isOnline,
+      revalidateOnReconnect: true,
+      // Keep data when going offline
+      keepPreviousData: true
+    }
+  );
   
   // Get events from API or offline cache
   const [allEvents, setAllEvents] = useState<Event[]>([]);
@@ -73,9 +90,19 @@ const EventSelector: React.FC<EventSelectorProps> = ({
               color: event.event_types.color
             } : null
           }));
+          
+          // Cache events when successfully fetched from API
+          try {
+            const { offlineStorage } = await import('../../../src/services/offline-storage');
+            offlineStorage.saveEventsCache(events);
+            console.log('💾 Events cached for offline use');
+            setIsOfflineMode(false);
+          } catch (cacheError) {
+            console.warn('⚠️ Failed to cache events:', cacheError);
+          }
         }
         
-        // If no events from API or API failed, try offline cache
+        // If no events from API (offline or error), try offline cache
         if (events.length === 0) {
           try {
             const { offlineStorage } = await import('../../../src/services/offline-storage');
@@ -88,27 +115,30 @@ const EventSelector: React.FC<EventSelectorProps> = ({
           } catch (offlineError) {
             console.warn('⚠️ Failed to load events from offline storage:', offlineError);
           }
-        } else {
-          // Cache events when successfully fetched from API
-          try {
-            const { offlineStorage } = await import('../../../src/services/offline-storage');
-            offlineStorage.saveEventsCache(events);
-            console.log('💾 Events cached for offline use');
-            setIsOfflineMode(false);
-          } catch (cacheError) {
-            console.warn('⚠️ Failed to cache events:', cacheError);
-          }
         }
         
         setAllEvents(events);
       } catch (error) {
         console.error('❌ Failed to load events:', error);
+        // Try to load from cache even if there's an error
+        try {
+          const { offlineStorage } = await import('../../../src/services/offline-storage');
+          const cachedEvents = offlineStorage.getEventsCache();
+          if (cachedEvents && Array.isArray(cachedEvents)) {
+            console.log('📱 Fallback: Using cached events after error');
+            setAllEvents(cachedEvents);
+            setIsOfflineMode(true);
+            return;
+          }
+        } catch (cacheError) {
+          console.warn('⚠️ Failed to load events from cache after error:', cacheError);
+        }
         setAllEvents([]);
       }
     };
     
     loadEvents();
-  }, [eventsResponse, error]);
+  }, [eventsResponse, error, isOnline]);
   
   // Filter events to only show Game and Scrimmage types
   const filteredEvents: Event[] = useMemo(() => {
@@ -123,17 +153,22 @@ const EventSelector: React.FC<EventSelectorProps> = ({
   
   // Check for existing data for each event
   const { data: eventsWithData, error: eventsDataError } = useSWR(
-    eventIds.length > 0 ? '/api/events/check-data' : null,
+    eventIds.length > 0 && isOnline ? '/api/events/check-data' : null,
     async (url) => {
       console.log('🔍 SWR: Fetching events data for IDs:', eventIds);
       
       // Get authentication token
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
-      const authHeaders: HeadersInit = session?.access_token ? {
+      
+      // Check if we have a valid session
+      if (!session?.access_token) {
+        console.log('🔐 No valid session, skipping events data check');
+        throw new Error('NO_SESSION');
+      }
+      
+      const authHeaders: HeadersInit = {
         'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      } : {
         'Content-Type': 'application/json'
       };
       
@@ -142,9 +177,32 @@ const EventSelector: React.FC<EventSelectorProps> = ({
         headers: authHeaders,
         body: JSON.stringify({ eventIds })
       });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.log('🔐 Authentication failed for events data check');
+          throw new Error('AUTH_FAILED');
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const result = await response.json();
       console.log('🔍 SWR: Events data response:', result);
       return result;
+    },
+    {
+      // Don't retry when offline or auth failed
+      shouldRetryOnError: (error) => {
+        return !error.message.includes('OFFLINE') && 
+               !error.message.includes('NO_SESSION') && 
+               !error.message.includes('AUTH_FAILED');
+      },
+      // Reduce retry attempts for network errors
+      errorRetryCount: 2,
+      errorRetryInterval: 1000,
+      // Don't revalidate when offline
+      revalidateOnFocus: isOnline,
+      revalidateOnReconnect: true
     }
   );
 
@@ -213,29 +271,14 @@ const EventSelector: React.FC<EventSelectorProps> = ({
     }
   }, [events, onEventSelect]);
 
-  const handleResumeGame = useCallback(() => {
+  const handleContinue = useCallback(() => {
     if (pendingEventId) {
-      if (onResumeGame) {
-        onResumeGame(pendingEventId);
-      }
-      // Also call onEventSelect to show the "Ready to Track Stats" box
+      // Just proceed with selecting the event - no resume functionality
       onEventSelect(pendingEventId);
     }
     setShowResumeModal(false);
     setPendingEventId(null);
-  }, [pendingEventId, onResumeGame, onEventSelect]);
-
-  const handleStartOver = useCallback(() => {
-    if (pendingEventId) {
-      if (onStartOver) {
-        onStartOver(pendingEventId);
-      }
-      // Also call onEventSelect to show the "Ready to Track Stats" box
-      onEventSelect(pendingEventId);
-    }
-    setShowResumeModal(false);
-    setPendingEventId(null);
-  }, [pendingEventId, onStartOver, onEventSelect]);
+  }, [pendingEventId, onEventSelect]);
 
   const handleCancelResume = useCallback(() => {
     setShowResumeModal(false);
@@ -256,13 +299,39 @@ const EventSelector: React.FC<EventSelectorProps> = ({
     });
   };
 
-  if (error) {
+  // Handle different error types - but don't block rendering for offline errors
+  const isOfflineError = error?.message?.includes('OFFLINE');
+  const isAuthError = error?.message?.includes('AUTH_FAILED') || error?.message?.includes('NO_SESSION');
+  
+  // Only show error alerts for non-offline errors
+  if (error && !isOfflineError) {
+    if (isAuthError) {
+      return (
+        <Alert
+          message="Authentication Required"
+          description="Please log in again to access your events."
+          type="error"
+          showIcon
+          action={
+            <Button size="small" type="primary" onClick={() => router.push('/login')}>
+              Login
+            </Button>
+          }
+        />
+      );
+    }
+    
     return (
       <Alert
         message="Error loading events"
-        description="Failed to load events. Please try again."
+        description="Failed to load events. Please check your connection and try again."
         type="error"
         showIcon
+        action={
+          <Button size="small" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        }
       />
     );
   }
@@ -301,11 +370,23 @@ const EventSelector: React.FC<EventSelectorProps> = ({
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
             <Text strong style={{ color: '#ffffff' }}>Choose an event:</Text>
-            {isOfflineMode && (
-              <Tag color="orange" style={{ fontSize: '11px' }}>
-                📱 Offline Mode
-              </Tag>
-            )}
+            <Space>
+              {isReconnecting && (
+                <Tag color="blue" style={{ fontSize: '11px' }}>
+                  🔄 Reconnecting...
+                </Tag>
+              )}
+              {!isOnline && (
+                <Tag color="orange" style={{ fontSize: '11px' }}>
+                  📱 Offline Mode
+                </Tag>
+              )}
+              {isOfflineMode && isOnline && (
+                <Tag color="green" style={{ fontSize: '11px' }}>
+                  💾 Cached Data
+                </Tag>
+              )}
+            </Space>
           </div>
           <Select
             placeholder="Select an event to track stats for..."
@@ -442,22 +523,29 @@ const EventSelector: React.FC<EventSelectorProps> = ({
             type={isOfflineMode ? "warning" : "info"}
             showIcon
             action={
-              !isOfflineMode && (
-                <Button size="small" type="primary" onClick={handleCreateEvent}>
-                  Create Event
-                </Button>
-              )
+              <Space>
+                {isOfflineMode && (
+                  <Button size="small" onClick={() => window.location.reload()}>
+                    Retry
+                  </Button>
+                )}
+                {!isOfflineMode && (
+                  <Button size="small" type="primary" onClick={handleCreateEvent}>
+                    Create Event
+                  </Button>
+                )}
+              </Space>
             }
           />
         )}
       </Space>
 
-      {/* Resume/Start Over Modal */}
+      {/* Warning Modal - Data Already Exists */}
       <Modal
         title={
           <Space>
             <ExclamationCircleOutlined style={{ color: '#faad14' }} />
-            <span style={{ color: '#ffffff' }}>Event Has Existing Data</span>
+            <span style={{ color: '#ffffff' }}>Data Already Collected</span>
           </Space>
         }
         open={showResumeModal}
@@ -472,19 +560,12 @@ const EventSelector: React.FC<EventSelectorProps> = ({
               }}>
                 Cancel
               </Button>
-              <Button key="startOver" danger onClick={handleStartOver} style={{
-                backgroundColor: '#dc2626',
-                borderColor: '#dc2626',
-                color: '#ffffff'
-              }}>
-                Start Over
-              </Button>
-              <Button key="resume" type="primary" onClick={handleResumeGame} style={{
+              <Button key="continue" type="primary" onClick={handleContinue} style={{
                 backgroundColor: '#1890ff',
                 borderColor: '#1890ff',
                 color: '#ffffff'
               }}>
-                Resume
+                Continue
               </Button>
             </Space>
           </div>
@@ -507,7 +588,7 @@ const EventSelector: React.FC<EventSelectorProps> = ({
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <Text style={{ color: '#e6f2ff', fontSize: '14px' }}>
-            This event already has game data stored. What would you like to do?
+            This event already has game data stored.
           </Text>
           
           <Card size="small" style={{ 
@@ -517,27 +598,11 @@ const EventSelector: React.FC<EventSelectorProps> = ({
           }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <Text strong style={{ color: '#60a5fa', fontSize: '14px' }}>
-                <TrophyOutlined style={{ marginRight: 8, color: '#fbbf24' }} />
-                Resume Game
+                <InfoCircleOutlined style={{ marginRight: 8, color: '#60a5fa' }} />
+                Important Notice
               </Text>
               <Text style={{ color: '#bfdbfe', fontSize: '12px' }}>
-                Continue tracking from where you left off. All existing data will be preserved.
-              </Text>
-            </Space>
-          </Card>
-          
-          <Card size="small" style={{ 
-            backgroundColor: '#7f1d1d', 
-            border: '1px solid #dc2626',
-            borderRadius: '8px'
-          }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong style={{ color: '#fca5a5', fontSize: '14px' }}>
-                <ExclamationCircleOutlined style={{ marginRight: 8, color: '#f87171' }} />
-                Start Over
-              </Text>
-              <Text style={{ color: '#fecaca', fontSize: '12px' }}>
-                ⚠️ This will reset and delete all existing statistics for this event. This action cannot be undone.
+                Statistics for this event have already been collected and stored. Continuing will show the existing data.
               </Text>
             </Space>
           </Card>
@@ -547,18 +612,29 @@ const EventSelector: React.FC<EventSelectorProps> = ({
   );
 };
 
-// Helper function for SWR with authentication
-const fetcher = async (url: string) => {
+// Helper function for SWR with authentication and offline handling
+const createFetcher = (isOnline: boolean) => async (url: string) => {
   try {
+    // Check if we're offline first
+    if (!isOnline) {
+      console.log('📱 Offline detected, skipping API call');
+      throw new Error('OFFLINE');
+    }
+
     // Import supabase client
     const { supabase } = await import('@/lib/supabase');
     
     // Get authentication token
     const { data: { session } } = await supabase.auth.getSession();
-    const authHeaders: HeadersInit = session?.access_token ? {
+    
+    // Check if we have a valid session
+    if (!session?.access_token) {
+      console.log('🔐 No valid session, skipping API call');
+      throw new Error('NO_SESSION');
+    }
+    
+    const authHeaders: HeadersInit = {
       'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    } : {
       'Content-Type': 'application/json'
     };
     
@@ -567,6 +643,11 @@ const fetcher = async (url: string) => {
     });
     
     if (!response.ok) {
+      // Handle specific error cases
+      if (response.status === 401) {
+        console.log('🔐 Authentication failed, user may need to re-login');
+        throw new Error('AUTH_FAILED');
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     

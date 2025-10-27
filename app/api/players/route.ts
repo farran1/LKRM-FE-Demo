@@ -9,9 +9,9 @@ export async function GET(request: NextRequest) {
 		const params = Object.fromEntries(searchParams.entries())
 		console.log('API GET /players - params:', params)
 		
-		// Build query
-		let query = supabase
-			.from('players')
+	// Build query
+	let query = (supabase as any)
+		.from('players')
 			.select(`
 				id,
 				name,
@@ -73,17 +73,17 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: 'Failed to fetch players' }, { status: 500 })
 		}
 
-		// Fetch notes and goals separately for each player
-		const playersWithNotesAndGoals = await Promise.all(
-			(players || []).map(async (player) => {
+	// Fetch notes and goals separately for each player
+	const playersWithNotesAndGoals = await Promise.all(
+		(players || []).map(async (player: any) => {
 				// Fetch notes for this player
-				const { data: notes } = await supabase
+				const { data: notes } = await (supabase as any)
 					.from('player_notes')
 					.select('id, note_text, note, created_at')
 					.eq('playerId', player.id)
 
 				// Fetch goals for this player
-				const { data: goals } = await supabase
+				const { data: goals } = await (supabase as any)
 					.from('player_goals')
 					.select('id, goal_text, goal, targetDate, isAchieved, created_at')
 					.eq('playerId', player.id)
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
 		const body = await request.json()
 		console.log('API POST /players - body:', body)
 
-    const { data: player, error } = await supabase
+    const { data: player, error } = await (supabase as any)
 			.from('players')
       .insert({
         name: `${body.first_name || ''} ${body.last_name || ''}`.trim(),

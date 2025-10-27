@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     
     // Use the authenticated client to fetch users from the public.users table
     // This respects RLS policies and doesn't require service role key
-    const { data: users, error } = await supabase
+    const { data: users, error } = await (supabase as any)
       .from('users')
       .select(`
         id,

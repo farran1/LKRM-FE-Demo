@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
 			params.perPage = parseInt(String(params.perPage))
 		}
 
-		// Build query
-		let query = supabase
-			.from('events')
+	// Build query
+	let query = (supabase as any)
+		.from('events')
 			.select(`
 				id,
 				name,
@@ -117,9 +117,9 @@ export async function POST(request: NextRequest) {
 		const body = await request.json()
 		console.log('API POST /events - body:', body)
 
-		const { data: event, error } = await supabase
-			.from('events')
-			.insert({
+	const { data: event, error } = await (supabase as any)
+		.from('events')
+		.insert({
 				name: body.title || body.name,
 				description: body.description,
 				startTime: body.start_time || body.startTime,
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
 		if (Array.isArray(body?.members) && body.members.length > 0) {
 			const emails: string[] = body.members.filter((v: any) => typeof v === 'string' && v.trim() !== '')
 			if (emails.length > 0) {
-				await supabase
+				await (supabase as any)
 					.from('event_coaches')
 					.insert(emails.map((email) => ({ eventId: event.id, coachUsername: email })))
 			}

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
 
     // Get total count first
-    const { count: totalCount, error: countError } = await supabase
+    const { count: totalCount, error: countError } = await (supabase as any)
       .from('quick_notes')
       .select('*', { count: 'exact', head: true })
       .eq('created_by', user.id)
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get quick notes with mentions
-    const { data: notes, error: notesError } = await supabase
+    const { data: notes, error: notesError } = await (supabase as any)
       .from('quick_notes')
       .select(`
         *,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the quick note
-    const { data: note, error: noteError } = await supabase
+    const { data: note, error: noteError } = await (supabase as any)
       .from('quick_notes')
       .insert({
         content,
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           end_position: mention.endPosition
         }))
 
-        const { error: mentionsError } = await supabase
+        const { error: mentionsError } = await (supabase as any)
           .from('coach_mentions')
           .insert(mentionInserts)
 
@@ -137,14 +137,14 @@ export async function POST(request: NextRequest) {
           mentioned_by: user.id
         }))
 
-        await supabase
+        await (supabase as any)
           .from('mention_notifications')
           .insert(notificationInserts)
       }
     }
 
     // Fetch the complete note with relationships
-    const { data: completeNote, error: fetchError } = await supabase
+    const { data: completeNote, error: fetchError } = await (supabase as any)
       .from('quick_notes')
       .select(`
         *,

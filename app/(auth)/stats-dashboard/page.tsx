@@ -46,7 +46,7 @@ const useStatsData = (filters: any) => {
       setLoading(true);
       setError(null);
       
-      const season = '2024-25'; // TODO: Make this configurable
+      const season = '2025-2026'; // TODO: Make this configurable
 
       const params = new URLSearchParams({ season });
       
@@ -409,7 +409,7 @@ export default function StatsDashboardPage() {
   // Game Analysis functionality
   const fetchRecordedGames = async () => {
     try {
-      const params = new URLSearchParams({ season: '2024-25' });
+      const params = new URLSearchParams({ season: '2025-2026' });
       if (filters?.timeRange) {
         params.set('timeRange', String(filters.timeRange));
       }

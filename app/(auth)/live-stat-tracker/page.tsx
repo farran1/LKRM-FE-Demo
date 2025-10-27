@@ -14,7 +14,6 @@ const { Title, Text } = Typography;
 export default function LiveStatTrackerPage() {
   const router = useRouter();
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>();
-  const [resumeChoice, setResumeChoice] = useState<'resume' | 'startOver' | null>(null);
 
   // Refresh roster and events cache when the page is opened
   useEffect(() => {
@@ -35,30 +34,17 @@ export default function LiveStatTrackerPage() {
     setSelectedEventId(eventId);
   };
 
-  const handleResumeGame = async (eventId: number) => {
-    // Only select event and mark intent to resume; do not open tracker yet
-    setSelectedEventId(eventId);
-    setResumeChoice('resume');
-  };
-
-  const handleStartOver = async (eventId: number) => {
-    // Only select event and mark intent to start over; do not open tracker yet
-    setSelectedEventId(eventId);
-    setResumeChoice('startOver');
-  };
-
   const handleStartTracking = () => {
-    console.log('🚀 Start tracking clicked:', { selectedEventId, resumeChoice });
+    console.log('🚀 Start tracking clicked:', { selectedEventId });
     
     if (!selectedEventId) {
       console.error('❌ No event selected');
       return;
     }
     
-    // Navigate to the tracking page with the selected event and choice
+    // Navigate to the tracking page with the selected event
     const params = new URLSearchParams({
-      eventId: selectedEventId.toString(),
-      ...(resumeChoice && { choice: resumeChoice })
+      eventId: selectedEventId.toString()
     });
     
     const url = `/live-stat-tracker/track?${params.toString()}`;
@@ -89,8 +75,6 @@ export default function LiveStatTrackerPage() {
             onEventSelect={handleEventSelect}
             selectedEventId={selectedEventId}
             showTitle={false}
-            onResumeGame={handleResumeGame}
-            onStartOver={handleStartOver}
           />
           
           {selectedEventId && (
@@ -109,13 +93,6 @@ export default function LiveStatTrackerPage() {
                   <Text type="secondary" style={{ color: '#dbeafe' }}>
                     You've selected an event. Click the button below to start the live stat tracker.
                   </Text>
-                  {resumeChoice && (
-                    <div style={{ marginTop: 8 }}>
-                      <Text style={{ color: resumeChoice === 'resume' ? '#52c41a' : '#faad14' }}>
-                        {resumeChoice === 'resume' ? '📋 Will resume existing game data' : '🔄 Will start fresh (existing data will be cleared)'}
-                      </Text>
-                    </div>
-                  )}
                 </div>
                 
                 <Space>

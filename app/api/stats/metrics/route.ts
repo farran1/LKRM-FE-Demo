@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const isActive = searchParams.get('is_active');
 
-    let query = supabase
+    let query = (supabase as any)
       .from('stat_metrics')
       .select('*')
       .order('name', { ascending: true });
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: metric, error } = await supabase
+    const { data: metric, error } = await (supabase as any)
       .from('stat_metrics')
       .insert({
         name,

@@ -17,7 +17,7 @@ export async function POST(
     }
 
     // Verify the session exists and user has permission
-    const { data: session, error: sessionError } = await supabase
+    const { data: session, error: sessionError } = await (supabase as any)
       .from('live_game_sessions')
       .select('id, created_by, event_id, game_state')
       .eq('id', parseInt(sessionId))
@@ -34,7 +34,7 @@ export async function POST(
     }
 
     // Mark session as completed
-    const { data: updatedSession, error: updateError } = await supabase
+    const { data: updatedSession, error: updateError } = await (supabase as any)
       .from('live_game_sessions')
       .update({
         is_active: false,
@@ -78,7 +78,7 @@ export async function POST(
     }
 
     // Log the completion for audit trail
-    await supabase
+    await (supabase as any)
       .from('audit_logs')
       .insert({
         userid: user.id,

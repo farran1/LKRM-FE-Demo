@@ -524,7 +524,7 @@ const GameDataTestPage: React.FC = () => {
               <Search
                 placeholder="Search games..."
                 value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
+                onChange={(e) => setSearchText(e.target.value as string)}
                 allowClear
               />
             </Col>

@@ -53,6 +53,7 @@ const makeData = (perf: PerfPoint[] | undefined) => {
 
 const options: ChartOptions<'bar'> = {
   responsive: true,
+  maintainAspectRatio: false,
   plugins: {
     legend: {
       display: false
@@ -93,7 +94,9 @@ const BarChart = ({ performance }: PlayerBarChartProps) => {
           <div><span className={style.pointLow}></span> Low</div>
         </Flex>
       </Flex>
-      <Bar data={makeData(performance)} options={options} height={100} />
+      <div style={{ height: '300px' }}>
+        <Bar data={makeData(performance)} options={options as any} />
+      </div>
     </>
   )
 }

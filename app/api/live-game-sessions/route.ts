@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const { event_id, game_id, session_key, game_state, is_active, started_at, ended_at } = body;
     
     // Insert new live game session
-    const { data: session, error: sessionError } = await supabase
+    const { data: session, error: sessionError } = await (supabase as any)
       .from('live_game_sessions')
       .insert({
         event_id,
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     const gameId = searchParams.get('gameId');
     const isActive = searchParams.get('isActive');
 
-    let query = supabase
+    let query = (supabase as any)
       .from('live_game_sessions')
       .select(`
         id,

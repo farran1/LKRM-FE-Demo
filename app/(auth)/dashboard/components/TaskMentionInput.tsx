@@ -238,7 +238,7 @@ export default function TaskMentionInput({ onTaskCreate, onCancel }: TaskMention
           <input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
             placeholder="Enter task title..."
             style={{
               width: '100%',
@@ -301,7 +301,7 @@ export default function TaskMentionInput({ onTaskCreate, onCancel }: TaskMention
             </label>
             <select
               value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setAssignedTo(e.target.value)}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -341,7 +341,7 @@ export default function TaskMentionInput({ onTaskCreate, onCancel }: TaskMention
             <input
               type="text"
               value={eventSearch}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 setEventSearch(e.target.value);
                 setShowEventDropdown(true);
               }}
@@ -426,7 +426,7 @@ export default function TaskMentionInput({ onTaskCreate, onCancel }: TaskMention
             </label>
             <select
               value={priority}
-              onChange={(e) => setPriority(e.target.value as 'high' | 'medium' | 'low')}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPriority(e.target.value as 'high' | 'medium' | 'low')}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -463,7 +463,7 @@ export default function TaskMentionInput({ onTaskCreate, onCancel }: TaskMention
             <input
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
               style={{
                 width: '100%',
                 padding: '12px',

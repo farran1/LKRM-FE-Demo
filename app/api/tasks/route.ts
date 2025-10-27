@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     }
 
     // First, get the total count for pagination
-    let countQuery = supabase
+    let countQuery = (supabase as any)
       .from('tasks')
       .select('*', { count: 'exact', head: true })
     
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     const { count: totalCount } = await countQuery
 
     // Build the main query with pagination
-    let query = supabase
+    let query = (supabase as any)
       .from('tasks')
       .select(`
         *,
@@ -392,7 +392,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Attempting to insert task with data:', JSON.stringify(taskData, null, 2))
 
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await (supabase as any)
       .from('tasks')
       .insert(taskData)
       .select(`
@@ -420,7 +420,7 @@ export async function POST(request: NextRequest) {
         let assigneeUuid: string | null = assigneeId
 
         if (assigneeUuid) {
-          await supabase
+          await (supabase as any)
             .from('mention_notifications')
             .insert({
               user_id: assigneeUuid,
@@ -445,7 +445,7 @@ export async function POST(request: NextRequest) {
       }))
 
       // TODO: Implement player_tasks table or use existing task-player relationship
-      // const { error: playerTaskError } = await supabase
+      // const { error: playerTaskError } = await (supabase as any)
       //   .from('player_tasks')
       //   .insert(playerTaskData)
 

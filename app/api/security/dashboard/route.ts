@@ -38,7 +38,7 @@ async function getSecurityDashboardHandler(
     }
 
     // Get security events
-    const { data: securityEvents, error: eventsError } = await supabase
+    const { data: securityEvents, error: eventsError } = await (supabase as any)
       .from('security_events')
       .select('*')
       .gte('timestamp', startDate.toISOString())
@@ -50,7 +50,7 @@ async function getSecurityDashboardHandler(
     }
 
     // Get audit logs
-    const { data: auditLogs, error: logsError } = await supabase
+    const { data: auditLogs, error: logsError } = await (supabase as any)
       .from('security_audit_logs')
       .select('*')
       .gte('timestamp', startDate.toISOString())
@@ -64,28 +64,28 @@ async function getSecurityDashboardHandler(
     // Calculate statistics
     const stats = {
       totalEvents: securityEvents?.length || 0,
-      criticalEvents: securityEvents?.filter(e => e.severity === 'critical').length || 0,
-      highSeverityEvents: securityEvents?.filter(e => e.severity === 'high').length || 0,
-      unresolvedEvents: securityEvents?.filter(e => !e.resolved).length || 0,
+      criticalEvents: securityEvents?.filter((e: any) => e.severity === 'critical').length || 0,
+      highSeverityEvents: securityEvents?.filter((e: any) => e.severity === 'high').length || 0,
+      unresolvedEvents: securityEvents?.filter((e: any) => !e.resolved).length || 0,
       recentActivity: auditLogs?.length || 0,
-      failedLogins: auditLogs?.filter(log => log.action === 'login_attempt_failed').length || 0,
-      permissionDenied: auditLogs?.filter(log => log.action === 'permission_denied').length || 0,
-      suspiciousActivity: auditLogs?.filter(log => log.action === 'suspicious_activity').length || 0
+      failedLogins: auditLogs?.filter((log: any) => log.action === 'login_attempt_failed').length || 0,
+      permissionDenied: auditLogs?.filter((log: any) => log.action === 'permission_denied').length || 0,
+      suspiciousActivity: auditLogs?.filter((log: any) => log.action === 'suspicious_activity').length || 0
     }
 
     // Get top actions
-    const actionCounts = auditLogs?.reduce((acc, log) => {
+    const actionCounts = auditLogs?.reduce((acc: any, log: any) => {
       acc[log.action] = (acc[log.action] || 0) + 1
       return acc
     }, {} as Record<string, number>) || {}
 
     const topActions = Object.entries(actionCounts)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([,a], [,b]) => (b as number) - (a as number))
       .slice(0, 10)
       .map(([action, count]) => ({ action, count }))
 
     // Get severity breakdown
-    const severityCounts = auditLogs?.reduce((acc, log) => {
+    const severityCounts = auditLogs?.reduce((acc: any, log: any) => {
       acc[log.severity] = (acc[log.severity] || 0) + 1
       return acc
     }, {} as Record<string, number>) || {}
@@ -94,7 +94,7 @@ async function getSecurityDashboardHandler(
       .map(([severity, count]) => ({ severity, count }))
 
     // Get user activity
-    const userActivity = auditLogs?.reduce((acc, log) => {
+    const userActivity = auditLogs?.reduce((acc: any, log: any) => {
       if (log.user_email) {
         acc[log.user_email] = (acc[log.user_email] || 0) + 1
       }
@@ -102,7 +102,7 @@ async function getSecurityDashboardHandler(
     }, {} as Record<string, number>) || {}
 
     const topUsers = Object.entries(userActivity)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([,a], [,b]) => (b as number) - (a as number))
       .slice(0, 10)
       .map(([email, count]) => ({ email, count }))
 
@@ -192,7 +192,7 @@ async function resolveSecurityEventHandler(
       updateData.resolution_notes = notes
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('security_events')
       .update(updateData)
       .eq('id', eventId)

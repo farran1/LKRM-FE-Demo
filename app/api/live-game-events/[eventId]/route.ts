@@ -20,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
     }
     
-    const { data: event, error } = await supabase
+    const { data: event, error } = await (supabase as any)
       .from('live_game_events')
       .select(`
         *,
@@ -73,7 +73,7 @@ export async function PUT(
     const body = await request.json();
 
     // First, get the event to verify ownership
-    const { data: existingEvent, error: fetchError } = await supabase
+    const { data: existingEvent, error: fetchError } = await (supabase as any)
       .from('live_game_events')
       .select(`
         *,
@@ -119,7 +119,7 @@ export async function PUT(
     updateData.updated_by = existingEvent.live_game_sessions.created_by;
 
     // Update the event
-    const { data: updatedEvent, error: updateError } = await supabase
+    const { data: updatedEvent, error: updateError } = await (supabase as any)
       .from('live_game_events')
       .update(updateData)
       .eq('id', eventId)
@@ -132,7 +132,7 @@ export async function PUT(
     }
 
     // Log the change for audit trail
-    await supabase
+    await (supabase as any)
       .from('audit_logs')
       .insert({
         updated_by: existingEvent.live_game_sessions.created_by,
@@ -177,7 +177,7 @@ export async function DELETE(
     console.log('Processing delete for eventId:', eventId);
 
     // First, get the event to verify ownership
-    const { data: existingEvent, error: fetchError } = await supabase
+    const { data: existingEvent, error: fetchError } = await (supabase as any)
       .from('live_game_events')
       .select(`
         *,
@@ -203,7 +203,7 @@ export async function DELETE(
 
     // Soft delete by updating deleted_at timestamp
     console.log('Attempting soft delete for event:', eventId);
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await (supabase as any)
       .from('live_game_events')
       .update({ 
         deleted_at: new Date().toISOString(),
@@ -221,7 +221,7 @@ export async function DELETE(
     // Try to log the deletion for audit trail, but don't fail if it doesn't work
     try {
       console.log('Attempting audit log insertion');
-      await supabase
+      await (supabase as any)
         .from('audit_logs')
         .insert({
           updated_by: existingEvent.live_game_sessions.created_by,

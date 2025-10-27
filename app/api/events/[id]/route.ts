@@ -46,7 +46,7 @@ export async function PUT(
     if (Array.isArray(body?.members)) {
       const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
       const emails: string[] = body.members.filter((v: any) => typeof v === 'string' && v.trim() !== '')
-      await supabase.from('event_coaches').delete().eq('eventId', id)
+      await (supabase as any).from('event_coaches').delete().eq('eventId', id)
       if (emails.length > 0) {
         await supabase
           .from('event_coaches')

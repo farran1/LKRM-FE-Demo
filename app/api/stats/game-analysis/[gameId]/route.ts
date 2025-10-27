@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Get the specific game session
-    const { data: session, error: sessionError } = await supabase
+    const { data: session, error: sessionError } = await (supabase as any)
       .from('live_game_sessions')
       .select(`
         id,
@@ -28,7 +28,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         events (
           name,
           startTime,
-          eventTypeId
+          eventTypeId,
+          oppositionTeam
         ),
         live_game_events!inner (
           id,
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Get all players for the analysis
-    const { data: players, error: playersError } = await supabase
+    const { data: players, error: playersError } = await (supabase as any)
       .from('players')
       .select(`
         *,
@@ -574,7 +575,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       gameId: gameId,
       actualGameId: session.game_id, // Add the actual game ID from the session
       eventId: session.event_id, // Add the event ID from the session
-      opponent: session.events?.name || 'Unknown',
+      opponent: session.events?.oppositionTeam || 'Unknown',
       date: session.events?.startTime || session.created_at,
       result,
       score: `${teamScore}-${opponentScore}`,

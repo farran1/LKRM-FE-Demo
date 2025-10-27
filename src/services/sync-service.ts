@@ -57,15 +57,16 @@ class NetworkDetector {
 
   private async checkConnectivity(): Promise<void> {
     try {
-      // Try to fetch a small resource to verify connectivity
-      const response = await fetch('/api/test-route', { 
-        method: 'HEAD',
-        cache: 'no-cache',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      })
+      // Use navigator.onLine for basic connectivity check
+      // For a more robust check, we can probe a real API endpoint
+      const { supabase } = await import('../lib/supabase')
+      
+      // Quick check to Supabase to verify connectivity
+      const { error } = await (supabase as any).from('players').select('id').limit(1)
       
       const wasOnline = this.isOnline
-      this.isOnline = response.ok
+      // If no error or navigator says we're online, consider it online
+      this.isOnline = navigator.onLine && !error
       
       // Notify if status changed
       if (wasOnline !== this.isOnline) {
@@ -240,11 +241,29 @@ class SyncService {
       const { SupabaseAPI } = await import('./supabase-api')
       const supabaseAPI = new SupabaseAPI()
       
-      // Insert or update the session in Supabase
-      const result = await (supabaseAPI as any).getLiveGameSessions(supabaseSession)
+      // Create the session in Supabase
+      const { cacheService } = await import('./cache-service')
+      const event = await cacheService.getEventById(sessionData.eventId)
       
-      if (result) {
-        console.log('✅ Session synced to Supabase successfully')
+      if (!event) {
+        throw new Error('Event not found for session creation')
+      }
+      
+      const createdSession = await supabaseAPI.createLiveGameSession({
+        event_id: sessionData.eventId,
+        session_key: sessionData.sessionKey,
+        game_id: null,
+        started_at: sessionData.startedAt,
+        quarter: sessionData.gameState.currentQuarter,
+        home_score: sessionData.gameState.homeScore,
+        away_score: sessionData.gameState.awayScore
+      })
+      
+      if (createdSession) {
+        // Store the mapping for future event syncs
+        const offlineStorage = (await import('./offline-storage')).offlineStorage
+        offlineStorage.storeSupabaseSessionMapping(sessionData.sessionKey, createdSession.id)
+        console.log('✅ Session synced to Supabase successfully, mapping stored:', createdSession.id)
         return true
       } else {
         throw new Error('Failed to create session in Supabase')
@@ -261,30 +280,29 @@ class SyncService {
       console.log('🔄 Event sessionId:', eventData.sessionId)
       console.log('🔄 Event sessionId type:', typeof eventData.sessionId)
       
-      // First, find the Supabase session ID using the session key
+      // First, find the Supabase session ID using the stored mapping
       const sessionKey = `session_${eventData.sessionId}`
+      
+      // Check offline storage for the Supabase session mapping
+      const offlineStorage = (await import('./offline-storage')).offlineStorage
+      let supabaseSessionId = offlineStorage.getSupabaseSessionMapping(sessionKey)
+      
+      if (!supabaseSessionId) {
+        console.error('❌ Could not find Supabase session mapping for key:', sessionKey)
+        console.log('🔄 This event belongs to a session that has not been synced to Supabase yet')
+        console.log('🔄 It will be synced once the session is created')
+        return false // Don't use fallback - wait for proper session creation
+      }
+      
+      // Get the session from Supabase to verify it exists
       const { SupabaseAPI } = await import('./supabase-api')
       const supabaseAPI = new SupabaseAPI()
-      
-      // Get the Supabase session ID
       const sessions = await supabaseAPI.getLiveGameSessions()
-      let supabaseSession = sessions.find((s: any) => s.session_key === sessionKey)
+      const supabaseSession = sessions.find((s: any) => s.id === supabaseSessionId)
       
       if (!supabaseSession) {
-        console.error('❌ Could not find Supabase session for key:', sessionKey)
-        console.log('🔄 Available sessions:', sessions.map((s: any) => ({ id: s.id, session_key: s.session_key })))
-        
-        // Try to find the most recent active session as fallback
-        supabaseSession = sessions
-          .filter((s: any) => s.is_active)
-          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        
-        if (supabaseSession) {
-          console.log('🔄 Using fallback session:', supabaseSession.id, supabaseSession.session_key)
-        } else {
-          console.error('❌ No active sessions found as fallback')
-          return false
-        }
+        console.error('❌ Supabase session not found for ID:', supabaseSessionId)
+        return false
       }
       
       console.log('🔄 Found Supabase session ID:', supabaseSession.id, 'for session key:', sessionKey)

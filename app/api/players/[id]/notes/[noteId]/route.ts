@@ -24,7 +24,7 @@ export async function GET(
 		}
 
 		// Get specific note
-		const { data: note, error } = await supabase
+		const { data: note, error } = await (supabase as any)
 			.from('player_notes')
 			.select(`
 				id,
@@ -84,7 +84,7 @@ export async function PUT(
 		}
 
 		// Update note - use correct column and enforce ownership
-		const { data: note, error } = await supabase
+		const { data: note, error } = await (supabase as any)
 			.from('player_notes')
 	      .update({
 	        note_text: content.trim(),
@@ -138,7 +138,7 @@ export async function DELETE(
 		}
 
 		// Delete note - enforce ownership to satisfy RLS
-		const { error } = await supabase
+		const { error } = await (supabase as any)
 			.from('player_notes')
 			.delete()
 			.eq('id', noteId)

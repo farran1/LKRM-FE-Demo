@@ -19,7 +19,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid goal ID' }, { status: 400 });
     }
 
-    const { data: goal, error } = await supabase
+    const { data: goal, error } = await (supabase as any)
       .from('team_goals')
       .select(`
         *,
@@ -128,7 +128,7 @@ export async function PUT(
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
 
-    const { data: goal, error } = await supabase
+    const { data: goal, error } = await (supabase as any)
       .from('team_goals')
       .update(updateData)
       .eq('id', goalId)
@@ -182,7 +182,7 @@ export async function DELETE(
     }
 
     // Soft delete by setting status to archived
-    const { data: goal, error } = await supabase
+    const { data: goal, error } = await (supabase as any)
       .from('team_goals')
       .update({ 
         status: 'archived',

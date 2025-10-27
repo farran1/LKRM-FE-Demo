@@ -7,15 +7,15 @@ import { MAX_GOAL } from '@/utils/constants'
 import NoteList from '@/components/note-list'
 
 function AddGoal({ goals, player, isOpen, showOpen, onRefresh }: any) {
+  // Don't render if player is not available - check before hooks
+  if (!player || !player.id) {
+    return null
+  }
+
   const [goal, setGoal] = useState('')
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
   const { message } = App.useApp()
-
-  // Don't render if player is not available
-  if (!player || !player.id) {
-    return null
-  }
 
   const saveGoal = useCallback(async () => {
     if (!goal.trim() || !player?.id) return

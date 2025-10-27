@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify session exists and user has access
-    const { data: session, error: sessionError } = await supabase
+    const { data: session, error: sessionError } = await (supabase as any)
       .from('live_game_sessions')
       .select('id, created_by')
       .eq('id', sessionId)

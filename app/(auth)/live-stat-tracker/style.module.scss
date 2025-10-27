@@ -172,6 +172,31 @@
     overflow-y: auto;
     padding: 8px;
 
+    // Minimal scrollbar styling
+    scrollbar-width: thin !important; /* Firefox - thin scrollbar */
+    scrollbar-color: rgba(24, 144, 255, 0.3) transparent !important; /* Firefox */
+    
+    /* Webkit browsers (Chrome, Safari, Edge) - minimal scrollbar */
+    &::-webkit-scrollbar {
+      width: 4px !important;
+      height: 4px !important;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: transparent !important;
+      border-radius: 2px !important;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: rgba(24, 144, 255, 0.3) !important;
+      border-radius: 2px !important;
+      transition: background 0.2s ease !important;
+      
+      &:hover {
+        background: rgba(24, 144, 255, 0.5) !important;
+      }
+    }
+
     .eventItem {
       display: flex;
       justify-content: space-between;
@@ -806,6 +831,30 @@
     }
 
     .eventsFeed {
+      // Minimal scrollbar styling for dark theme
+      scrollbar-width: thin !important;
+      scrollbar-color: rgba(24, 144, 255, 0.4) transparent !important;
+      
+      &::-webkit-scrollbar {
+        width: 4px !important;
+        height: 4px !important;
+      }
+      
+      &::-webkit-scrollbar-track {
+        background: transparent !important;
+        border-radius: 2px !important;
+      }
+      
+      &::-webkit-scrollbar-thumb {
+        background: rgba(24, 144, 255, 0.4) !important;
+        border-radius: 2px !important;
+        transition: background 0.2s ease !important;
+        
+        &:hover {
+          background: rgba(24, 144, 255, 0.6) !important;
+        }
+      }
+
       .eventItem {
         background: #262626;
         border-left-color: #177ddc;
@@ -1177,6 +1226,30 @@
     }
 
     .eventsFeed {
+      // Minimal scrollbar styling for dark theme (mobile)
+      scrollbar-width: thin !important;
+      scrollbar-color: rgba(24, 144, 255, 0.4) transparent !important;
+      
+      &::-webkit-scrollbar {
+        width: 4px !important;
+        height: 4px !important;
+      }
+      
+      &::-webkit-scrollbar-track {
+        background: transparent !important;
+        border-radius: 2px !important;
+      }
+      
+      &::-webkit-scrollbar-thumb {
+        background: rgba(24, 144, 255, 0.4) !important;
+        border-radius: 2px !important;
+        transition: background 0.2s ease !important;
+        
+        &:hover {
+          background: rgba(24, 144, 255, 0.6) !important;
+        }
+      }
+
       .eventItem {
         background: #262626;
         border-left-color: #177ddc;

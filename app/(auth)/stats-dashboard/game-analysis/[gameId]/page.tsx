@@ -1667,7 +1667,7 @@ export default function GameAnalysisPage() {
                       allowClear
                       placeholder="Search description or player"
                       onSearch={(v) => setSearchText(v)}
-                      onChange={(e) => setSearchText(e.target.value)}
+                      onChange={(e) => setSearchText(e.target.value as string)}
                       style={{ width: 280 }}
                     />
                     <Select

@@ -85,7 +85,7 @@ import api from '@/services/api'
 class StatsService {
 
   // API Methods
-  async fetchTeamStats(seasonId: string = '2024-25'): Promise<TeamStats> {
+  async fetchTeamStats(seasonId: string = '2025-2026'): Promise<TeamStats> {
     const gamesRes = await api.get('/api/games', { params: { season: seasonId } })
     const games = ((gamesRes?.data as any)?.data ?? []) as any[]
     const wins = games.filter(g => (g.result ?? '').toUpperCase() === 'WIN').length
@@ -110,7 +110,7 @@ class StatsService {
     return teamStats
   }
 
-  async fetchGameStats(seasonId: string = '2024-25'): Promise<GameStats[]> {
+  async fetchGameStats(seasonId: string = '2025-2026'): Promise<GameStats[]> {
     const res = await api.get('/api/games', { params: { season: seasonId } })
     const games = ((res?.data as any)?.data ?? []) as any[]
     return games.map(g => ({
@@ -127,7 +127,7 @@ class StatsService {
     }))
   }
 
-  async fetchPlayerStats(seasonId: string = '2024-25'): Promise<PlayerStats[]> {
+  async fetchPlayerStats(seasonId: string = '2025-2026'): Promise<PlayerStats[]> {
     const playersRes = await api.get('/api/players')
     const players = ((playersRes?.data as any)?.data ?? []) as any[]
     const statsRes = await api.get('/api/game-stats', { params: { season: seasonId } })
@@ -179,7 +179,7 @@ class StatsService {
     })
   }
 
-  async fetchSeasonData(seasonId: string = '2024-25'): Promise<SeasonData> {
+  async fetchSeasonData(seasonId: string = '2025-2026'): Promise<SeasonData> {
     const [teamStats, games, players] = await Promise.all([
       this.fetchTeamStats(seasonId),
       this.fetchGameStats(seasonId),

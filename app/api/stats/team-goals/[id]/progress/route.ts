@@ -24,7 +24,7 @@ export async function GET(
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // Get goal with metric details
-    const { data: goal, error: goalError } = await supabase
+    const { data: goal, error: goalError } = await (supabase as any)
       .from('team_goals')
       .select(`
         *,
@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Get progress history
-    const { data: progress, error: progressError } = await supabase
+    const { data: progress, error: progressError } = await (supabase as any)
       .from('team_goal_progress')
       .select(`
         *,
@@ -70,7 +70,7 @@ export async function GET(
     }
 
     // Get total count for pagination
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await (supabase as any)
       .from('team_goal_progress')
       .select('*', { count: 'exact', head: true })
       .eq('goal_id', goalId);

@@ -13,6 +13,7 @@ import { UploadOutlined, FileTextOutlined } from '@ant-design/icons'
 import { secureStorage, normalizeReceiptPath } from '@/lib/security/storage'
 import { UserRole } from '@/lib/security/roles'
 import { auditLogger, AuditAction } from '@/lib/security/audit'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 const { Title } = Typography
 
@@ -42,6 +43,7 @@ function EditExpense({ expenseId }: { expenseId: string }) {
   const [fileList, setFileList] = useState<ExpenseUploadFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [form] = Form.useForm()
+  const { user } = useAuth()
   const router = useRouter()
   const { message } = App.useApp()
 
@@ -141,10 +143,18 @@ function EditExpense({ expenseId }: { expenseId: string }) {
       setUploading(true)
       
       // Use secure storage with enhanced security
+      if (!user) {
+        message.error('You must be logged in to upload files')
+        return null
+      }
+      
+      const userId = user.id
+      const userName = user.email?.split('@')[0] || 'Unknown'
+      
       const result = await secureStorage.uploadFile(
         file,
-        'current_user_id', // TODO: Get from actual user context
-        UserRole.COACH,    // TODO: Get from actual user context
+        userId,
+        UserRole.COACH,
         'expense_edit'
       )
       
@@ -155,9 +165,9 @@ function EditExpense({ expenseId }: { expenseId: string }) {
       
       // Log successful upload
       await auditLogger.logUserAction(
-        'current_user_id', // TODO: Get from actual user context
-        'unknown',         // TODO: Get from actual user context
-        UserRole.COACH,    // TODO: Get from actual user context
+        userId,
+        userName,
+        UserRole.COACH,
         AuditAction.RECEIPT_UPLOADED,
         'receipt',
         result.filePath,
@@ -199,22 +209,29 @@ function EditExpense({ expenseId }: { expenseId: string }) {
         receiptUrl = existingPath || normalizeReceiptPath(fileList[0].url)
       }
       
-      console.log('Receipt URL being sent:', receiptUrl)
-      console.log('File list:', fileList)
+      console.log('📤 Submitting expense update with receiptUrl:', receiptUrl)
+      console.log('📋 File list:', fileList)
+      console.log('📝 Form values:', values)
+
+      const payload = {
+        ...values,
+        date: values.date?.format('YYYY-MM-DD'),
+        budgetId: values.budgetId || null,
+        eventId: values.eventId || null,
+        receiptUrl: receiptUrl
+      }
+      
+      console.log('📦 Final payload:', payload)
 
       const response = await fetch(`/api/expenses/${expenseId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...values,
-          date: values.date?.format('YYYY-MM-DD'),
-          budgetId: values.budgetId || null,
-          eventId: values.eventId || null,
-          receiptUrl: receiptUrl
-        }),
+        body: JSON.stringify(payload),
       })
+      
+      console.log('📡 Response status:', response.status)
 
       if (response.ok) {
         message.success('Expense updated successfully!')
