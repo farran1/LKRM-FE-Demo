@@ -154,7 +154,8 @@ class CacheService {
         throw new Error('NO_SESSION');
       }
 
-      const response = await fetch('/api/players', {
+      // Request only active players at the API level
+      const response = await fetch('/api/players?isActive=true', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

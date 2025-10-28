@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 				last_name,
 				jersey_number,
 				jersey,
+				is_active,
 				positionId,
 				height,
 				weight,
