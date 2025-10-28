@@ -3,14 +3,14 @@
 }
 .layout {
   :global(.ant-layout) {
-    background-color: #202c3e !important; // Dark blue background matching the image
+    background-color: #202c3e !important;
   }
   :global(.ant-layout-header) {
     height: var(--header-height);
     padding: 0 28px;
-    background: #17375c; // Dark blue header background
+    background: #17375c;
     box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-    position: fixed;
+    position: sticky;
     width: calc(100% - 212px);
     z-index: 1000;
     display: flex;
@@ -21,12 +21,8 @@
   }
   :global(.ant-layout-sider) {
     height: 100vh;
-    // position: fixed;
-    // left: 0;
-    // top: 0;
-    // bottom: 0;
     z-index: 2;
-    background: #17375c; // Dark blue sidebar background
+    background: #17375c;
     border-right: 1px solid #2a4a6b;
   }
   :global(.ant-menu-root) {
@@ -58,7 +54,7 @@
       background-color: unset !important;
     }
     :global(.ant-menu-item-selected) {
-      background: rgba(24, 144, 255, 0.2) !important; // Blue highlight for selected items
+      background: rgba(24, 144, 255, 0.2) !important;
       border-right: 3px solid #1890ff;
     }
     :global(.ant-menu-submenu-selected) {
@@ -67,14 +63,14 @@
   }
 
   :global(.ant-layout-content) {
-    // margin-left: var(--sidebar-width);
-    margin-top: var(--header-height);
     padding: 28px;
-    height: calc(100vh - var(--header-height));
+    min-height: calc(100vh - var(--header-height));
+    max-height: calc(100vh - var(--header-height));
     overflow-y: auto;
-    // background: #202c3e; // Dark blue content background - REMOVED to prevent double background
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
-
+  
   :global(.ant-layout-footer) {
     text-align: center;
     background: #fff;
@@ -93,7 +89,10 @@
 }
 .main {
   min-height: 100vh;
+  height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .main::-webkit-scrollbar-track {
   background: transparent;
@@ -108,69 +107,5 @@
   height: 4px;
 }
 
-/* Mobile-specific improvements */
-@media (max-width: 768px) {
-  .layout {
-    :global(.ant-layout-sider) {
-      position: fixed !important;
-      left: 0 !important;
-      top: 0 !important;
-      bottom: 0 !important;
-      z-index: 1001 !important;
-      height: 100vh !important;
-      
-      &.ant-layout-sider-collapsed {
-        width: 0 !important;
-        min-width: 0 !important;
-        max-width: 0 !important;
-        overflow: hidden !important;
-      }
-    }
-    
-    :global(.ant-layout-header) {
-      width: 100% !important;
-      left: 0 !important;
-      padding: 0 16px !important;
-      height: 56px !important;
-    }
-    
-    :global(.ant-layout-content) {
-      margin-left: 0 !important;
-      margin-top: 56px !important;
-      padding: 16px !important;
-      height: calc(100vh - 56px) !important;
-    }
-    
-    :global(.ant-menu-root) {
-      :global(.ant-menu-item) {
-        margin-inline: 8px;
-        padding-inline: 8px !important;
-        width: calc(100% - 16px);
-        height: 44px !important;
-        line-height: 44px !important;
-        font-size: 16px !important;
-        
-        &:hover {
-          background: rgba(255, 255, 255, 0.15) !important;
-        }
-      }
-      
-      :global(.ant-menu-submenu-title) {
-        margin-inline: 8px;
-        padding-inline: 8px !important;
-        height: 44px !important;
-        line-height: 44px !important;
-        font-size: 16px !important;
-        
-        &:hover {
-          background: rgba(255, 255, 255, 0.15) !important;
-        }
-      }
-    }
-  }
-  
-  .main {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
+/* Tablet and iPad support - COMMENTED OUT FOR NOW */
+/* Mobile-specific improvements - COMMENTED OUT FOR NOW */

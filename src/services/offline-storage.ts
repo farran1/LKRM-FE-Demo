@@ -5,6 +5,7 @@
  */
 
 import LZString from 'lz-string'
+import { generateUUID } from '@/utils/uuid'
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -88,7 +89,7 @@ class OfflineStorageService {
   private getOrCreateDeviceId(): string {
     let deviceId = this.get(STORAGE_KEYS.DEVICE_ID)
     if (!deviceId) {
-      deviceId = crypto.randomUUID()
+      deviceId = generateUUID()
       this.set(STORAGE_KEYS.DEVICE_ID, deviceId)
     }
     return deviceId
@@ -308,7 +309,7 @@ class OfflineStorageService {
   public addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'timestamp' | 'retryCount'>): string {
     const syncItem: SyncQueueItem = {
       ...item,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       timestamp: new Date().toISOString(),
       retryCount: 0
     }

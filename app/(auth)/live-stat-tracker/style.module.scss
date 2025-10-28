@@ -1,7 +1,7 @@
 // DEV-ONLY: Enhanced statistics page styles with comprehensive features
 .container {
   padding: 16px;
-  background: #102840;
+  background: #f5f5f5;
   min-height: 100vh;
 
   .ant-card {
@@ -65,23 +65,22 @@
     align-items: center;
     padding: 8px 10px;
     margin: 4px 0;
-    border: 2px solid #1890ff;
+    border: 2px solid #e8e8e8;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.3s ease;
-    background: #f0f8ff;
+    background: #17375c;
     min-height: 40px;
 
     &:hover {
-      border-color: #096dd9;
-      background: #e6f7ff;
-      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+      border-color: #1890ff;
+      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
       transform: translateY(-1px);
     }
 
     &.selected {
       border-color: #52c41a;
-      background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+      background: linear-gradient(135deg, #17375c 0%, #274916 100%);
       box-shadow: 0 2px 8px rgba(82, 196, 26, 0.3);
     }
 
@@ -91,7 +90,7 @@
 
       .playerName {
         font-weight: 600;
-        color: #0050b3;
+        color: #262626;
         font-size: 0.9rem;
         line-height: 1.2;
         white-space: nowrap;
@@ -100,7 +99,7 @@
       }
 
       .playerNumber {
-        color: #096dd9;
+        color: #8c8c8c;
         font-size: 0.8rem;
       }
     }
@@ -204,13 +203,13 @@
       align-items: center;
       padding: 8px 12px;
       margin: 4px 0;
-      background: #fafafa;
+      background: #17375c;
       border-radius: 6px;
       border-left: 4px solid #1890ff;
       transition: all 0.2s ease;
 
       &:hover {
-        background: #f0f0f0;
+        background: #0958b5;
         transform: translateX(4px);
       }
 
@@ -817,37 +816,17 @@
     }
 
     .playerCard {
-      background: #1a365d;
-      border-color: #2563eb;
+      background: #262626;
+      border-color: #434343;
 
       &:hover {
-        border-color: #3b82f6;
-        background: #1e40af;
+        border-color: #177ddc;
+        background: #303030;
       }
 
       &.selected {
-        background: linear-gradient(135deg, #1a3a1a 0%, #2d5016 100%);
+        background: linear-gradient(135deg, #162312 0%, #274916 100%);
         border-color: #49aa19;
-        
-        .playerInfo {
-          .playerName {
-            color: #b7eb8f;
-          }
-          
-          .playerNumber {
-            color: #95de64;
-          }
-        }
-      }
-      
-      .playerInfo {
-        .playerName {
-          color: #dbeafe;
-        }
-        
-        .playerNumber {
-          color: #93c5fd;
-        }
       }
     }
 
@@ -1233,37 +1212,16 @@
     }
 
     .playerCard {
-      background: #1a365d;
-      border-color: #2563eb;
+      background: #1f1f1f;
+      border-color: #434343;
 
       &:hover {
-        border-color: #3b82f6;
-        background: #1e40af;
+        border-color: #177ddc;
       }
 
       &.selected {
-        background: linear-gradient(135deg, #1a3a1a 0%, #2d5016 100%);
+        background: linear-gradient(135deg, #162312 0%, #274916 100%);
         border-color: #49aa19;
-        
-        .playerInfo {
-          .playerName {
-            color: #b7eb8f;
-          }
-          
-          .playerNumber {
-            color: #95de64;
-          }
-        }
-      }
-      
-      .playerInfo {
-        .playerName {
-          color: #dbeafe;
-        }
-        
-        .playerNumber {
-          color: #93c5fd;
-        }
       }
     }
 

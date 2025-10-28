@@ -4742,6 +4742,9 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                                     setOpponentOnCourt(next)
                                   }
                                 }}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 style={{ 
                                   width: 80,
                                   backgroundColor: opponentStarting5Set ? '#1e293b' : undefined,
@@ -4753,10 +4756,34 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                                 danger
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  const newJersey = prompt(`Enter new jersey number for slot ${idx + 1}:`)
-                                  if (newJersey && newJersey.trim()) {
-                                    handleOpponentSubstitution(idx, newJersey.trim())
-                                  }
+                                  modal.confirm({
+                                    title: `Substitute Jersey Number - Slot ${idx + 1}`,
+                                    content: (
+                                      <div style={{ marginTop: '16px' }}>
+                                        <Input
+                                          placeholder="Enter jersey number"
+                                          maxLength={3}
+                                          inputMode="numeric"
+                                          pattern="[0-9]*"
+                                          autoFocus
+                                          onPressEnter={(e: any) => {
+                                            const value = e.target.value;
+                                            if (value && value.trim()) {
+                                              handleOpponentSubstitution(idx, value.trim().replace(/[^0-9]/g, ''))
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                    ),
+                                    okText: 'Substitute',
+                                    okButtonProps: { danger: true },
+                                    onOk: (instance) => {
+                                      const input = document.querySelector('.ant-modal-content input') as HTMLInputElement;
+                                      if (input && input.value && input.value.trim()) {
+                                        handleOpponentSubstitution(idx, input.value.trim().replace(/[^0-9]/g, ''))
+                                      }
+                                    }
+                                  })
                                 }}
                               >
                                 Sub
@@ -5896,9 +5923,11 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // 1) Block all navigation attempts globally
     // 1) Warn on browser refresh/close
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Modern browsers ignore custom messages for security - must use default or empty string
+      const message = 'You have an active game in progress. Leaving this page may interrupt tracking.'
       e.preventDefault()
-      e.returnValue = ''
-      return ''
+      e.returnValue = message // Some browsers display this
+      return message // Required for older browsers
     }
 
     // 2) Intercept anchor clicks and external navigations
@@ -6080,7 +6109,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     }
 
          // Attach
-     window.addEventListener('beforeunload', handleBeforeUnload)
+     // Use capture phase to ensure handler runs before others
+     window.addEventListener('beforeunload', handleBeforeUnload, { capture: true })
      document.addEventListener('click', handleDocumentClick, true)
      document.addEventListener('pointerdown', handlePointerDown, true)
      document.addEventListener('click', handleGlobalNavigation, true)
@@ -6091,7 +6121,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
 
          // Cleanup
      return () => {
-       window.removeEventListener('beforeunload', handleBeforeUnload)
+       window.removeEventListener('beforeunload', handleBeforeUnload, { capture: true })
        document.removeEventListener('click', handleDocumentClick, true)
        document.removeEventListener('pointerdown', handlePointerDown, true)
        document.removeEventListener('click', handleGlobalNavigation, true)
@@ -6102,7 +6132,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
        router.push = originalRouterPush
        router.replace = originalRouterReplace
      }
-  }, [navigationGuardEnabled])
+  }, [navigationGuardEnabled, router, modal, suppressNavigationGuard, hasGameStarted, gameState?.isPlaying, events?.length || 0])
   // Show start screen if not auto-started and user hasn't started yet
   if (!autoStart && !hasUserStarted) {
     return (

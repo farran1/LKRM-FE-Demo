@@ -9,6 +9,11 @@
   --font-inter: "Inter", "Inter Fallback";
 }
 
+/* Ensure all content areas respect the sticky header */
+:global(.ant-layout-content) {
+  min-height: calc(100vh - var(--header-height)) !important;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -173,6 +178,12 @@ a:hover {
     }
   }
   
+  /* Ensure content respects mobile header */
+  :global(.ant-layout-content) {
+    margin-top: 56px !important;
+    height: calc(100vh - 56px) !important;
+  }
+  
   /* Better mobile table responsiveness */
   :global(.ant-table) {
     font-size: 14px;
@@ -207,6 +218,20 @@ a:hover {
       flex: 1;
       min-width: 0;
     }
+  }
+}
+
+/* Tablet and iPad header support */
+@media (min-width: 768px) and (max-width: 1024px) {
+  :global(.ant-layout-content) {
+    margin-top: 48px !important;
+    height: calc(100vh - 48px) !important;
+  }
+  
+  :global(.main-layout-header) {
+    width: 100% !important;
+    left: 0 !important;
+    height: 48px !important;
   }
 }
 

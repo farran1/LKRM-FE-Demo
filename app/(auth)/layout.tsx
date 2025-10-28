@@ -231,11 +231,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               width: collapsed ? '100%' : 'calc(100% - 212px)',
               left: collapsed ? 0 : 212,
               transition: 'width 0.2s, left 0.2s',
-              position: 'fixed',
+              position: 'sticky',
               zIndex: 1000,
               display: 'flex',
               alignItems: 'center',
               top: 0,
+              height: '48px',
             }}
           >
             {collapsed && (
