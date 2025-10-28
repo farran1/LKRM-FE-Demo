@@ -228,8 +228,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <Header
             className="main-layout-header"
             style={{
-              width: collapsed ? '100%' : 'calc(100% - 212px)',
-              left: collapsed ? 0 : 212,
+              width: collapsed ? 'calc(100% - 0px)' : 'calc(100% - 0px)',
+              left: collapsed ? 56 : 212,
               transition: 'width 0.2s, left 0.2s',
               position: 'sticky',
               zIndex: 1000,
