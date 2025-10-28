@@ -601,7 +601,19 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         
         // Use cache service which handles offline scenarios
         const { cacheService } = await import('@/services/cache-service')
-        const playersData = (await cacheService.getRoster()).filter((p: any) => p && p.isActive === true)
+        const playersData = (await cacheService.getRoster()).filter((p: any) => {
+          if (!p) return false
+          // Exclude only if explicitly inactive across common shapes
+          const status = (p.status || p.player_status || '').toString().toLowerCase()
+          const isExplicitlyInactive = (
+            p.isActive === false ||
+            p.is_active === false ||
+            p.active === false ||
+            status === 'inactive' ||
+            status === 'disabled'
+          )
+          return !isExplicitlyInactive
+        })
         
         console.log('Live Stat Tracker: Received players:', playersData)
         console.log('Live Stat Tracker: Players array:', playersData)
