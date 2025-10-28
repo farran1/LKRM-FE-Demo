@@ -4768,7 +4768,8 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                                 danger
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  modal.confirm({
+                                  let enteredValue = ''
+                                  const confirmRef = modal.confirm({
                                     title: `Substitute Jersey Number - Slot ${idx + 1}`,
                                     content: (
                                       <div style={{ marginTop: '16px' }}>
@@ -4779,20 +4780,24 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                                           pattern="[0-9]*"
                                           autoFocus
                                           onPressEnter={(e: any) => {
-                                            const value = e.target.value;
+                                            const value = (e.target.value || enteredValue)
                                             if (value && value.trim()) {
                                               handleOpponentSubstitution(idx, value.trim().replace(/[^0-9]/g, ''))
+                                              // Close the confirm modal explicitly when submitting via Enter
+                                              confirmRef?.destroy?.()
                                             }
                                           }}
+                                          onChange={(e) => { enteredValue = e.target.value || '' }}
                                         />
                                       </div>
                                     ),
                                     okText: 'Substitute',
                                     okButtonProps: { danger: true },
-                                    onOk: (instance) => {
-                                      const input = document.querySelector('.ant-modal-content input') as HTMLInputElement;
-                                      if (input && input.value && input.value.trim()) {
-                                        handleOpponentSubstitution(idx, input.value.trim().replace(/[^0-9]/g, ''))
+                                    onOk: () => {
+                                      const input = document.querySelector('.ant-modal-content input') as HTMLInputElement
+                                      const value = (enteredValue || input?.value || '')
+                                      if (value && value.trim()) {
+                                        handleOpponentSubstitution(idx, value.trim().replace(/[^0-9]/g, ''))
                                       }
                                     }
                                   })
