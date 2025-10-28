@@ -601,7 +601,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         
         // Use cache service which handles offline scenarios
         const { cacheService } = await import('@/services/cache-service')
-        const playersData = await cacheService.getRoster()
+        const playersData = (await cacheService.getRoster()).filter((p: any) => p && p.isActive === true)
         
         console.log('Live Stat Tracker: Received players:', playersData)
         console.log('Live Stat Tracker: Players array:', playersData)
