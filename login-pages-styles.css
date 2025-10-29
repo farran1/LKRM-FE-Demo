@@ -1,0 +1,191 @@
+/* ============================================
+   LKRM Login Pages - Complete Styling
+   ============================================
+   This file contains all styles for:
+   - Login page
+   - Forgot Password page
+   - Reset Password page
+   - Signup page
+   ============================================ */
+
+/* Main Container */
+.auth-container {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Ant Design Input Overrides */
+.auth-container :global(.ant-input-outlined),
+.auth-container :global(.ant-input-outlined:hover),
+.auth-container :global(.ant-input-outlined:focus-within) {
+  background-color: transparent;
+}
+
+/* Ant Design Form Label Overrides */
+.auth-container :global(.ant-form-vertical .ant-form-item:not(.ant-form-item-horizontal) .ant-form-item-label) {
+  padding: 0;
+}
+
+.auth-container :global(.ant-form-item .ant-form-item-label > label) {
+  font-size: 13px;
+}
+
+/* Background Image Section (Left 40%) */
+.auth-background {
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 40%;
+}
+
+.auth-background img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Form Wrapper Section (Right 60%) */
+.auth-form-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  background: linear-gradient(#022133, #025A8A);
+  padding: 40px 20px;
+  margin-left: 40%;
+  min-height: 100vh;
+}
+
+/* Form Container */
+.auth-form {
+  width: 100%;
+  max-width: 500px;
+  min-width: 360px;
+}
+
+/* Logo Section */
+.auth-logo {
+  text-align: center;
+}
+
+.auth-logo .auth-des {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 32px;
+}
+
+/* Divider with Text (OR) */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ccc;
+}
+
+.auth-divider:not(:empty)::before {
+  margin-right: 0.75em;
+}
+
+.auth-divider:not(:empty)::after {
+  margin-left: 0.75em;
+}
+
+.auth-divider-text {
+  font-weight: bold;
+}
+
+/* Forgot Password Link */
+.auth-forgot-password {
+  color: #fff;
+  text-align: right;
+  font-size: 14px;
+  text-decoration: underline;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.auth-forgot-password:hover {
+  color: #1D75D0;
+  text-decoration: underline;
+}
+
+/* Success Message (Used in Forgot/Reset Password) */
+.auth-success-message {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.auth-success-message p {
+  margin: 10px 0;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+/* Actions Container (Used in Forgot/Reset Password) */
+.auth-actions {
+  margin-top: 20px;
+}
+
+/* ============================================
+   Responsive Styles (Optional)
+   ============================================ */
+
+/* For mobile devices, stack background and form */
+@media (max-width: 768px) {
+  .auth-background {
+    position: relative;
+    width: 100%;
+    height: 30vh;
+  }
+
+  .auth-form-wrapper {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* ============================================
+   Usage Instructions:
+   ============================================
+   
+   HTML Structure:
+   <div class="auth-container">
+     <div class="auth-background">
+       <img src="path/to/login_bg.jpg" alt="Background" />
+     </div>
+     <div class="auth-form-wrapper">
+       <div class="auth-form">
+         <div class="auth-logo">
+           <!-- Your logo here -->
+           <div class="auth-des">Login into your account</div>
+         </div>
+         <!-- Your form content here -->
+         <div class="auth-divider">
+           <span class="auth-divider-text">OR</span>
+         </div>
+       </div>
+     </div>
+   </div>
+   
+   For success messages:
+   <div class="auth-success-message">
+     <p>Your success message here</p>
+   </div>
+   
+   For action buttons container:
+   <div class="auth-actions">
+     <!-- Your buttons here -->
+   </div>
+   
+   ============================================ */
+
