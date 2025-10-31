@@ -28,17 +28,15 @@ export async function GET(
 			.from('player_notes')
 			.select(`
 				id,
-				content,
+				note,
+				note_text,
 				created_at,
+				createdAt,
 				updated_at,
-				created_by,
-				auth_users!player_notes_created_by_fkey (
-					id,
-					email
-				)
+				createdBy
 			`)
 			.eq('id', noteId)
-			.eq('player_id', playerId)
+			.eq('playerId', playerId)
 			.single();
 
 		if (error) {
@@ -83,26 +81,27 @@ export async function PUT(
 			return NextResponse.json({ error: 'Note content is required' }, { status: 400 });
 		}
 
-		// Update note - use correct column and enforce ownership
+		// Update note - use correct columns
+		// Note: createdBy is an integer field (legacy), so we don't check ownership
 		const { data: note, error } = await (supabase as any)
 			.from('player_notes')
 	      .update({
 	        note_text: content.trim(),
+	        note: content.trim(),
+	        updatedAt: new Date().toISOString(),
 	        updated_at: new Date().toISOString()
 	      })
 			.eq('id', noteId)
-			.eq('player_id', playerId)
-			.eq('created_by', user.id)
+			.eq('playerId', playerId)
 			.select(`
 				id,
+				note,
 				note_text,
 				created_at,
+				createdAt,
 				updated_at,
-				created_by,
-				auth_users!player_notes_created_by_fkey (
-					id,
-					email
-				)
+				updatedAt,
+				createdBy
 			`)
 			.single();
 
@@ -137,17 +136,23 @@ export async function DELETE(
 			return NextResponse.json({ error: 'Invalid player ID or note ID' }, { status: 400 });
 		}
 
-		// Delete note - enforce ownership to satisfy RLS
-		const { error } = await (supabase as any)
+		// Delete note - use playerId for player_notes table
+		// Note: createdBy is an integer field, not UUID, so we don't check ownership
+		const { data: deletedNotes, error } = await (supabase as any)
 			.from('player_notes')
 			.delete()
 			.eq('id', noteId)
-			.eq('player_id', playerId)
-			.eq('created_by', user.id);
+			.eq('playerId', playerId)
+			.select();
 
 		if (error) {
 			console.error('Error deleting note:', error);
-			return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 });
+			return NextResponse.json({ error: 'Failed to delete note', details: error.message }, { status: 500 });
+		}
+
+		// Verify deletion succeeded - check if any rows were deleted
+		if (!deletedNotes || deletedNotes.length === 0) {
+			return NextResponse.json({ error: 'Note not found or already deleted' }, { status: 404 });
 		}
 
 		return NextResponse.json({ message: 'Note deleted successfully' });

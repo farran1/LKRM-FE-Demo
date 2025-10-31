@@ -8,7 +8,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' },
+        { status: 500 }
+      )
+    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { id: idStr } = await params
     const id = Number(idStr)
     const { data, error } = await supabase
@@ -21,6 +29,52 @@ export async function GET(
       .eq('id', id)
       .single()
     if (error) throw error
+
+    // Fetch user information for coaches from users table
+    if (data?.event_coaches && Array.isArray(data.event_coaches) && data.event_coaches.length > 0) {
+      const coachEmails = data.event_coaches.map((c: any) => c.coachUsername).filter(Boolean)
+      if (coachEmails.length > 0) {
+        try {
+          const { data: coachUsers, error: usersError } = await supabase
+            .from('users')
+            .select('id, email, first_name, last_name, full_name, avatar_url')
+            .in('email', coachEmails)
+
+          if (!usersError && coachUsers) {
+            // Map coach users by email for easy lookup
+            const coachUsersByEmail = new Map(
+              coachUsers.map((u: any) => [u.email, u])
+            )
+
+            // Enhance event_coaches with user information
+            data.event_coaches = data.event_coaches.map((coach: any) => {
+              const userInfo = coachUsersByEmail.get(coach.coachUsername)
+              return {
+                ...coach,
+                user: userInfo ? {
+                  id: userInfo.id,
+                  email: userInfo.email,
+                  name: userInfo.full_name || `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim() || userInfo.email?.split('@')[0] || 'Unknown',
+                  first_name: userInfo.first_name,
+                  last_name: userInfo.last_name,
+                  full_name: userInfo.full_name,
+                  avatar_url: userInfo.avatar_url
+                } : {
+                  id: null,
+                  email: coach.coachUsername,
+                  name: coach.coachUsername?.split('@')[0] || 'Unknown',
+                  avatar_url: null
+                }
+              }
+            })
+          }
+        } catch (usersErr) {
+          console.warn('Error fetching coach user info:', usersErr)
+          // Continue without user info enhancement
+        }
+      }
+    }
+
     return NextResponse.json({ event: data })
   } catch (error) {
     console.error('Error fetching event:', error)
@@ -44,7 +98,15 @@ export async function PUT(
 
     // Upsert event_coaches from members (array of email addresses)
     if (Array.isArray(body?.members)) {
-      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseUrl || !supabaseServiceKey) {
+        return NextResponse.json(
+          { error: 'Supabase configuration missing' },
+          { status: 500 }
+        )
+      }
+      const supabase = createClient(supabaseUrl, supabaseServiceKey)
       const emails: string[] = body.members.filter((v: any) => typeof v === 'string' && v.trim() !== '')
       await (supabase as any).from('event_coaches').delete().eq('eventId', id)
       if (emails.length > 0) {
@@ -87,10 +149,15 @@ export async function DELETE(
     console.log('API DELETE /events/[id] - Event ID type:', typeof id)
     
     // Use service role key since RLS is disabled on events table
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' },
+        { status: 500 }
+      )
+    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     
     // First, let's check if the event exists and belongs to the user
     console.log('API DELETE /events/[id] - Querying for event with ID:', id, 'and createdBy:', user.id)

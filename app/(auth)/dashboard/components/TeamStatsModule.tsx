@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '@/services/api';
+import { getCurrentSeason } from '@/utils/season';
 
 const statCategories = [
   'All',
@@ -29,7 +30,7 @@ export default function TeamStatsModule() {
       setLoading(true);
       setError(null);
       
-      const season = '2024-25'; // TODO: Make this configurable
+      const season = getCurrentSeason();
       
       // Fetch team stats from API
       const [teamStatsRes, gamesRes, playerStatsRes] = await Promise.all([

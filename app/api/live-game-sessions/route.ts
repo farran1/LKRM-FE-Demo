@@ -16,6 +16,21 @@ export async function POST(request: NextRequest) {
     
     const { event_id, game_id, session_key, game_state, is_active, started_at, ended_at } = body;
     
+    // Check if session with this key already exists
+    const { data: existingSession, error: checkError } = await (supabase as any)
+      .from('live_game_sessions')
+      .select('*')
+      .eq('session_key', session_key)
+      .single();
+
+    if (existingSession && !checkError) {
+      // Session already exists, return it
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 Session already exists, returning existing:', existingSession.id);
+      }
+      return NextResponse.json(existingSession);
+    }
+    
     // Insert new live game session
     const { data: session, error: sessionError } = await (supabase as any)
       .from('live_game_sessions')
@@ -33,8 +48,25 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (sessionError) {
+      // Check if it's a duplicate key error (409)
+      if (sessionError.code === '23505' || sessionError.message?.includes('duplicate') || sessionError.message?.includes('unique')) {
+        // Try to get the existing session
+        const { data: duplicateSession } = await (supabase as any)
+          .from('live_game_sessions')
+          .select('*')
+          .eq('session_key', session_key)
+          .single();
+        
+        if (duplicateSession) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🎯 Duplicate session key detected, returning existing:', duplicateSession.id);
+          }
+          return NextResponse.json(duplicateSession);
+        }
+      }
+      
       console.error('🎯 Error creating session:', sessionError);
-      return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create session', details: sessionError.message }, { status: 500 });
     }
 
     console.log('🎯 Session created successfully:', session.id);

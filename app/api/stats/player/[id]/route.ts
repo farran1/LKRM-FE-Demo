@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithAuth } from '@/lib/supabase';
 
+// Helper function to extract opponent name from event name when oppositionTeam is null
+function extractOpponentFromEventName(eventName: string | null | undefined): string | null {
+  if (!eventName) return null;
+  
+  // Common patterns to extract opponent name:
+  // "Milton HS V. Williams HS" -> "Williams HS"
+  // "JL Mann VS Dutch Fork HS" -> "Dutch Fork HS"
+  // "Away Game vs. Westside High" -> "Westside High"
+  // "Season Opener vs. Central High" -> "Central High"
+  
+  const patterns = [
+    /\s+[Vv][Ss]\.?\s+(.+)/i,      // "VS" or "Vs" or "vs"
+    /\s+[Vv]\.?\s+(.+)/i,           // "V" or "v" or "V."
+    /\s+vs\.?\s+(.+)/i,             // "vs" or "vs."
+    /\s+versus\s+(.+)/i,            // "versus"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = eventName.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to get opponent name with fallbacks
+function getOpponentName(event: any): string {
+  // Priority 1: Use oppositionTeam if available
+  if (event?.oppositionTeam) {
+    return event.oppositionTeam;
+  }
+  
+  // Priority 2: Extract from event name
+  const extractedName = extractOpponentFromEventName(event?.name);
+  if (extractedName) {
+    return extractedName;
+  }
+  
+  // Priority 3: Fallback to event name or "Unknown"
+  return event?.name || 'Unknown';
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { client: supabase, user } = await createServerClientWithAuth(request);
@@ -17,10 +61,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { searchParams } = new URL(request.url);
-    const season = searchParams.get('season') || '2024-25';
+    const season = searchParams.get('season') || '2025-26';
     const timeRange = searchParams.get('timeRange') || 'season';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const gameIdsParam = searchParams.get('gameIds');
+    const selectedGameIds = gameIdsParam ? gameIdsParam.split(',').map(id => id.trim()).filter(id => id.length > 0) : [];
 
     // Get player details
     const { data: player, error: playerError } = await (supabase as any)
@@ -58,6 +104,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // Use full-day bounds for custom range
       fromDate = new Date(startDate + 'T00:00:00Z').toISOString();
       toDate = new Date(endDate + 'T23:59:59.999Z').toISOString();
+    } else if (timeRange === 'selectGames' && selectedGameIds.length > 0) {
+      // For selectGames, we'll filter by session_id and game_id after fetching events
+      // Set a wide date range to get all events, then filter by session_id/game_id
+      // Note: selectedGameIds are session IDs from recordedGames API
+      fromDate = null;
+      toDate = null;
     } else {
       // Fallback: current season approximation if unspecified
       const now = new Date();
@@ -92,11 +144,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const gameIds = Array.from(new Set((filteredEvents || []).map((e: any) => e.game_id))).filter(Boolean);
     let allowedGameIds = new Set<string>();
     let gameIdToEvent: Record<string, any> = {};
+    
+    // Also get session_ids for events without game_id to fetch their event info
+    const sessionIds = Array.from(new Set((filteredEvents || []).map((e: any) => e.session_id).filter(Boolean)));
+    let sessionIdToEvent: Record<string, any> = {};
+    
     if (gameIds.length > 0) {
       try {
         let gamesQuery = (supabase as any)
           .from('events')
-          .select('id, name, startTime')
+          .select('id, name, startTime, oppositionTeam')
           .in('id', gameIds);
 
         // Apply time filters to the game start time so per-game log respects range
@@ -122,6 +179,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         console.warn('Events fetch exception; proceeding without scrimmage exclusion:', e);
       }
     }
+    
+    // Fetch event info for sessions (events without game_id)
+    if (sessionIds.length > 0) {
+      try {
+        const { data: sessionsData, error: sessionsErr } = await (supabase as any)
+          .from('live_game_sessions')
+          .select('id, event_id, events(id, name, startTime, oppositionTeam)')
+          .in('id', sessionIds);
+        
+        if (!sessionsErr && sessionsData) {
+          sessionsData.forEach((session: any) => {
+            if (session?.events) {
+              sessionIdToEvent[String(session.id)] = session.events;
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Sessions fetch exception:', e);
+      }
+    }
 
     // No sessions used; stats are computed from events only
 
@@ -143,19 +220,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const gameStats: any[] = [];
 
     // Group strictly by game_id for per-game aggregates (avoids cross-game aggregation)
+    // Handle events without game_id by grouping them by session_id (each session is a separate game entry)
+    // For selectGames mode, only include events from selected games
     const eventsByGroup: Record<string, any[]> = {};
     (filteredEvents || []).forEach((ev: any) => {
-      const gid = ev.game_id != null ? String(ev.game_id) : null;
-      if (!gid) {
-        // If we cannot determine a game id for this event, skip it for per-game logs
-        return;
+      // If game_id exists, use it as the grouping key
+      // If game_id is null, use session_id instead so each session gets its own entry
+      const gid = ev.game_id != null ? String(ev.game_id) : `session-${ev.session_id}`;
+      
+      // If selectGames mode is active, filter out events not in selectedGameIds
+      // Note: selectedGameIds are actually session IDs from recordedGames
+      if (timeRange === 'selectGames' && selectedGameIds.length > 0) {
+        // Check if this event belongs to a selected session/game
+        // selectedGameIds can be either session IDs or game IDs (depending on what was selected)
+        const matchesBySession = ev.session_id != null && selectedGameIds.includes(String(ev.session_id));
+        const matchesByGame = ev.game_id != null && selectedGameIds.includes(String(ev.game_id));
+        
+        if (!matchesBySession && !matchesByGame) {
+          return; // Skip this event if it's not in the selected games/sessions
+        }
       }
+      
       (eventsByGroup[gid] ||= []).push(ev);
     });
 
     for (const [groupKey, evs] of Object.entries(eventsByGroup)) {
-      // groupKey is the game_id string
-      const groupGameId = groupKey;
+      // groupKey is either:
+      // - A game_id string (e.g., "123")
+      // - A session-based key (e.g., "session-39") for events without game_id
+      const isSessionBased = groupKey.startsWith('session-');
+      const groupGameId = isSessionBased ? null : groupKey;
+      const sessionId = isSessionBased ? parseInt(groupKey.replace('session-', '')) : null;
+      
+      // Skip if this is a real game_id and it's not in allowedGameIds (excluded scrimmages)
+      // But allow session-based events (no game_id) to be included
       if (groupGameId && allowedGameIds.size > 0 && !allowedGameIds.has(groupGameId)) {
         continue;
       }
@@ -246,10 +344,34 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
       gamesPlayed.add(groupKey);
       const evGame = groupGameId ? gameIdToEvent[groupGameId] : null;
+      
+      // For session-based entries, get event info from session
+      let sessionEvent = sessionId ? sessionIdToEvent[String(sessionId)] : null;
+      
+      // Determine game name using helper function
+      let gameName: string;
+      if (groupGameId && evGame) {
+        // For games with game_id, use opponent name
+        gameName = `vs ${getOpponentName(evGame)}`;
+      } else if (sessionId && sessionEvent) {
+        // For sessions, use opponent name from event
+        gameName = `vs ${getOpponentName(sessionEvent)}`;
+      } else if (groupGameId) {
+        // Fallback for game_id without event data
+        gameName = 'Game';
+      } else {
+        // Fallback for sessions without event data
+        gameName = sessionId ? `Session ${sessionId}` : 'Practice/Scrimmage';
+      }
+      
+      // Determine game date
+      const gameDate = evGame?.startTime || sessionEvent?.startTime || evs[0]?.created_at;
+      
       gameStats.push({
-        gameId: Number(groupGameId),
-        gameName: evGame?.name || 'Game',
-        gameDate: evGame?.startTime || evs[0]?.created_at,
+        gameId: groupGameId ? Number(groupGameId) : null,
+        sessionId: sessionId,
+        gameName: gameName,
+        gameDate: gameDate,
         points: gamePoints,
         fgMade: gameFgMade,
         fgAttempted: gameFgAttempted,

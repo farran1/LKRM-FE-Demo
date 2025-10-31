@@ -2,16 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClientWithAuth } from '@/lib/supabase'
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+// Initialize Supabase client with validation
+const getSupabaseClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase configuration missing')
+  }
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const { id: taskId } = await params
     
     console.log(`Fetching task ${taskId}`)
@@ -154,6 +160,7 @@ export async function PATCH(
     console.log('Update data being sent to Supabase:', updateData)
 
     // Update the task using the correct primary key 'userId'
+    const supabase = getSupabaseClient()
     const { data: updatedTask, error: updateError } = await (supabase as any)
       .from('tasks')
       .update(updateData)

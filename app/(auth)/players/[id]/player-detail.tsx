@@ -8,6 +8,7 @@ import { EditOutlined } from '@ant-design/icons'
 import ArrowIcon from '@/components/icon/arrow_left.svg'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getCurrentSeason } from '@/utils/season'
  
  
 import DefaultAvatar from '@/components/icon/avatar.svg'
@@ -67,8 +68,10 @@ function Detail({
   const [loadingGoal, setLoadingGoal] = useState(true)
   const [goals, setGoals] = useState<Array<any>>([])
   const [stats, setStats] = useState<any>(null)
-  const [timeRange, setTimeRange] = useState<'season' | 'last30days' | 'custom'>('season')
+  const [timeRange, setTimeRange] = useState<'season' | 'last30days' | 'custom' | 'selectGames'>('season')
   const [customRange, setCustomRange] = useState<[string, string] | null>(null)
+  const [gameIds, setGameIds] = useState<string[]>([])
+  const [recordedGames, setRecordedGames] = useState<any[]>([])
   const [selectedStats, setSelectedStats] = useState<[string, string, string, string]>(['rebounds', 'steals', 'blocks', 'fouls'])
 
   const availableStats = [
@@ -117,29 +120,42 @@ function Detail({
     setSelectedStats(newSelectedStats)
   }
 
-  useEffect(() => {
-    if (!playerId) {
-      return
+  const fetchRecordedGames = useCallback(async () => {
+    try {
+      const currentSeason = getCurrentSeason()
+      const params = new URLSearchParams({ season: currentSeason })
+      const res: any = await api.get(`/api/stats/recorded-games?${params.toString()}`)
+      if (res?.data && Array.isArray(res.data)) {
+        setRecordedGames(res.data)
+      } else if (res?.data?.data && Array.isArray(res.data.data)) {
+        setRecordedGames(res.data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching recorded games:', error)
+      setRecordedGames([])
     }
+  }, [])
 
-    fetchDetail()
-    fetchNotes()
-    fetchGoals()
-    fetchStats()
-  }, [playerId])
-  useEffect(() => {
-    if (!playerId) return
-    fetchStats()
-  }, [playerId, timeRange, customRange])
-
-  const fetchStats = async (override?: { timeRange?: 'season' | 'last30days' | 'custom'; customRange?: [string, string] | null }) => {
+  const fetchStats = async (override?: { timeRange?: 'season' | 'last30days' | 'custom' | 'selectGames'; customRange?: [string, string] | null; gameIds?: string[] }) => {
     try {
       const tr = override?.timeRange ?? timeRange
       const cr = override?.customRange !== undefined ? override.customRange : customRange
-      const params: any = { season: '2024-25', timeRange: tr, _: Date.now() }
+      const gids = override?.gameIds !== undefined ? override.gameIds : gameIds
+      
+      // Don't fetch if selectGames is selected but no games are selected
+      if (tr === 'selectGames' && (!gids || gids.length === 0)) {
+        setStats(null)
+        return
+      }
+      
+      const currentSeason = getCurrentSeason()
+      const params: any = { season: currentSeason, timeRange: tr, _: Date.now() }
       if (tr === 'custom' && cr) {
         params.startDate = cr[0]
         params.endDate = cr[1]
+      }
+      if (tr === 'selectGames' && gids && gids.length > 0) {
+        params.gameIds = gids.join(',')
       }
       const qs = new URLSearchParams(params).toString()
       const res: any = await api.get(`/api/stats/player/${playerId}?${qs}`)
@@ -155,6 +171,22 @@ function Detail({
       setStats(null)
     }
   }
+
+  useEffect(() => {
+    if (!playerId) {
+      return
+    }
+
+    fetchDetail()
+    fetchNotes()
+    fetchGoals()
+    fetchStats()
+    fetchRecordedGames()
+  }, [playerId, fetchRecordedGames])
+  useEffect(() => {
+    if (!playerId) return
+    fetchStats()
+  }, [playerId, timeRange, customRange, gameIds])
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -227,9 +259,16 @@ function Detail({
     if (val !== 'custom') {
       setCustomRange(null)
     }
+    if (val !== 'selectGames') {
+      setGameIds([])
+    }
     // Trigger an immediate fetch to avoid stale UI during state batching
     setTimeout(() => {
-      fetchStats({ timeRange: val, customRange: val === 'custom' ? customRange : null })
+      fetchStats({ 
+        timeRange: val, 
+        customRange: val === 'custom' ? customRange : null,
+        gameIds: val === 'selectGames' ? gameIds : []
+      })
     }, 0)
   }
 
@@ -269,14 +308,52 @@ function Detail({
               { label: 'Season', value: 'season' },
               { label: 'Last 30 days', value: 'last30days' },
               { label: 'Custom Range', value: 'custom' },
+              { label: 'Select Games', value: 'selectGames' },
             ]}
             style={{ width: 160 }}
           />
           {timeRange === 'custom' && (
             <DatePicker.RangePicker onChange={(v:any)=>{
-              if (!v || v.length!==2) { setCustomRange(null); return }
-              setCustomRange([v[0].format('YYYY-MM-DD'), v[1].format('YYYY-MM-DD')])
+              if (!v || v.length!==2) { 
+                setCustomRange(null)
+                fetchStats({ timeRange: 'custom', customRange: null })
+                return 
+              }
+              const newRange: [string, string] = [v[0].format('YYYY-MM-DD'), v[1].format('YYYY-MM-DD')]
+              setCustomRange(newRange)
+              // Trigger fetch with new custom range
+              fetchStats({ timeRange: 'custom', customRange: newRange })
             }} />
+          )}
+          {timeRange === 'selectGames' && (
+            <Select
+              mode="multiple"
+              placeholder="Select games"
+              value={gameIds}
+              onChange={(vals) => {
+                const newGameIds = (vals as any[]).map(v => String(v))
+                setGameIds(newGameIds)
+                fetchStats({ timeRange: 'selectGames', gameIds: newGameIds })
+              }}
+              style={{ minWidth: 240 }}
+              maxTagCount={2}
+              maxTagPlaceholder={(omittedValues) => `+${omittedValues.length} more`}
+              optionLabelProp="label"
+              options={recordedGames
+                .reduce((acc: any[], item: any) => {
+                  const id = String(item?.id ?? '')
+                  if (!id) return acc
+                  if (!acc.some((x: any) => String(x.id) === id)) acc.push(item)
+                  return acc
+                }, [])
+                .map((g: any) => {
+                  const id = String(g.id)
+                  const dateStr = g.date || g.created_at || g.startTime
+                  const opponent = g.opponent || g.oppositionTeam || 'Unknown'
+                  const label = `${new Date(dateStr).toLocaleDateString()} vs ${opponent}${g.result ? ` (${g.result})` : ''}`
+                  return { key: id, value: id, label }
+                })}
+            />
           )}
         </Flex>
       </Flex>
@@ -401,7 +478,7 @@ function Detail({
                  <Table
                    size="small"
                    pagination={{ pageSize: 10 }}
-                   rowKey={(r:any)=>`${r.gameId}-${r.gameDate}`}
+                   rowKey={(r:any)=>`${r.gameId ?? `session-${r.sessionId}`}-${r.gameDate}`}
                    dataSource={stats?.gameStats || []}
                    columns={[
                      { title: 'Date', dataIndex: 'gameDate', render: (date: string) => new Date(date).toLocaleDateString() },
@@ -426,7 +503,7 @@ function Detail({
                      { title: 'AST', dataIndex: 'assists' },
                      { title: 'STL', dataIndex: 'steals' },
                      { title: 'BLK', dataIndex: 'blocks' },
-                     { title: 'TOV', dataIndex: 'turnovers' },
+                     { title: 'TO', dataIndex: 'turnovers' },
                      { title: 'FLS', dataIndex: 'fouls' },
                      { title: 'FG', render: (r:any)=>`${r.fgMade}/${r.fgAttempted}` },
                      { title: '3PT', render: (r:any)=>`${r.threeMade}/${r.threeAttempted}` },

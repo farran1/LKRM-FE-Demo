@@ -19,8 +19,23 @@ const TeamComparisonTable = ({
   teamName = 'HOME',
   opponentName = 'OPPONENT'
 }: { teamStats: ComparisonStats; opponentStats: ComparisonStats; teamName?: string; opponentName?: string }) => {
-  const getComparisonBar = (teamValue: number, opponentValue: number, statKey: string) => {
-    if (teamValue === opponentValue) return null
+  const getComparisonBar = (teamValue: number | string, opponentValue: number | string, statKey: string, teamPercent?: number, opponentPercent?: number) => {
+    // For percentage-based stats, compare percentages instead of raw values
+    let teamComparisonValue: number
+    let opponentComparisonValue: number
+    
+    if (statKey === 'fg' || statKey === '2p' || statKey === '3p' || statKey === 'ft') {
+      // Use percentages for percentage-based stats
+      teamComparisonValue = teamPercent ?? 0
+      opponentComparisonValue = opponentPercent ?? 0
+    } else {
+      // For non-percentage stats, convert to numbers if strings
+      teamComparisonValue = typeof teamValue === 'string' ? parseFloat(teamValue) || 0 : teamValue
+      opponentComparisonValue = typeof opponentValue === 'string' ? parseFloat(opponentValue) || 0 : opponentValue
+    }
+    
+    if (teamComparisonValue === opponentComparisonValue) return null
+    
     const isTeamBetter = (() => {
       switch (statKey) {
         case 'fg':
@@ -35,13 +50,13 @@ const TeamComparisonTable = ({
         case 'scp':
         case 'pto':
         case 'bp':
-          return teamValue > opponentValue
+          return teamComparisonValue > opponentComparisonValue
         case 'to':
         case 'tf':
         case 'f':
-          return teamValue < opponentValue
+          return teamComparisonValue < opponentComparisonValue
         default:
-          return teamValue > opponentValue
+          return teamComparisonValue > opponentComparisonValue
       }
     })()
     const color = isTeamBetter ? '#1890ff' : '#ff4d4f'
@@ -81,7 +96,7 @@ const TeamComparisonTable = ({
         )}
       </td>
       <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#ffffff', background: 'rgba(255,255,255,0.1)', fontSize: 14, position: 'relative' }}>
-        {getComparisonBar(stat.teamValue, stat.opponentValue, stat.key)}
+        {getComparisonBar(stat.teamValue, stat.opponentValue, stat.key, stat.teamPercent, stat.opponentPercent)}
         <Tooltip title={
           stat.key === 'fg' ? 'Field Goals made/attempted and percentage' :
           stat.key === '2p' ? 'Two-point shots made/attempted and percentage' :

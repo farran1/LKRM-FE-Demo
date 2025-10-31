@@ -75,13 +75,14 @@ export async function POST(
 		}
 
 		// Create new note
+		// Note: createdBy is an integer field (legacy), set to 0 as fallback
 		const { data: note, error } = await (supabase as any)
 			.from('player_notes')
 			.insert({
 				playerId: playerId,
 				note: content.trim(),
 				note_text: content.trim(),
-				createdBy: parseInt(user.id) || 0
+				createdBy: 0  // Legacy integer field, no mapping to auth.users
 			})
 			.select(`
 				id,

@@ -28,6 +28,7 @@ import {
 } from '@ant-design/icons';
 
 import PlayerLink from '@/components/PlayerLink';
+import { getCurrentSeason } from '@/utils/season';
 import GoalsModule from './components/GoalsModule';
 
 
@@ -46,7 +47,7 @@ const useStatsData = (filters: any) => {
       setLoading(true);
       setError(null);
       
-      const season = '2025-2026'; // TODO: Make this configurable
+      const season = getCurrentSeason();
 
       const params = new URLSearchParams({ season });
       
@@ -318,6 +319,7 @@ export default function StatsDashboardPage() {
   const [selectedMetric, setSelectedMetric] = useState('points');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showGameAnalysisModal, setShowGameAnalysisModal] = useState(false);
+  const [showPerformanceTrendsModal, setShowPerformanceTrendsModal] = useState(false);
   const [recordedGames, setRecordedGames] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'totals' | 'averages'>('totals');
   const [teamStatsPositionFilter, setTeamStatsPositionFilter] = useState<string>('all');
@@ -409,7 +411,7 @@ export default function StatsDashboardPage() {
   // Game Analysis functionality
   const fetchRecordedGames = async () => {
     try {
-      const params = new URLSearchParams({ season: '2025-2026' });
+      const params = new URLSearchParams({ season: getCurrentSeason() });
       if (filters?.timeRange) {
         params.set('timeRange', String(filters.timeRange));
       }
@@ -929,38 +931,61 @@ const compareWithZeroBottom = (aVal: number, bVal: number) => {
           </StatsModule>
 
                      {/* Performance Trends Module */}
-           <StatsModule title="Performance Trends" icon={<RiseOutlined />} minHeight="240px" data-section="game-analysis">
-             {trends && trends.length > 0 ? (
-               <ResponsiveContainer width="100%" height={180}>
-                 <LineChart data={trends}>
-                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                   <XAxis dataKey="game" stroke="#fff" fontSize={12} />
-                   <YAxis stroke="#fff" fontSize={12} />
-                   <RechartsTooltip 
-                     contentStyle={{ 
-                       background: '#17375c', 
-                       border: '1px solid rgba(255,255,255,0.2)',
-                       color: '#ffffff',
-                       borderRadius: '8px'
-                     }}
-                   />
-                   <Line type="monotone" dataKey="ppg" stroke="#1890ff" strokeWidth={2} dot={{ fill: '#1890ff' }} />
-                   <Line type="monotone" dataKey="oppg" stroke="#ff4d4f" strokeWidth={2} dot={{ fill: '#ff4d4f' }} />
-                 </LineChart>
-               </ResponsiveContainer>
-             ) : (
-               <div style={{ 
-                 display: 'flex', 
-                 alignItems: 'center', 
-                 justifyContent: 'center', 
-                 height: '180px',
-                 color: '#b0b0b0',
-                 fontSize: '14px'
-               }}>
-                 {loading ? 'Loading performance data...' : 'No performance data available'}
-               </div>
-             )}
-           </StatsModule>
+           <div 
+             onClick={() => setShowPerformanceTrendsModal(true)}
+             style={{ cursor: 'pointer' }}
+           >
+             <StatsModule title="Performance Trends" icon={<RiseOutlined />} minHeight="240px" data-section="game-analysis">
+               {trends && trends.length > 0 ? (
+                 <div style={{ marginLeft: '-10px', marginRight: '-5px', width: 'calc(100% + 10px)' }}>
+                   <ResponsiveContainer width="100%" height={180}>
+                     <LineChart data={trends} margin={{ left: -10, right: 10, top: 5, bottom: 5 }}>
+                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                       <XAxis dataKey="game" stroke="#fff" fontSize={12} />
+                       <YAxis stroke="#fff" fontSize={12} width={35} />
+                     <RechartsTooltip 
+                       contentStyle={{ 
+                         background: '#0f1419', 
+                         border: '1px solid rgba(255,255,255,0.2)',
+                         color: '#ffffff',
+                         borderRadius: '8px'
+                       }}
+                       formatter={(value: any, name: string, props: any) => {
+                         // Get dataKey from props, payload data, or name parameter
+                         let dataKey = props.dataKey;
+                         if (!dataKey && props.payload) {
+                           dataKey = props.payload.ppg === value ? 'ppg' : 'oppg';
+                         }
+                         if (!dataKey) {
+                           // Fallback: check name parameter
+                           dataKey = (name === 'ppg' || name === 'Points For') ? 'ppg' : 'oppg';
+                         }
+                         return [`${value}`, dataKey === 'ppg' ? 'PPG' : 'OPPG'];
+                       }}
+                       labelFormatter={(label: any, payload: any) => {
+                         const gameName = payload?.[0]?.payload?.gameName;
+                         return gameName ? `Game ${label}: ${gameName}` : `Game ${label}`;
+                       }}
+                     />
+                     <Line type="monotone" dataKey="ppg" stroke="#1890ff" strokeWidth={2} dot={{ fill: '#1890ff' }} />
+                     <Line type="monotone" dataKey="oppg" stroke="#ff4d4f" strokeWidth={2} dot={{ fill: '#ff4d4f' }} />
+                   </LineChart>
+                 </ResponsiveContainer>
+                 </div>
+               ) : (
+                 <div style={{ 
+                   display: 'flex', 
+                   alignItems: 'center', 
+                   justifyContent: 'center', 
+                   height: '180px',
+                   color: '#b0b0b0',
+                   fontSize: '14px'
+                 }}>
+                   {loading ? 'Loading performance data...' : 'No performance data available'}
+                 </div>
+               )}
+             </StatsModule>
+           </div>
 
           
         </div>
@@ -2373,6 +2398,106 @@ const compareWithZeroBottom = (aVal: number, bVal: number) => {
         }}>
           <strong>PDF Export:</strong> Captures the dashboard as a visual screenshot, perfect for reports and presentations.
         </div>
+      </div>
+    </Modal>
+
+    {/* Performance Trends Modal */}
+    <Modal
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <RiseOutlined style={{ color: '#B58842' }} />
+          <span style={{ color: '#fff' }}>Performance Trends</span>
+        </div>
+      }
+      open={showPerformanceTrendsModal}
+      onCancel={() => setShowPerformanceTrendsModal(false)}
+      footer={null}
+      width={900}
+      style={{ top: 20 }}
+      styles={{
+        header: {
+          background: '#17375c',
+          borderBottom: '1px solid rgba(255,255,255,0.1)'
+        },
+        body: {
+          background: '#17375c',
+          borderRadius: '8px'
+        },
+        content: {
+          background: '#17375c'
+        }
+      }}
+    >
+      <div style={{ padding: '20px 0', background: '#17375c' }}>
+        {trends && trends.length > 0 ? (
+          <ResponsiveContainer width="100%" height={500}>
+            <LineChart data={trends}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <XAxis 
+                dataKey="game" 
+                stroke="#fff" 
+                fontSize={14}
+                tick={{ fill: '#fff' }}
+              />
+              <YAxis 
+                stroke="#fff" 
+                fontSize={14}
+                tick={{ fill: '#fff' }}
+              />
+              <RechartsTooltip 
+                contentStyle={{ 
+                  background: '#0f1419', 
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#ffffff',
+                  borderRadius: '8px'
+                }}
+                formatter={(value: any, name: string, props: any) => {
+                  // Get dataKey from props, payload data, or name parameter
+                  let dataKey = props.dataKey;
+                  if (!dataKey && props.payload) {
+                    dataKey = props.payload.ppg === value ? 'ppg' : 'oppg';
+                  }
+                  if (!dataKey) {
+                    // Fallback: check name parameter
+                    dataKey = (name === 'ppg' || name === 'Points For') ? 'ppg' : 'oppg';
+                  }
+                  return [`${value}`, dataKey === 'ppg' ? 'PPG' : 'OPPG'];
+                }}
+                labelFormatter={(label: any, payload: any) => {
+                  const gameName = payload?.[0]?.payload?.gameName;
+                  return gameName ? `Game ${label}: ${gameName}` : `Game ${label}`;
+                }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="ppg" 
+                stroke="#1890ff" 
+                strokeWidth={3} 
+                dot={{ fill: '#1890ff', r: 5 }} 
+                name="Points For"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="oppg" 
+                stroke="#ff4d4f" 
+                strokeWidth={3} 
+                dot={{ fill: '#ff4d4f', r: 5 }} 
+                name="Points Against"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            height: '500px',
+            color: '#b0b0b0',
+            fontSize: '16px'
+          }}>
+            {loading ? 'Loading performance data...' : 'No performance data available'}
+          </div>
+        )}
       </div>
     </Modal>
 

@@ -5,7 +5,6 @@ import { memo, useEffect, useState } from 'react'
 import CloseIcon from '@/components/icon/close.svg'
 import style from './style.module.scss'
 import api from '@/services/api'
-import { locations } from '@/utils/constants'
 import { stringify } from 'querystring'
 import { useRouter, useSearchParams } from 'next/navigation'
 import convertSearchParams, { formatPayload } from '@/utils/app'
@@ -32,6 +31,12 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
         (item: any) => ({label: item.name, value: item.id}), 
         []
       )
+      // Sort so "Other" appears at the end
+      eventTypeOptions.sort((a, b) => {
+        if (a.label.toLowerCase() === 'other') return 1
+        if (b.label.toLowerCase() === 'other') return -1
+        return a.label.localeCompare(b.label)
+      })
       setEventTypes(eventTypeOptions)
     } catch (error) {
       console.error('Error fetching event types:', error)
@@ -114,26 +119,9 @@ function Filter({ isOpen, showOpen, onFilter } : any) {
         <div className={style.subtitle}>Event Type</div>
         <Form.Item name="eventTypeIds">
           <Select placeholder="Select Event Type" mode="multiple" allowClear loading={loading}>
-            {eventTypes.map((item: any) => (<Select.Option value={item.value}>{item.label}</Select.Option>))}
+            {eventTypes.map((item: any) => (<Select.Option key={item.value} value={item.value}>{item.label}</Select.Option>))}
           </Select>
         </Form.Item>
-
-        <div className={style.subtitle}>Location</div>
-        <Form.Item label="Address" name="location" style={{ marginBottom: 12 }}>
-          <Select placeholder="Select Event Address">
-            {locations.map((item: any) => (<Select.Option value={item.value}>{item.label}</Select.Option>))}
-          </Select>
-        </Form.Item>
-         <Form.Item shouldUpdate={(prev, curr) => prev.location !== curr.location}>
-            {({ getFieldValue }) => {
-              const location = getFieldValue('location')
-              return location ? (
-                <Form.Item label="Away Address" name="venue">
-                  <Input />
-                </Form.Item>
-              ) : null
-            }}
-          </Form.Item>
 
         <Flex style={{ marginTop: 24, gap: 8 }}>
           <Button onClick={reset} style={{ flex: 1 }}>

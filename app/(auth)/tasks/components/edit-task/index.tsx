@@ -141,18 +141,19 @@ function EditTask({ task, isOpen, showOpen, onRefresh } : any) {
       }
 
       // Process the users data
+      // The /api/users endpoint returns users with first_name, last_name, full_name, email directly
       const processedUsers = users.map((user: any) => {
-        // Extract name from user_metadata
-        const firstName = user.user_metadata?.first_name || ''
-        const lastName = user.user_metadata?.last_name || ''
-        const fullName = user.user_metadata?.full_name || ''
+        // Extract name from direct fields (from users table) or user_metadata (legacy)
+        const firstName = user.first_name || user.user_metadata?.first_name || ''
+        const lastName = user.last_name || user.user_metadata?.last_name || ''
+        const fullName = user.full_name || user.user_metadata?.full_name || ''
         
         // Create display name
         let displayName = ''
         if (fullName) {
           displayName = fullName
         } else if (firstName && lastName) {
-          displayName = `${firstName} ${lastName}`
+          displayName = `${firstName} ${lastName}`.trim()
         } else if (firstName) {
           displayName = firstName
         } else {

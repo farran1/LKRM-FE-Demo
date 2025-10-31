@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithAuth } from '@/lib/supabase';
 
+// Helper function to extract opponent name from event name when oppositionTeam is null
+function extractOpponentFromEventName(eventName: string | null | undefined): string | null {
+  if (!eventName) return null;
+  
+  // Common patterns to extract opponent name:
+  // "Milton HS V. Williams HS" -> "Williams HS"
+  // "JL Mann VS Dutch Fork HS" -> "Dutch Fork HS"
+  // "Away Game vs. Westside High" -> "Westside High"
+  // "Season Opener vs. Central High" -> "Central High"
+  
+  const patterns = [
+    /\s+[Vv][Ss]\.?\s+(.+)/i,      // "VS" or "Vs" or "vs"
+    /\s+[Vv]\.?\s+(.+)/i,           // "V" or "v" or "V."
+    /\s+vs\.?\s+(.+)/i,             // "vs" or "vs."
+    /\s+versus\s+(.+)/i,            // "versus"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = eventName.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to get opponent name with fallbacks
+function getOpponentName(event: any): string {
+  // Priority 1: Use oppositionTeam if available
+  if (event?.oppositionTeam) {
+    return event.oppositionTeam;
+  }
+  
+  // Priority 2: Extract from event name
+  const extractedName = extractOpponentFromEventName(event?.name);
+  if (extractedName) {
+    return extractedName;
+  }
+  
+  // Priority 3: Fallback to "Unknown"
+  return 'Unknown';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { client: supabase, user } = await createServerClientWithAuth(request)
@@ -10,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url);
-    const season = searchParams.get('season') || '2024-25';
+    const season = searchParams.get('season') || '2025-26';
     const timeRange = searchParams.get('timeRange') || 'season';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -114,7 +158,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: session.id,
-        opponent: session.events?.oppositionTeam || 'Unknown',
+        opponent: getOpponentName(session.events),
         date: session.events?.startTime || session.created_at,
         result,
         score: `${teamScore}-${opponentScore}`,
@@ -128,7 +172,12 @@ export async function GET(request: NextRequest) {
       };
     }) || [];
 
-    return NextResponse.json(gameStats);
+    // Filter out games with 0-0 scores
+    const filteredGameStats = gameStats.filter((game: any) => {
+      return !(game.ppg === 0 && game.oppg === 0);
+    });
+
+    return NextResponse.json(filteredGameStats);
   } catch (error) {
     console.error('Error in games stats API:', error);
     

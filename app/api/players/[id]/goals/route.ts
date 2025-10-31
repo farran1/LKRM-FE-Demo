@@ -44,6 +44,7 @@ export async function GET(
 		}
 
 		// Get player goals
+		// Note: createdBy is an integer field (legacy) with no foreign key to auth_users
 		const { data: goals, error } = await (supabase as any)
 			.from('player_goals')
 			.select(`
@@ -54,16 +55,25 @@ export async function GET(
 				isAchieved,
 				category,
 				createdAt,
-				created_at
+				created_at,
+				createdBy
 			`)
 			.eq('playerId', playerId)
 			.order('createdAt', { ascending: false })
 
 		if (error) {
-			return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 })
+			console.error('Error fetching goals:', error);
+			return NextResponse.json({ error: 'Failed to fetch goals', details: error.message }, { status: 500 })
 		}
 
-		return NextResponse.json({ goals: goals || [] })
+		// Transform goals to include createdUser for NoteList component
+		// Since createdBy is just an integer with no user mapping, set createdUser to null
+		const transformedGoals = (goals || []).map((g: any) => ({
+			...g,
+			createdUser: null  // No user mapping available for legacy integer createdBy
+		}))
+		
+		return NextResponse.json({ goals: transformedGoals })
 	} catch (error) {
 		return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 	}
@@ -103,6 +113,8 @@ export async function POST(
 		const { title, description, target_value, priority, deadline } = validatedData
 
 		// Create new goal
+		// Note: createdBy is an integer field (legacy), set to 0 as fallback
+		// TODO: Consider migrating to UUID or removing this constraint
 		const { data: goal, error } = await (supabase as any)
 			.from('player_goals')
 			.insert({
@@ -112,7 +124,7 @@ export async function POST(
 				targetDate: deadline || null,
 				isAchieved: false,
 				category: priority || 'medium',
-				createdBy: parseInt(user.id) || 0
+				createdBy: 0  // Legacy integer field, no mapping to auth.users
 			})
 			.select(`
 				id,
@@ -122,15 +134,24 @@ export async function POST(
 				isAchieved,
 				category,
 				createdAt,
-				created_at
+				created_at,
+				createdBy
 			`)
 			.single()
 
 		if (error) {
-			return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 })
+			console.error('Error creating goal:', error);
+			return NextResponse.json({ error: 'Failed to create goal', details: error.message }, { status: 500 })
 		}
 
-		return NextResponse.json({ goal }, { status: 201 })
+		// Transform goal to include createdUser for NoteList component
+		// Since createdBy is just an integer with no user mapping, set createdUser to null
+		const transformedGoal = {
+			...goal,
+			createdUser: null  // No user mapping available for legacy integer createdBy
+		}
+		
+		return NextResponse.json({ goal: transformedGoal }, { status: 201 })
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			return NextResponse.json({ error: 'Invalid input data', details: error.issues }, { status: 400 })

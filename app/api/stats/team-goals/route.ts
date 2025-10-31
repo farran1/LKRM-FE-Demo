@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url);
-    const season = searchParams.get('season') || '2024-25';
+    const season = searchParams.get('season') || '2025-26';
     const status = searchParams.get('status') || 'active';
     const visibility = searchParams.get('visibility');
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         target_value: parseFloat(target_value),
         comparison_operator,
         period_type: period_type || 'per_game',
-        season: season || '2024-25',
+        season: season || '2025-26',
         competition_filter: competition_filter || {},
         status: 'active',
         created_by: user.id // Use authenticated user ID

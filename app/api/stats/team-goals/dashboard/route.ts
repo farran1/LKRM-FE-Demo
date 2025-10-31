@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url);
-    const season = searchParams.get('season') || '2024-25';
+    const season = searchParams.get('season') || '2025-26';
     const limit = parseInt(searchParams.get('limit') || '10');
 
     // Get all active goals with their metrics

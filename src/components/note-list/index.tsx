@@ -79,7 +79,7 @@ function NoteList({ notes, deleteNote, onNoteDeleted, playerId, itemType }: Note
   }, [])
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteModal.note?.id) return
+    if (!deleteModal.note?.id || !playerId) return
 
     setDeleteModal(prev => ({ ...prev, loading: true }))
 
@@ -88,13 +88,17 @@ function NoteList({ notes, deleteNote, onNoteDeleted, playerId, itemType }: Note
         ? `/api/players/${playerId}/notes/${deleteModal.note.id}`
         : `/api/players/${playerId}/goals/${deleteModal.note.id}`
       
-      console.log('Deleting item:', { endpoint, noteId: deleteModal.note.id, itemType })
+      console.log('Deleting item:', { endpoint, noteId: deleteModal.note.id, itemType, playerId })
       
       const response = await api.delete(endpoint)
       console.log('Delete response:', response)
       
-      // Check if the deletion was successful
-      if ((response as any)?.status && (response as any).status < 400) {
+      // The API service returns { data, status } format
+      // Check if the deletion was successful (status < 400 or response.data exists)
+      const status = (response as any)?.status
+      const responseData = (response as any)?.data
+      
+      if ((status && status < 400) || responseData) {
         message.success(`${itemType === 'note' ? 'Note' : 'Goal'} deleted successfully`)
         
         console.log('Calling onNoteDeleted with:', deleteModal.note.id)
@@ -102,11 +106,14 @@ function NoteList({ notes, deleteNote, onNoteDeleted, playerId, itemType }: Note
         
         setDeleteModal({ isOpen: false, note: null, loading: false })
       } else {
-        throw new Error('Delete operation failed')
+        // If no clear success indicator, check if there's an error
+        const errorMessage = responseData?.error || 'Delete operation failed'
+        throw new Error(errorMessage)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error deleting ${itemType}:`, error)
-      message.error(`Failed to delete ${itemType}. Please try again.`)
+      const errorMessage = error?.message || error?.data?.error || `Failed to delete ${itemType}. Please try again.`
+      message.error(errorMessage)
       setDeleteModal(prev => ({ ...prev, loading: false }))
     }
   }, [deleteModal.note, playerId, itemType, onNoteDeleted, message])

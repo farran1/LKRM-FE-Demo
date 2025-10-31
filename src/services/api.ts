@@ -562,7 +562,13 @@ async function routeDelete(path: string) {
 				method: 'DELETE',
 				headers,
 			})
-			const json = await resp.json().catch(() => undefined)
+			
+			if (!resp.ok) {
+				const errorData = await resp.json().catch(() => ({}))
+				throw new Error(`HTTP error! status: ${resp.status}, message: ${errorData.error || 'Unknown error'}`)
+			}
+			
+			const json = await resp.json().catch(() => ({}))
 			return ok(json, resp.status)
 		}
 		

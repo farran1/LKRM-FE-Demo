@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithAuth } from '@/lib/supabase';
 
+// Helper function to extract opponent name from event name when oppositionTeam is null
+function extractOpponentFromEventName(eventName: string | null | undefined): string | null {
+  if (!eventName) return null;
+  
+  // Common patterns to extract opponent name:
+  // "Milton HS V. Williams HS" -> "Williams HS"
+  // "JL Mann VS Dutch Fork HS" -> "Dutch Fork HS"
+  // "Away Game vs. Westside High" -> "Westside High"
+  // "Season Opener vs. Central High" -> "Central High"
+  
+  const patterns = [
+    /\s+[Vv][Ss]\.?\s+(.+)/i,      // "VS" or "Vs" or "vs"
+    /\s+[Vv]\.?\s+(.+)/i,           // "V" or "v" or "V."
+    /\s+vs\.?\s+(.+)/i,             // "vs" or "vs."
+    /\s+versus\s+(.+)/i,            // "versus"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = eventName.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to get opponent name with fallbacks
+function getOpponentName(event: any): string {
+  // Priority 1: Use oppositionTeam if available
+  if (event?.oppositionTeam) {
+    return event.oppositionTeam;
+  }
+  
+  // Priority 2: Extract from event name
+  const extractedName = extractOpponentFromEventName(event?.name);
+  if (extractedName) {
+    return extractedName;
+  }
+  
+  // Priority 3: Fallback to event name or "Unknown"
+  return event?.name || 'Unknown';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { client: supabase, user } = await createServerClientWithAuth(request);
@@ -10,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url);
-    const season = searchParams.get('season') || '2024-25';
+    const season = searchParams.get('season') || '2025-26';
     const timeRange = searchParams.get('timeRange') || 'season';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -39,7 +83,9 @@ export async function GET(request: NextRequest) {
         game_state,
         created_at,
         events (
-          startTime
+          name,
+          startTime,
+          oppositionTeam
         ),
         live_game_events (
           event_type,
@@ -109,7 +155,8 @@ export async function GET(request: NextRequest) {
         ppg: teamScore,
         oppg: opponentScore,
         date: session.events?.startTime || session.created_at,
-        margin: teamScore - opponentScore
+        margin: teamScore - opponentScore,
+        gameName: getOpponentName(session.events)
       };
     }) || [];
 

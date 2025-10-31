@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url);
-    const season = searchParams.get('season') || '2024-25';
+    const season = searchParams.get('season') || '2025-26';
     const timeRange = searchParams.get('timeRange') || 'season';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');

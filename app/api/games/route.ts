@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       away_score: away_score || 0,
       result: result || 'WIN',
       game_date: new Date().toISOString(),
-      season: '2024-25',
+      season: '2025-26',
       is_playoffs: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()

@@ -1,4 +1,4 @@
-import { Button, Col, DatePicker, Drawer, Flex, Form, Input, Row, Select, Switch, TimePicker, Typography, Radio, Checkbox } from 'antd'
+import { Button, Col, DatePicker, Drawer, Flex, Form, Input, Row, Select, Switch, TimePicker, Typography, Radio, Checkbox, App } from 'antd'
 import { memo, useEffect, useMemo, useState } from 'react'
 import CloseIcon from '@/components/icon/close.svg'
 import style from './style.module.scss'
@@ -36,6 +36,7 @@ function extractArrayFromApiResponse(value: unknown): unknown[] {
 }
 
 function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [eventTypes, setEventTypes] = useState<Array<{ label: string; value: number }>>([])
   const [isShowModalNewType, showModalNewType] = useState(false)
@@ -104,18 +105,19 @@ function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
       }
 
       // Process the users data
+      // The /api/users endpoint returns users with first_name, last_name, full_name, email directly
       const processedUsers = users.map((user: any) => {
-        // Extract name from user_metadata
-        const firstName = user.user_metadata?.first_name || ''
-        const lastName = user.user_metadata?.last_name || ''
-        const fullName = user.user_metadata?.full_name || ''
+        // Extract name from direct fields (from users table) or user_metadata (legacy)
+        const firstName = user.first_name || user.user_metadata?.first_name || ''
+        const lastName = user.last_name || user.user_metadata?.last_name || ''
+        const fullName = user.full_name || user.user_metadata?.full_name || ''
         
         // Create display name
         let displayName = ''
         if (fullName) {
           displayName = fullName
         } else if (firstName && lastName) {
-          displayName = `${firstName} ${lastName}`
+          displayName = `${firstName} ${lastName}`.trim()
         } else if (firstName) {
           displayName = firstName
         } else {
@@ -161,14 +163,40 @@ function EditEvent({ event, isOpen, showOpen, onRefresh } : any) {
       const allCoachesIndex = payload.attendees.indexOf('all_coaches')
       if (allCoachesIndex !== -1) {
         // If "All Coaches" is selected, replace with all coach IDs
-        const allCoachIds = coaches.map(coach => coach.value)
+        // If coaches state is empty, fetch them first
+        let coachesToUse = coaches
+        if (coachesToUse.length === 0) {
+          try {
+            const response = await api.get('/api/users')
+            const raw: unknown = (response as any)?.data ?? response
+            const users = extractArrayFromApiResponse(raw) as UserApi[]
+            
+            if (Array.isArray(users) && users.length > 0) {
+              coachesToUse = users.map((user: any) => {
+                const firstName = user.first_name || user.user_metadata?.first_name || ''
+                const lastName = user.last_name || user.user_metadata?.last_name || ''
+                const fullName = user.full_name || user.user_metadata?.full_name || ''
+                const displayName = fullName || `${firstName} ${lastName}`.trim() || firstName || user.email?.split('@')[0] || 'Unknown User'
+                return {
+                  label: displayName,
+                  value: user.email || user.id
+                }
+              })
+            }
+          } catch (error) {
+            console.error('Error fetching coaches for "All Coaches":', error)
+          }
+        }
+        
+        const allCoachIds = coachesToUse.map(coach => coach.value).filter(Boolean)
         if (allCoachIds.length > 0) {
           payload.attendees = allCoachIds
           console.log('Replaced "all_coaches" with:', allCoachIds)
         } else {
-          // If no coaches available, remove "all_coaches" from attendees
-          payload.attendees = payload.attendees.filter((attendee: string | number) => attendee !== 'all_coaches')
-          console.warn('No coaches available to replace "all_coaches"')
+          // If no coaches available, show error and don't submit
+          message.error('No coaches available. Please select specific coaches or try again.')
+          setLoading(false)
+          return
         }
       }
     }

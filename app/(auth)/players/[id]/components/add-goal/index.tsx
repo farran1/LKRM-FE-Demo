@@ -21,14 +21,19 @@ function AddGoal({ goals, player, isOpen, showOpen, onRefresh }: any) {
     if (!goal.trim() || !player?.id) return
     setSaving(true)
     try {
-      await api.post(`/api/players/${player.id}/goals`, { goal: goal.trim() })
+      const response = await api.post(`/api/players/${player.id}/goals`, { 
+        title: goal.trim(),
+        description: ''
+      })
+      console.log('Goal save response:', response)
       // Ensure the UI refreshes before notifying
       await Promise.resolve(onRefresh && onRefresh())
       message.success('Goal saved!')
       setGoal('')
-    } catch (error) {
-      message.error('Failed to save goal')
+    } catch (error: any) {
       console.error('Error saving goal:', error)
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to save goal'
+      message.error(errorMessage)
     } finally {
       setSaving(false)
     }

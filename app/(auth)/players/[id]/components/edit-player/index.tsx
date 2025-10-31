@@ -6,7 +6,7 @@ import api from '@/services/api'
 
 function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
   const [loading, setLoading] = useState(false)
-  const [positions, setPositions] = useState<Array<{id: number, name: string}>>([])
+  const [positions, setPositions] = useState<Array<{label: string, value: number}>>([])
   const { message } = App.useApp()
   const [form] = Form.useForm()
 
@@ -29,10 +29,33 @@ function EditPlayer({ player, isOpen, showOpen, onRefresh } : any) {
   }, [player, form])
 
   async function getPositions() {
-    const res = await api.get('/api/positions')
-    if ((res as any)?.data?.data?.length > 0) {
-      const types = (res as any)?.data?.data.map((item: any) => ({label: item.name, value: item.id}))
-      setPositions(types)
+    setLoading(true)
+    try {
+      const res = await api.get('/api/positions')
+      console.log('Positions API response:', res) // Debug log
+      
+      // Check if we have data in the expected format
+      if ((res as any)?.data?.data && Array.isArray((res as any).data.data)) {
+        const types = (res as any).data.data.map((item: any) => ({
+          label: item.name, 
+          value: item.id
+        }))
+        setPositions(types)
+      } else if ((res as any)?.data && Array.isArray((res as any).data)) {
+        // Alternative response format
+        const types = (res as any).data.map((item: any) => ({
+          label: item.name, 
+          value: item.id
+        }))
+        setPositions(types)
+      } else {
+        console.warn('Positions API returned unexpected format:', res)
+      }
+    } catch (error) {
+      console.error('Error fetching positions:', error)
+      message.error('Failed to load positions')
+    } finally {
+      setLoading(false)
     }
   }
 

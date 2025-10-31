@@ -39,8 +39,22 @@ type ComparisonStats = {
 }
 
 const TeamComparisonTable = ({ teamStats, opponentStats, teamName = "HOME", opponentName = "OPPONENT" }: { teamStats: ComparisonStats; opponentStats: ComparisonStats; teamName?: string; opponentName?: string }) => {
-  const getComparisonBar = (teamValue: number, opponentValue: number, statKey: string) => {
-    if (teamValue === opponentValue) return null;
+  const getComparisonBar = (teamValue: number | string, opponentValue: number | string, statKey: string, teamPercent?: number, opponentPercent?: number) => {
+    // For percentage-based stats, compare percentages instead of raw values
+    let teamComparisonValue: number;
+    let opponentComparisonValue: number;
+    
+    if (statKey === 'fg' || statKey === '2p' || statKey === '3p' || statKey === 'ft') {
+      // Use percentages for percentage-based stats
+      teamComparisonValue = teamPercent ?? 0;
+      opponentComparisonValue = opponentPercent ?? 0;
+    } else {
+      // For non-percentage stats, convert to numbers if strings
+      teamComparisonValue = typeof teamValue === 'string' ? parseFloat(String(teamValue)) || 0 : teamValue;
+      opponentComparisonValue = typeof opponentValue === 'string' ? parseFloat(String(opponentValue)) || 0 : opponentValue;
+    }
+    
+    if (teamComparisonValue === opponentComparisonValue) return null;
     
     // Determine which direction is "better" for each stat type
     const isTeamBetter = (() => {
@@ -58,14 +72,14 @@ const TeamComparisonTable = ({ teamStats, opponentStats, teamName = "HOME", oppo
         case 'scp':
         case 'pto':
         case 'bp':
-          return teamValue > opponentValue;
+          return teamComparisonValue > opponentComparisonValue;
         // Lower is better
         case 'to':
         case 'tf':
         case 'f':
-          return teamValue < opponentValue;
+          return teamComparisonValue < opponentComparisonValue;
         default:
-          return teamValue > opponentValue;
+          return teamComparisonValue > opponentComparisonValue;
       }
     })();
     
@@ -147,7 +161,7 @@ const TeamComparisonTable = ({ teamStats, opponentStats, teamName = "HOME", oppo
         fontSize: '14px',
         position: 'relative'
                 }}>
-        {getComparisonBar(stat.teamValue, stat.opponentValue, stat.key)}
+        {getComparisonBar(stat.teamValue, stat.opponentValue, stat.key, stat.teamPercent, stat.opponentPercent)}
                   <Tooltip
                     title={
                       stat.key === 'fg' ? 'Field Goals made/attempted and percentage' :
@@ -2439,6 +2453,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // Sort events by timestamp to process chronologically
     const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp)
     
+    // Track which events have been used in a second chance sequence
+    // This prevents double-counting when multiple missed shots occur
+    const usedScoreEvents = new Set<string>()
+    
     for (let i = 0; i < sortedEvents.length; i++) {
       const event = sortedEvents[i]
       
@@ -2450,6 +2468,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         
         while (j < sortedEvents.length && !foundRebound) {
           const nextEvent = sortedEvents[j]
+          
+          // Skip events that have already been used in another sequence
+          if (usedScoreEvents.has(nextEvent.id)) {
+            j++
+            continue
+          }
           
           // If opponent gets the rebound, break the chain (no second chance)
           if (nextEvent.opponentEvent && nextEvent.eventType === 'rebound') {
@@ -2466,6 +2490,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             while (k < sortedEvents.length) {
               const scoreEvent = sortedEvents[k]
               
+              // Skip events that have already been used in another sequence
+              if (usedScoreEvents.has(scoreEvent.id)) {
+                k++
+                continue
+              }
+              
               // If opponent does ANYTHING (possession changed), break the chain
               if (scoreEvent.opponentEvent) {
                 break
@@ -2476,15 +2506,21 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                 const points = scoreEvent.eventType === 'three_made' ? 3 : 2
                 secondChancePoints += points
                 
-                console.log('🔍 Second Chance Point:', {
-                  missedShot: event.eventType,
-                  rebound: nextEvent.eventType,
-                  score: scoreEvent.eventType,
-                  points,
-                  missedShotTime: event.timestamp,
-                  reboundTime: nextEvent.timestamp,
-                  scoreTime: scoreEvent.timestamp
-                })
+                // Mark this score event as used so it can't be counted again
+                usedScoreEvents.add(scoreEvent.id)
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 Second Chance Point:', {
+                    missedShot: event.eventType,
+                    rebound: nextEvent.eventType,
+                    score: scoreEvent.eventType,
+                    points,
+                    missedShotTime: event.timestamp,
+                    reboundTime: nextEvent.timestamp,
+                  scoreTime: scoreEvent.timestamp,
+                  sequenceId: `${event.id}-${nextEvent.id}-${scoreEvent.id}`
+                  })
+                }
                 break // Found the score, move to next missed shot
               }
               
@@ -2557,6 +2593,10 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     // Sort events by timestamp to process chronologically
     const sortedEvents = [...opponentEvents].sort((a, b) => a.timestamp - b.timestamp)
     
+    // Track which events have been used in a second chance sequence
+    // This prevents double-counting when multiple missed shots occur
+    const usedScoreEvents = new Set<string>()
+    
     for (let i = 0; i < sortedEvents.length; i++) {
       const event = sortedEvents[i]
       
@@ -2569,6 +2609,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         while (j < sortedEvents.length && !foundRebound) {
           const nextEvent = sortedEvents[j]
           
+          // Skip events that have already been used in another sequence
+          if (usedScoreEvents.has(nextEvent.id)) {
+            j++
+            continue
+          }
+          
           // If opponent gets an offensive rebound
           if (nextEvent.eventType === 'rebound') {
             foundRebound = true
@@ -2580,17 +2626,30 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
             while (k < sortedEvents.length && !foundScore) {
               const scoreEvent = sortedEvents[k]
               
+              // Skip events that have already been used in another sequence
+              if (usedScoreEvents.has(scoreEvent.id)) {
+                k++
+                continue
+              }
+              
               // If opponent scores on a field goal, count as second chance
               if (scoreEvent.eventType === 'fg_made' || scoreEvent.eventType === 'three_made') {
                 const points = scoreEvent.eventType === 'three_made' ? 3 : 2
                 secondChancePoints += points
                 foundScore = true
-                console.log('🔍 Opponent Second Chance Point:', {
-                  missedShot: event.eventType,
-                  rebound: nextEvent.eventType,
-                  score: scoreEvent.eventType,
-                  points
-                })
+                
+                // Mark this score event as used so it can't be counted again
+                usedScoreEvents.add(scoreEvent.id)
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 Opponent Second Chance Point:', {
+                    missedShot: event.eventType,
+                    rebound: nextEvent.eventType,
+                    score: scoreEvent.eventType,
+                    points,
+                    sequenceId: `${event.id}-${nextEvent.id}-${scoreEvent.id}`
+                  })
+                }
                 break
               }
               
@@ -2629,12 +2688,14 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         if (opponentEvent.eventType === 'fg_made' || opponentEvent.eventType === 'three_made') {
           const points = opponentEvent.eventType === 'three_made' ? 3 : 2
           pointsOffTurnovers += points
-          console.log('🔍 Opponent Points Off Turnover:', {
-            eventType: opponentEvent.eventType,
-            points,
-            turnoverTime,
-            shotTime: opponentEvent.timestamp
-          })
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 Opponent Points Off Turnover:', {
+              eventType: opponentEvent.eventType,
+              points,
+              turnoverTime,
+              shotTime: opponentEvent.timestamp
+            })
+          }
           break // Found the score for this turnover, move to next turnover
         }
       }
@@ -3700,7 +3761,9 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
     if (pendingReboundEvent) {
       const { eventType, playerId, isOpponent: originalIsOpponent, opponentSlot } = pendingReboundEvent
       
-      console.log('🔍 handleReboundConfirm - Recording missed shot:', { eventType, playerId, originalIsOpponent, opponentSlot })
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 handleReboundConfirm - Recording missed shot:', { eventType, playerId, originalIsOpponent, opponentSlot })
+      }
       
       // First record the missed shot
       if (originalIsOpponent) {
@@ -3709,37 +3772,53 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         handleStatEvent(playerId, eventType)
       }
       
-      // Then record the rebound if someone got it
+      // Record the rebound if someone got it
+      // Use a slightly later timestamp to ensure proper chronological ordering for second chance point calculation
       if (reboundPlayerId) {
-        if (isOpponent) {
-          // Find the opponent player by slot
-          const opponentPlayer = opponentOnCourt[reboundPlayerId]
-          if (opponentPlayer) {
-            handleOpponentStatEvent(opponentPlayer, 'rebound')
+        // Determine if this is an offensive rebound (same team that missed) or defensive (opponent got it)
+        const isOffensiveRebound = (originalIsOpponent && isOpponent) || (!originalIsOpponent && !isOpponent)
+        
+        // Small delay to ensure missed shot event is recorded and timestamped before rebound
+        setTimeout(() => {
+          if (isOpponent) {
+            // Find the opponent player by slot
+            const opponentPlayer = opponentOnCourt[reboundPlayerId]
+            if (opponentPlayer) {
+              handleOpponentStatEvent(opponentPlayer, 'rebound', 1, { reboundType: isOffensiveRebound ? 'offensive' : 'defensive' })
+            }
+          } else {
+            handleStatEvent(reboundPlayerId, 'rebound', 1, false, { reboundType: isOffensiveRebound ? 'offensive' : 'defensive' })
           }
-        } else {
-          handleStatEvent(reboundPlayerId, 'rebound')
-        }
-      }
 
-      // Update possession windows
-      if (reboundPlayerId) {
-        if (isOpponent) {
+          // Update possession windows after rebound is recorded
+          if (isOpponent) {
+            lastPossessionRef.current = 'away'
+            if (originalIsOpponent) {
+              scpWindowAwayRef.current = true
+            } else {
+              scpWindowHomeRef.current = false
+              ptoWindowHomeRef.current = false
+            }
+          } else {
+            lastPossessionRef.current = 'home'
+            if (!originalIsOpponent) {
+              scpWindowHomeRef.current = true
+            } else {
+              scpWindowAwayRef.current = false
+              ptoWindowAwayRef.current = false
+            }
+          }
+        }, 50) // Increased delay to ensure proper event ordering
+      } else {
+        // No rebound - update possession windows immediately
+        if (originalIsOpponent) {
           lastPossessionRef.current = 'away'
-          if (originalIsOpponent) {
-            scpWindowAwayRef.current = true
-          } else {
-            scpWindowHomeRef.current = false
-            ptoWindowHomeRef.current = false
-          }
+          scpWindowAwayRef.current = false
+          ptoWindowAwayRef.current = false
         } else {
-          lastPossessionRef.current = 'home'
-          if (!originalIsOpponent) {
-            scpWindowHomeRef.current = true
-          } else {
-            scpWindowAwayRef.current = false
-            ptoWindowAwayRef.current = false
-          }
+          lastPossessionRef.current = 'away' // Opponent got possession (no rebound)
+          scpWindowHomeRef.current = false
+          ptoWindowHomeRef.current = false
         }
       }
     }
@@ -3990,10 +4069,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       }
     })
     
-    console.log('🔍 Opponent Player Analytics - Processing events:', {
-      totalOpponentEvents: opponentEvents.length,
-      events: opponentEvents.map(e => ({ type: e.eventType, jersey: e.opponentJersey, value: e.value }))
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Opponent Player Analytics - Processing events:', {
+        totalOpponentEvents: opponentEvents.length,
+        events: opponentEvents.map(e => ({ type: e.eventType, jersey: e.opponentJersey, value: e.value }))
+      })
+    }
     
     opponentEvents.forEach(event => {
       const jersey = event.opponentJersey || 'Unknown'
@@ -4162,10 +4243,12 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
       }
     }).sort((a, b) => b.points - a.points) // Sort by points descending
     
-    console.log('🔍 Opponent Player Analytics - Final result:', {
-      totalPlayers: result.length,
-      players: result.map(p => ({ number: p.number, points: p.points, fgMade: p.fgMade, fgAttempted: p.fgAttempted }))
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Opponent Player Analytics - Final result:', {
+        totalPlayers: result.length,
+        players: result.map(p => ({ number: p.number, points: p.points, fgMade: p.fgMade, fgAttempted: p.fgAttempted }))
+      })
+    }
     
     return result
   }, [events])
@@ -6502,8 +6585,7 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       >
                         Analytics
                       </Button>
-                      {/* Settings under Export (same column, next row) - COMMENTED OUT */}
-                      {/* 
+                      {/* Settings under Export (same column, next row) */}
                       <Button 
                         icon={<SettingOutlined />}
                         onClick={() => { setShowSettingsModal(true); setSuppressNavigationGuard(true) }}
@@ -6511,7 +6593,6 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
                       >
                         Settings
                       </Button>
-                      */}
                     </div>
                   </Col>
                 </Row>
@@ -7724,159 +7805,29 @@ const Statistics: React.FC<StatisticsProps> = ({ eventId, onExit, autoStart = tr
         </div>
       </Modal>
 
-      {/* Settings Modal - COMMENTED OUT */}
-      {/* 
+      {/* Settings Modal */}
       <Modal
         title="Game Settings"
         open={showSettingsModal}
         onCancel={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}
-        width={800}
+        width={500}
         footer={[
-          <Button key="reset" onClick={resetSettings}>
-            Reset to Defaults
-          </Button>,
           <Button key="cancel" onClick={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}>
-            Cancel
-          </Button>,
-          <Button key="save" type="primary" onClick={() => { setShowSettingsModal(false); setSuppressNavigationGuard(false) }}>
-            Save Settings
+            Close
           </Button>
         ]}
       >
-        <Tabs
-          defaultActiveKey="game"
-          size="small"
-          items={[
-            {
-              key: 'game',
-              label: 'Game Configuration',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Quarter Duration (minutes):" controlType="input" value={settings.quarterDuration} onChange={e => saveSettings({ quarterDuration: parseInt(e.target.value) || 10 })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Total Quarters:" controlType="select" value={settings.totalQuarters} onChange={value => saveSettings({ totalQuarters: value })} options={[{value: 4, label: '4 Quarters'}, {value: 2, label: '2 Halves'}, {value: 6, label: '6 Quarters (Youth)'}]} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Timeouts per Team:" controlType="input" value={settings.timeoutCount} onChange={e => saveSettings({ timeoutCount: parseInt(e.target.value) || 4 })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Shot Clock (seconds):" controlType="input" value={settings.shotClock} onChange={e => saveSettings({ shotClock: parseInt(e.target.value) || 30 })} />
-                  </Col>
-                </Row>
-              )
-            },
-            {
-              key: 'workflow',
-              label: 'Workflow',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Auto-pause on Timeout:" controlType="switch" value={settings.autoPauseOnTimeout} onChange={checked => saveSettings({ autoPauseOnTimeout: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Auto-pause on Quarter End:" controlType="switch" value={settings.autoPauseOnQuarterEnd} onChange={checked => saveSettings({ autoPauseOnQuarterEnd: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Confirmations:" controlType="switch" value={settings.showConfirmations} onChange={checked => saveSettings({ showConfirmations: checked })} />
-                  </Col>
-                </Row>
-              )
-            },
-            {
-              key: 'display',
-              label: 'Display',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Show Player Numbers:" controlType="switch" value={settings.showPlayerNumbers} onChange={checked => saveSettings({ showPlayerNumbers: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Positions:" controlType="switch" value={settings.showPositions} onChange={checked => saveSettings({ showPositions: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Efficiency Ratings:" controlType="switch" value={settings.showEfficiencyRatings} onChange={checked => saveSettings({ showEfficiencyRatings: checked })} />
-                  </Col>
-                </Row>
-              )
-            },
-            {
-              key: 'export',
-              label: 'Export',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Auto Export:" controlType="switch" value={settings.autoExport} onChange={checked => saveSettings({ autoExport: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Export Format:" controlType="select" value={settings.exportFormat} onChange={value => saveSettings({ exportFormat: value })} options={[{value: 'json', label: 'JSON'}, {value: 'csv', label: 'CSV'}, {value: 'pdf', label: 'PDF'}]} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Export Interval (minutes):" controlType="input" value={settings.exportInterval} onChange={e => saveSettings({ exportInterval: parseInt(e.target.value) || 5 })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Include Player Stats:" controlType="switch" value={settings.includePlayerStats} onChange={checked => saveSettings({ includePlayerStats: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Include Team Stats:" controlType="switch" value={settings.includeTeamStats} onChange={checked => saveSettings({ includeTeamStats: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Include Lineup Data:" controlType="switch" value={settings.includeLineupData} onChange={checked => saveSettings({ includeLineupData: checked })} />
-                  </Col>
-                </Row>
-              )
-            },
-            {
-              key: 'analytics',
-              label: 'Analytics',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Show Advanced Stats:" controlType="switch" value={settings.showAdvancedStats} onChange={checked => saveSettings({ showAdvancedStats: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Projections:" controlType="switch" value={settings.showProjections} onChange={checked => saveSettings({ showProjections: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Trends:" controlType="switch" value={settings.showTrends} onChange={checked => saveSettings({ showTrends: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Highlight Top Performers:" controlType="switch" value={settings.highlightTopPerformers} onChange={checked => saveSettings({ highlightTopPerformers: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Efficiency Threshold:" controlType="input" value={settings.efficiencyThreshold} onChange={e => saveSettings({ efficiencyThreshold: parseInt(e.target.value) || 15 })} />
-                  </Col>
-                </Row>
-              )
-            },
-            {
-              key: 'notifications',
-              label: 'Notifications',
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <SettingRow label="Halftime Reminder:" controlType="switch" value={settings.halftimeReminder} onChange={checked => saveSettings({ halftimeReminder: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Timeout Reminder:" controlType="switch" value={settings.timeoutReminder} onChange={checked => saveSettings({ timeoutReminder: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Foul Trouble Alert:" controlType="switch" value={settings.foulTroubleAlert} onChange={checked => saveSettings({ foulTroubleAlert: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Strategic Recommendations:" controlType="switch" value={settings.showRecommendations} onChange={checked => saveSettings({ showRecommendations: checked })} />
-                  </Col>
-                  <Col span={12}>
-                    <SettingRow label="Show Quick Actions:" controlType="switch" value={settings.showQuickActions} onChange={checked => saveSettings({ showQuickActions: checked })} />
-                  </Col>
-                </Row>
-              )
-            }
-          ]}
-        />
+        <Row gutter={[16, 16]}>
+          <Col span={24}>
+            <SettingRow 
+              label="Timeouts per Team:" 
+              controlType="input" 
+              value={settings.timeoutCount} 
+              onChange={e => saveSettings({ timeoutCount: parseInt(e.target.value) || 4 })} 
+            />
+          </Col>
+        </Row>
       </Modal>
-      */}
 
 
       {/* Lineup Builder Modal */}

@@ -15,7 +15,10 @@ if (!anon) {
 export const createServerClientWithAuth = async (_request?: Request) => {
 	try {
 		// Create server client with cookies for authentication (App Router)
-		const supabaseClient = createServerComponentClient<Database>({ cookies })
+		const cookieStore = await cookies()
+		const supabaseClient = createServerComponentClient<Database>({ 
+			cookies: () => cookieStore as any
+		})
 
 		// Get the current user from the session
 		const { data: { user }, error } = await supabaseClient.auth.getUser()

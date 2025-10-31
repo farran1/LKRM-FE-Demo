@@ -74,7 +74,7 @@ export const createServerClientWithAuth = async (request: Request) => {
 	// If no authorization header, use App Router server component client with cookies
 	try {
 		const { cookies } = await import('next/headers')
-		const cookieStore = cookies()
+		const cookieStore = await cookies()
 		// Create server client bound to Next.js cookies (App Router)
 		const supabaseClient = createServerComponentClient<Database>({
 			cookies: () => cookieStore as any

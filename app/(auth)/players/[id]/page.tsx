@@ -2,7 +2,6 @@ import { Metadata } from 'next'
 import Page from './player-detail'
 import { Suspense } from 'react'
 import dayjs from 'dayjs'
-import { cookies } from 'next/headers';
 
 const metadata: Metadata = {
   title: "Player Detail | LKRM",
@@ -34,7 +33,15 @@ export async function generateMetadata(
   
   try {
     // Fetch player data for the title
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/players/${id}`)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_SITE_URL
+    if (!apiUrl) {
+      console.error('API URL not configured')
+      return {
+        title: 'Player | LKRM',
+        description: 'Player profile',
+      }
+    }
+    const response = await fetch(`${apiUrl}/api/players/${id}`)
     if (response.ok) {
       const data = await response.json()
       const player = data.player

@@ -203,17 +203,58 @@ function EventDetailModal({ isShowModal, onClose, event, openEdit, onDelete }: E
                 </Flex>
                 {event?.event_coaches && event.event_coaches.length > 0 ? (
                   <div style={{ padding: '8px 0' }}>
-                    {event.event_coaches.map((coach: any, index: number) => (
-                      <div key={index} className={style.task}>
-                        <Flex align='center'>
-                          <UserIcon />
-                          <div>
-                            <div className={style.title}>{coach.coachUsername}</div>
-                            <div className={style.value}>Coach</div>
-                          </div>
-                        </Flex>
-                      </div>
-                    ))}
+                    {event.event_coaches.map((coach: any, index: number) => {
+                      const coachName = coach?.user?.name || coach?.user?.full_name || 
+                        `${coach?.user?.first_name || ''} ${coach?.user?.last_name || ''}`.trim() || 
+                        coach.coachUsername?.split('@')[0] || 'Coach'
+                      const coachEmail = coach?.user?.email || coach.coachUsername
+                      const coachAvatar = coach?.user?.avatar_url
+                      const initials = coachName
+                        .split(' ')
+                        .map((n: string) => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)
+
+                      return (
+                        <div key={index} className={style.task} style={{ marginBottom: '12px' }}>
+                          <Flex align='center' gap={12}>
+                            {coachAvatar ? (
+                              <img 
+                                src={coachAvatar} 
+                                alt={coachName}
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #1890ff, #096dd9)',
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                flexShrink: 0
+                              }}>
+                                {initials}
+                              </div>
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className={style.title} style={{ marginBottom: '4px' }}>{coachName}</div>
+                              <div className={style.value} style={{ fontSize: '12px', color: '#999' }}>{coachEmail}</div>
+                            </div>
+                          </Flex>
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : (
                   <div style={{ color: '#666', fontSize: '14px', padding: '8px 0' }}>

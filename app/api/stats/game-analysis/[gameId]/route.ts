@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithAuth } from '@/lib/supabase';
 
+// Helper function to extract opponent name from event name when oppositionTeam is null
+function extractOpponentFromEventName(eventName: string | null | undefined): string | null {
+  if (!eventName) return null;
+  
+  // Common patterns to extract opponent name:
+  // "Milton HS V. Williams HS" -> "Williams HS"
+  // "JL Mann VS Dutch Fork HS" -> "Dutch Fork HS"
+  // "Away Game vs. Westside High" -> "Westside High"
+  // "Season Opener vs. Central High" -> "Central High"
+  
+  const patterns = [
+    /\s+[Vv][Ss]\.?\s+(.+)/i,      // "VS" or "Vs" or "vs"
+    /\s+[Vv]\.?\s+(.+)/i,           // "V" or "v" or "V."
+    /\s+vs\.?\s+(.+)/i,             // "vs" or "vs."
+    /\s+versus\s+(.+)/i,            // "versus"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = eventName.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to get opponent name with fallbacks
+function getOpponentName(event: any): string {
+  // Priority 1: Use oppositionTeam if available
+  if (event?.oppositionTeam) {
+    return event.oppositionTeam;
+  }
+  
+  // Priority 2: Extract from event name
+  const extractedName = extractOpponentFromEventName(event?.name);
+  if (extractedName) {
+    return extractedName;
+  }
+  
+  // Priority 3: Fallback to "Unknown"
+  return 'Unknown';
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ gameId: string }> }) {
   try {
     const { client: supabase, user } = await createServerClientWithAuth(request);
@@ -575,7 +619,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       gameId: gameId,
       actualGameId: session.game_id, // Add the actual game ID from the session
       eventId: session.event_id, // Add the event ID from the session
-      opponent: session.events?.oppositionTeam || 'Unknown',
+      opponent: getOpponentName(session.events),
       date: session.events?.startTime || session.created_at,
       result,
       score: `${teamScore}-${opponentScore}`,

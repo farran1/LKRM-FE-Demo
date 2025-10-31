@@ -10,9 +10,11 @@ export async function GET(request: NextRequest) {
   try {
     const { client: supabase, user } = await createServerClientWithAuth(request)
     
-    // Use the authenticated client to fetch users from the public.users table
-    // This respects RLS policies and doesn't require service role key
-    const { data: users, error } = await (supabase as any)
+    const { searchParams } = new URL(request.url)
+    const idsParam = searchParams.get('ids')
+    
+    // Build query
+    let query = (supabase as any)
       .from('users')
       .select(`
         id,
@@ -24,7 +26,19 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at
       `)
-      .order('created_at', { ascending: false })
+    
+    // If ids parameter is provided, filter by those IDs
+    if (idsParam) {
+      const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean)
+      if (ids.length > 0) {
+        query = query.in('id', ids)
+      }
+    } else {
+      // Default: order by created_at
+      query = query.order('created_at', { ascending: false })
+    }
+    
+    const { data: users, error } = await query
 
     if (error) {
       console.error('Error fetching users:', error)
@@ -59,10 +73,30 @@ export async function GET(request: NextRequest) {
       AuditSeverity.LOW
     )
 
+    // Transform users to include name and username fields
+    const transformedUsers = (users || []).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      name: u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email?.split('@')[0] || 'Unknown',
+      username: u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email?.split('@')[0] || 'Unknown',
+      first_name: u.first_name,
+      last_name: u.last_name,
+      full_name: u.full_name,
+      avatar_url: u.avatar_url
+    }))
+    
+    // If ids parameter was provided, return format expected by RecentActivityModule
+    if (idsParam) {
+      return NextResponse.json({
+        users: transformedUsers
+      })
+    }
+    
+    // Default response format
     return NextResponse.json({
       success: true,
-      data: users || [],
-      count: users?.length || 0
+      data: transformedUsers,
+      count: transformedUsers.length
     })
 
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Statistic, Table, Tag, Button, Spin, Alert, Tabs, Card, Row, Col, Divider, Tooltip, Input, Select, Modal, App } from 'antd';
+import { Statistic, Table, Tag, Button, Spin, Alert, Tabs, Card, Row, Col, Divider, Tooltip, Input, Select, Modal, App, Space } from 'antd';
 import { 
   ArrowLeftOutlined,
   ArrowUpOutlined,
@@ -24,7 +24,9 @@ import {
   FileTextOutlined,
   EditOutlined,
   PlusOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  ExportOutlined,
+  DownloadOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import TeamComparisonTable, { ComparisonStats } from '../components/TeamComparisonTable';
@@ -52,6 +54,7 @@ export default function GameAnalysisPage() {
   const [players, setPlayers] = useState<any[]>([]);
   const [deletingEvent, setDeletingEvent] = useState<any>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     if (gameId) {
@@ -143,10 +146,12 @@ export default function GameAnalysisPage() {
     try {
       // Get the current session for authentication
       const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Supabase configuration missing')
+      }
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -369,6 +374,138 @@ export default function GameAnalysisPage() {
     return true;
   }).sort((a: any, b: any) => sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp);
 
+  // Export functions
+  const exportGameData = (format: 'csv' | 'json' | 'maxpreps') => {
+    const gameData: any = {
+      exportTime: new Date().toISOString(),
+      gameInfo,
+      teamStats,
+      playerStats,
+      opponentStats: gameAnalysisData?.opponentStats,
+      events,
+      quarterBreakdown
+    };
+
+    if (format === 'maxpreps') {
+      const txtContent = generateMaxPrepsTxt({ players: playerStats });
+      const dataBlob = new Blob([txtContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maxpreps-export-${Date.now()}.txt`;
+      link.click();
+      setShowExportModal(false);
+      return;
+    }
+
+    if (format === 'json') {
+      const dataStr = JSON.stringify(gameData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `game-analysis-${Date.now()}.json`;
+      link.click();
+      setShowExportModal(false);
+    } else if (format === 'csv') {
+      const csvContent = generateCSV(gameData);
+      const dataBlob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `game-analysis-${Date.now()}.csv`;
+      link.click();
+      setShowExportModal(false);
+    }
+  };
+
+  const generateCSV = (gameData: any) => {
+    const headers = ['Player', 'Number', 'Position', 'Minutes', 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Fouls', 'Turnovers', 'FG%', '3PT%', 'FT%', '+/-'];
+    const rows = (gameData.playerStats || []).map((player: any) => [
+      player.name || 'N/A',
+      player.number || '',
+      player.position || '',
+      player.minutesPlayed || 0,
+      player.points || 0,
+      player.rebounds || 0,
+      player.assists || 0,
+      player.steals || 0,
+      player.blocks || 0,
+      player.fouls || 0,
+      player.turnovers || 0,
+      (player.fgAttempted || 0) > 0 ? `${Math.round(((player.fgMade || 0) / (player.fgAttempted || 0)) * 100)}%` : '0%',
+      (player.threeAttempted || 0) > 0 ? `${Math.round(((player.threeMade || 0) / (player.threeAttempted || 0)) * 100)}%` : '0%',
+      (player.ftAttempted || 0) > 0 ? `${Math.round(((player.ftMade || 0) / (player.ftAttempted || 0)) * 100)}%` : '0%',
+      player.plusMinus || 0
+    ]);
+    
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  };
+
+  const generateMaxPrepsTxt = ({ players }: { players: any[] }) => {
+    const supplierId = '00000000000000000000000000000000';
+    const fields = [
+      'Jersey',
+      'MinutesPlayed',
+      'Points',
+      'TwoPointsMade',
+      'TwoPointAttempts',
+      'ThreePointsMade',
+      'ThreePointAttempts',
+      'FreeThrowsMade',
+      'FreeThrowAttempts',
+      'OffensiveRebounds',
+      'DefensiveRebounds',
+      'Rebounds',
+      'Assists',
+      'BlockedShots',
+      'Steals',
+      'Deflections',
+      'Turnovers',
+      'Charges',
+      'PersonalFouls'
+    ];
+
+    const escapeVal = (v: any) => (v === undefined || v === null ? '' : String(v));
+
+    const lines: string[] = [];
+    lines.push(supplierId);
+    lines.push(fields.join('|'));
+
+    (players || []).forEach((p: any) => {
+      const twoMade = Math.max(0, (p.fgMade || 0) - (p.threeMade || 0));
+      const twoAtt = Math.max(0, (p.fgAttempted || 0) - (p.threeAttempted || 0));
+      const defReb = p.defensiveRebounds ?? Math.max(0, (p.rebounds || 0) - (p.offensiveRebounds || 0));
+      const totalReb = p.rebounds ?? ((p.offensiveRebounds || 0) + (defReb || 0));
+
+      const row = [
+        escapeVal(p.number),
+        escapeVal(p.minutesPlayed),
+        escapeVal(p.points),
+        escapeVal(twoMade),
+        escapeVal(twoAtt),
+        escapeVal(p.threeMade),
+        escapeVal(p.threeAttempted),
+        escapeVal(p.ftMade),
+        escapeVal(p.ftAttempted),
+        escapeVal(p.offensiveRebounds),
+        escapeVal(defReb),
+        escapeVal(totalReb),
+        escapeVal(p.assists),
+        escapeVal(p.blocks),
+        escapeVal(p.steals),
+        escapeVal(p.deflections),
+        escapeVal(p.turnovers),
+        escapeVal(p.chargesTaken),
+        escapeVal(p.fouls)
+      ];
+
+      lines.push(row.join('|'));
+    });
+
+    return lines.join('\n') + '\n';
+  };
+
   const formatPlayDescription = (p: any): { actorNode: React.ReactNode; text: string } => {
     const t = String(p.type || '').toLowerCase()
     const actorText = p.player && p.player !== 'N/A'
@@ -436,20 +573,33 @@ export default function GameAnalysisPage() {
           </div>
         </div>
         
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '32px', fontWeight: '700', color: '#1890ff', marginBottom: '4px' }}>
-            {gameInfo?.score || '0-0'}
-          </div>
-          <Tag 
-            color={gameInfo?.result === 'W' ? 'success' : gameInfo?.result === 'L' ? 'error' : 'warning'} 
-            style={{ 
-              fontSize: '16px', 
-              padding: '4px 12px',
-              border: 'none'
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Button
+            icon={<ExportOutlined />}
+            onClick={() => setShowExportModal(true)}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff'
             }}
           >
-            {gameInfo?.result === 'W' ? 'WIN' : gameInfo?.result === 'L' ? 'LOSS' : 'TIE'}
-          </Tag>
+            Export
+          </Button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: '#1890ff', marginBottom: '4px' }}>
+              {gameInfo?.score || '0-0'}
+            </div>
+            <Tag 
+              color={gameInfo?.result === 'W' ? 'success' : gameInfo?.result === 'L' ? 'error' : 'warning'} 
+              style={{ 
+                fontSize: '16px', 
+                padding: '4px 12px',
+                border: 'none'
+              }}
+            >
+              {gameInfo?.result === 'W' ? 'WIN' : gameInfo?.result === 'L' ? 'LOSS' : 'TIE'}
+            </Tag>
+          </div>
         </div>
       </div>
 
@@ -1933,6 +2083,47 @@ export default function GameAnalysisPage() {
         <p>Are you sure you want to delete this event?</p>
         <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>This action cannot be undone.</p>
         
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal
+        title="Export Game Data"
+        open={showExportModal}
+        onCancel={() => setShowExportModal(false)}
+        footer={null}
+        styles={{
+          content: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          header: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          },
+          body: {
+            backgroundColor: '#17375c',
+            color: '#f5f7fa'
+          }
+        }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Button icon={<DownloadOutlined />} onClick={() => exportGameData('json')} block>
+            Export as JSON
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={() => exportGameData('csv')} block>
+            Export as CSV
+          </Button>
+          <Button 
+            icon={<DownloadOutlined />} 
+            onClick={() => exportGameData('maxpreps')} 
+            block
+            style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#ffffff', fontWeight: 700 }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div>Export for MaxPreps (.txt)</div>
+            </div>
+          </Button>
+        </Space>
       </Modal>
     </main>
   );

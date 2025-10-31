@@ -114,6 +114,22 @@ export class SupabaseAPI {
         away_score: number
     }) {
         const client = this.getClient()
+        
+        // Check if session with this key already exists
+        const { data: existingSession, error: checkError } = await (client as any)
+            .from('live_game_sessions')
+            .select('*')
+            .eq('session_key', session.session_key)
+            .single()
+
+        if (existingSession && !checkError) {
+            // Session already exists, return it
+            if (process.env.NODE_ENV === 'development') {
+                console.log('createLiveGameSession: Session already exists, returning existing:', existingSession.id)
+            }
+            return existingSession
+        }
+        
         const { data, error } = await (client as any)
             .from('live_game_sessions')
             .insert({
@@ -131,7 +147,26 @@ export class SupabaseAPI {
             .select()
             .single()
         if (error) {
-            console.error('createLiveGameSession error:', error)
+            // Check if it's a duplicate key error
+            if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+                // Try to get the existing session
+                const { data: duplicateSession } = await (client as any)
+                    .from('live_game_sessions')
+                    .select('*')
+                    .eq('session_key', session.session_key)
+                    .single()
+                
+                if (duplicateSession) {
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('createLiveGameSession: Duplicate session key detected, returning existing:', duplicateSession.id)
+                    }
+                    return duplicateSession
+                }
+            }
+            
+            if (process.env.NODE_ENV === 'development') {
+                console.error('createLiveGameSession error:', error)
+            }
             return null
         }
         return data

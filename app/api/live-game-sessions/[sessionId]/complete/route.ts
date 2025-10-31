@@ -53,7 +53,15 @@ export async function POST(
     // Trigger goal calculations
     try {
       console.log('Triggering goal calculations for session:', sessionId);
-      const calculationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/stats/team-goals/calculate`, {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+      if (!siteUrl) {
+        console.error('NEXT_PUBLIC_SITE_URL not configured, skipping goal calculation')
+        return NextResponse.json({ 
+          session: updatedSession,
+          message: 'Session completed successfully (goal calculation skipped - site URL not configured)'
+        })
+      }
+      const calculationResponse = await fetch(`${siteUrl}/api/stats/team-goals/calculate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

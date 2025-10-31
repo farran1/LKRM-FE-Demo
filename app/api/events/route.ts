@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClientWithAuth } from '@/lib/supabase'
 
+interface CoachUserInfo {
+	id: string | number
+	email: string
+	first_name?: string | null
+	last_name?: string | null
+	full_name?: string | null
+	avatar_url?: string | null
+}
+
 export async function GET(request: NextRequest) {
 	try {
 		const { client: supabase, user } = await createServerClientWithAuth(request)
@@ -83,8 +92,69 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 })
 		}
 
-		console.log('API GET /events - returning:', { events: events?.length || 0 })
-		return NextResponse.json({ data: events || [] })
+		// Fetch user information for coaches from users table
+		let eventsWithCoaches = events || []
+		if (eventsWithCoaches && Array.isArray(eventsWithCoaches)) {
+			const allCoachEmails = new Set<string>()
+			eventsWithCoaches.forEach((event: any) => {
+				if (event?.event_coaches && Array.isArray(event.event_coaches)) {
+					event.event_coaches.forEach((coach: any) => {
+						if (coach.coachUsername) {
+							allCoachEmails.add(coach.coachUsername)
+						}
+					})
+				}
+			})
+
+			if (allCoachEmails.size > 0) {
+				try {
+					const { data: coachUsers, error: usersError } = await (supabase as any)
+						.from('users')
+						.select('id, email, first_name, last_name, full_name, avatar_url')
+						.in('email', Array.from(allCoachEmails))
+
+					if (!usersError && coachUsers) {
+						// Map coach users by email for easy lookup
+						const coachUsersByEmail = new Map<string, CoachUserInfo>(
+							(coachUsers as CoachUserInfo[]).map((u) => [u.email, u])
+						)
+
+						// Enhance event_coaches with user information
+						eventsWithCoaches = eventsWithCoaches.map((event: any) => {
+							if (event?.event_coaches && Array.isArray(event.event_coaches)) {
+								event.event_coaches = event.event_coaches.map((coach: any) => {
+									const userInfo: CoachUserInfo | undefined = coachUsersByEmail.get(coach.coachUsername)
+									return {
+										...coach,
+										user: userInfo ? {
+											id: userInfo.id,
+											email: userInfo.email,
+											name: userInfo.full_name || `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim() || userInfo.email?.split('@')[0] || 'Unknown',
+											first_name: userInfo.first_name,
+											last_name: userInfo.last_name,
+											full_name: userInfo.full_name,
+											avatar_url: userInfo.avatar_url
+										} : {
+											id: null,
+											email: coach.coachUsername,
+											name: coach.coachUsername?.split('@')[0] || 'Unknown',
+											avatar_url: null
+										}
+									}
+								})
+							}
+							return event
+						})
+					}
+				} catch (usersErr) {
+					console.warn('Error fetching coach user info:', usersErr)
+					// Continue without user info enhancement
+				}
+			}
+		}
+
+		console.log('API GET /events - returning:', { events: eventsWithCoaches?.length || 0 })
+		return NextResponse.json({ data: eventsWithCoaches || [] })
 	} catch (error) {
 		console.error('Error fetching events:', error)
 		

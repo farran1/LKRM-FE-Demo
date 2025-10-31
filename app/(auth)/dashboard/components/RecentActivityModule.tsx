@@ -189,34 +189,47 @@ export default function RecentActivityModule() {
             return;
           }
 
-          // Parse the createdBy JSON string to get user info
+          // Parse the createdBy field to get user info
           let createdByUser = null as any;
+          let userName = 'Unassigned';
+          
           try {
             if (typeof task.createdBy === 'string') {
               // Check if it's JSON format
               if (task.createdBy.startsWith('{')) {
-                createdByUser = JSON.parse(task.createdBy);
+                try {
+                  createdByUser = JSON.parse(task.createdBy);
+                  userName = createdByUser.name || createdByUser.email?.split('@')[0] || 'Unknown User';
+                } catch (e) {
+                  // If JSON parse fails, treat as email
+                  userName = task.createdBy.split('@')[0] || 'Unknown User';
+                }
               } else {
-                // It's a simple email string, create a mock user object
-                createdByUser = {
-                  email: task.createdBy,
-                  name: task.createdBy.split('@')[0] || 'Unknown User'
-                };
+                // It's an email string, extract name from email
+                userName = task.createdBy.split('@')[0] || 'Unknown User';
+                // Capitalize first letter and replace dots with spaces
+                userName = userName.split('.').map((word: string) => 
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ') || userName;
               }
-            } else {
+            } else if (task.createdBy) {
               createdByUser = task.createdBy;
+              userName = createdByUser.name || createdByUser.email?.split('@')[0] || 'Unknown User';
             }
           } catch (e) {
-            console.warn('Failed to parse task createdBy:', task.createdBy);
-            // Create a fallback user object
-            createdByUser = {
-              email: task.createdBy || 'unknown@example.com',
-              name: 'Unknown User'
-            };
+            console.warn('Failed to parse task createdBy:', task.createdBy, e);
+            // Fallback: try to extract name from createdBy if it's a string
+            if (typeof task.createdBy === 'string' && task.createdBy.includes('@')) {
+              userName = task.createdBy.split('@')[0] || 'Unknown User';
+            } else {
+              userName = 'Unknown User';
+            }
           }
 
-          // Get user info from the task's users field (already populated by API)
-          const userName = task.users?.username || (createdByUser && createdByUser.name) || 'Unassigned';
+          // If we have a users field (for assignees), prefer that if createdBy parsing failed
+          if (userName === 'Unassigned' && task.users?.username) {
+            userName = task.users.username;
+          }
           
           console.log('Task user resolution:', {
             createdBy: task.createdBy,
@@ -248,17 +261,12 @@ export default function RecentActivityModule() {
       const events = Array.isArray(eventsData) ? eventsData : ((eventsData as any)?.data || []);
       if (events.length > 0) {
         // Fetch user data from auth.users for events
+        // Events.createdBy is a UUID that references auth.users.id
         const eventUserIds = events
           .slice(0, 3)
           .map((event: any) => {
-            try {
-              const createdByParsed = typeof event.createdBy === 'string' && event.createdBy.trim().startsWith('{')
-                ? JSON.parse(event.createdBy)
-                : event.createdBy;
-              return createdByParsed && createdByParsed.id ? createdByParsed.id : event.createdBy;
-            } catch {
-              return event.createdBy;
-            }
+            // createdBy is a UUID, use it directly
+            return event.createdBy;
           })
           .filter(Boolean);
         let userMap = new Map();
@@ -284,24 +292,32 @@ export default function RecentActivityModule() {
         events.slice(0, 3).forEach((event: any) => {
           console.log('Processing event for activity:', event);
           
-          // Try to parse createdBy for name and id
-          let createdByParsed: any = null;
-          try {
-            createdByParsed = typeof event.createdBy === 'string' && event.createdBy.trim().startsWith('{')
-              ? JSON.parse(event.createdBy)
-              : event.createdBy;
-          } catch (e) {
-            console.warn('Failed to parse event createdBy:', event.createdBy);
-          }
-
+          // Events.createdBy is a UUID that references auth.users.id
           // Get user info from the userMap we built earlier
-          const userInfo = (createdByParsed && createdByParsed.id) ? userMap.get(createdByParsed.id) : userMap.get(event.createdBy);
-          const userName = (createdByParsed && createdByParsed.name) || (userInfo && userInfo.name) || 'Unassigned';
+          let userName = 'Unassigned';
+          
+          if (event.createdBy) {
+            // createdBy is a UUID, look it up in the userMap
+            const userInfo = userMap.get(event.createdBy);
+            if (userInfo) {
+              userName = userInfo.name || userInfo.username || userInfo.email?.split('@')[0] || 'Unknown User';
+            } else {
+              // If not in map, try to extract from email if createdBy looks like an email (legacy)
+              if (typeof event.createdBy === 'string' && event.createdBy.includes('@')) {
+                userName = event.createdBy.split('@')[0] || 'Unknown User';
+                userName = userName.split('.').map((word: string) => 
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ') || userName;
+              } else {
+                // It's a UUID but not in map, use fallback
+                userName = 'Unknown User';
+              }
+            }
+          }
           
           console.log('Event user resolution:', {
             createdBy: event.createdBy,
-            createdByParsed,
-            userInfo,
+            userInfo: event.createdBy ? userMap.get(event.createdBy) : null,
             userName
           });
 
@@ -333,7 +349,29 @@ export default function RecentActivityModule() {
           console.log('Processing expense for activity:', expense);
           
           // Get user info from the expense's createdByUser field (already populated by API)
-          const userName = expense.createdByUser?.username || 'Unassigned';
+          let userName = expense.createdByUser?.username || 'Unassigned';
+          
+          // If createdByUser is not available, try to extract from createdBy (email format)
+          if (userName === 'Unassigned' && expense.createdBy) {
+            if (typeof expense.createdBy === 'string') {
+              if (expense.createdBy.includes('@')) {
+                // It's an email, extract name
+                userName = expense.createdBy.split('@')[0] || 'Unknown User';
+                // Capitalize first letter and replace dots with spaces
+                userName = userName.split('.').map((word: string) => 
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ') || userName;
+              } else if (expense.createdBy.startsWith('{')) {
+                // It's JSON format, try to parse
+                try {
+                  const userData = JSON.parse(expense.createdBy);
+                  userName = userData.name || userData.email?.split('@')[0] || 'Unknown User';
+                } catch (e) {
+                  userName = 'Unknown User';
+                }
+              }
+            }
+          }
           
           console.log('Expense user resolution:', {
             createdBy: expense.createdBy,
